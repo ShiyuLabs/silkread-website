@@ -1,0 +1,3 @@
+.venv/
+server/translator.db
+node_modules/
