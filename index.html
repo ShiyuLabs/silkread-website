@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; scroll-behavior: smooth; }
+        .blur-sm { backdrop-filter: blur(4px); }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased font-sans">
@@ -18,11 +19,26 @@
                 <div class="flex items-center">
                     <span class="text-xl font-bold text-blue-600 tracking-tight">AI 智能翻译插件</span>
                 </div>
-                <!-- 导航链接 -->
-                <div class="flex items-center space-x-6 text-sm font-medium text-gray-600">
-                    <a href="#hero" class="hover:text-blue-600 transition-colors">功能介绍</a>
-                    <a href="#pricing" class="hover:text-blue-600 transition-colors">套餐定价</a>
-                    <a href="#contact" class="hover:text-blue-600 transition-colors">联系我们</a>
+                <!-- 导航链接与用户状态 -->
+                <div class="flex items-center">
+                    <div class="hidden md:flex space-x-6 text-sm font-medium text-gray-600">
+                        <a href="#hero" class="hover:text-blue-600 transition-colors">功能介绍</a>
+                        <a href="#pricing" class="hover:text-blue-600 transition-colors">套餐定价</a>
+                        <a href="#contact" class="hover:text-blue-600 transition-colors">联系我们</a>
+                    </div>
+                    
+                    <!-- 用户状态区域 -->
+                    <div class="flex items-center ml-8 md:pl-8 md:border-l border-gray-200">
+                        <!-- 未登录状态 -->
+                        <button id="btn-login-show" class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full shadow-sm transition transform hover:-translate-y-0.5">登录 / 注册</button>
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-info" class="hidden items-center space-x-4">
+                            <span class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="user@example.com">user@example.com</span>
+                            <span class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">余额：10000 豆</span>
+                            <button id="btn-logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">退出</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -44,7 +60,7 @@
         </div>
     </main>
 
-    <!-- 商业定价与套餐 (审核核对点) -->
+    <!-- 商业定价与套餐 -->
     <section id="pricing" class="bg-white py-20 px-4 sm:px-6 lg:px-8 border-t border-gray-100">
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16">
@@ -53,24 +69,24 @@
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- 免费模式 (自带 Key) -->
+                <!-- 免费体验 -->
                 <div class="border rounded-2xl shadow-sm p-8 hover:shadow-xl transition-shadow bg-gray-50 flex flex-col">
-                    <h3 class="text-xl font-bold text-gray-900">自带 Key 模式</h3>
-                    <p class="mt-2 text-sm text-gray-500">适合已经拥有大模型接口的开发者</p>
+                    <h3 class="text-xl font-bold text-gray-900">新注册体验</h3>
+                    <p class="mt-2 text-sm text-gray-500">适合想简单体验插件翻译能力的用户</p>
                     <div class="my-6">
                         <span class="text-4xl font-extrabold text-gray-900">免费</span>
                     </div>
                     <ul class="mb-8 space-y-4 text-gray-600 flex-1">
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>用户自定义 API 接口和秘钥</span>
+                            <span>注册即送初始调用额度</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             <span>免费接入所有内置翻译排版样式</span>
                         </li>
                     </ul>
-                    <button class="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">直接使用</button>
+                    <button class="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">立即注册</button>
                 </div>
 
                 <!-- 基础套餐 -->
@@ -94,7 +110,8 @@
                             <span>默认调用极速高性价比模型匹配日常外文阅读</span>
                         </li>
                     </ul>
-                    <button class="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md">立即购买</button>
+                    <!-- 绑定通过 class "btn-buy" 和 data-price 触发支付流程 -->
+                    <button class="btn-buy w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md transition" data-price="10">立即购买</button>
                 </div>
 
                 <!-- 高级套餐 -->
@@ -118,7 +135,7 @@
                             <span>提供最优专业词库翻译纠正能力</span>
                         </li>
                     </ul>
-                    <button class="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">立即购买</button>
+                    <button class="btn-buy w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition" data-price="50">立即购买</button>
                 </div>
             </div>
         </div>
@@ -127,29 +144,198 @@
     <!-- 合规信息与联系页脚 (Footer) -->
     <footer id="contact" class="bg-gray-900 text-gray-300 py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <!-- 品牌信息 -->
             <div>
                 <span class="text-2xl font-bold text-white mb-4 block">AI 智能翻译插件</span>
-                <p class="text-gray-400 max-w-sm">
-                    我们致力于提供最流畅的智能外文阅读支持，随时随地打破语言壁垒。
-                </p>
+                <p class="text-gray-400 max-w-sm">我们致力于提供最流畅的智能外文阅读支持，随时随地打破语言壁垒。</p>
             </div>
-            
-            <!-- 联系与合规信息 -->
             <div class="flex flex-col md:items-end space-y-2">
                 <p class="font-medium text-white mb-2">联系方式及支持</p>
                 <p>商务及售后 Email：<a href="mailto:support@yourdomain.com" class="text-blue-400 hover:text-blue-300 transition">support@yourdomain.com</a></p>
-                
                 <div class="flex space-x-6 pt-4 mt-4 border-t border-gray-700 w-full md:w-auto">
                     <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">用户协议</a>
                     <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">隐私政策</a>
                 </div>
-                <!-- 底部版权声明 -->
-                <p class="text-xs text-gray-500 pt-6 mt-6 w-full md:text-right">
-                    &copy; 2024 AI 智能翻译插件团队. All rights reserved.
-                </p>
+                <p class="text-xs text-gray-500 pt-6 mt-6 w-full md:text-right">&copy; 2026 AI 智能翻译插件团队. All rights reserved.</p>
             </div>
         </div>
     </footer>
+
+    <!-- ========== 极简登录弹窗 (Login Modal) ========== -->
+    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- 半透明遮罩层 -->
+        <div class="absolute inset-0 bg-black bg-opacity-60 blur-sm" id="login-overlay"></div>
+        <!-- 弹窗内容 -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 transform scale-95 transition-transform duration-300" id="login-box">
+            <button id="close-login" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">登录账号</h3>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="email">邮箱</label>
+                    <input id="email" type="email" placeholder="your@email.com" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="password">密码 / 验证码</label>
+                    <input id="password" type="password" placeholder="******" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
+                </div>
+                <button id="btn-do-login" class="w-full mt-2 py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-colors flex justify-center items-center">
+                    <span>发送验证码 / 登录</span>
+                </button>
+            </div>
+            <p class="text-center text-xs text-gray-400 mt-6">未注册的邮箱验证后将自动创建账号</p>
+        </div>
+    </div>
+
+    <!-- ========== 支付扫码弹窗 (Payment Modal) ========== -->
+    <div id="payment-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <!-- 半透明遮罩层 -->
+        <div class="absolute inset-0 bg-black bg-opacity-60 blur-sm" id="payment-overlay"></div>
+        <!-- 弹窗内容 -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 text-center transform scale-95 transition-transform duration-300" id="payment-box">
+            <button id="close-payment" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-xl font-bold text-gray-900 mb-1">微信扫码支付</h3>
+            <p class="text-sm text-gray-500 mb-2">订单安全支付，即时充值</p>
+            <p id="payment-amount" class="text-4xl font-extrabold text-blue-600 mb-6">￥0.00</p>
+            <!-- 模拟二维码占位 -->
+            <div class="w-48 h-48 mx-auto bg-gray-50 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center mb-6 relative overflow-hidden group hover:border-blue-400 transition">
+                <div class="text-center">
+                    <svg class="mx-auto h-10 w-10 text-blue-400 mb-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span class="text-blue-500 text-sm font-medium">二维码加载中...</span>
+                </div>
+            </div>
+            <div class="bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg inline-flex items-center">
+                <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                请使用微信扫码，支付成功后自动到账
+            </div>
+        </div>
+    </div>
+
+    <!-- 交互逻辑 JS -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // === 全局模拟登录状态 ===
+            let isLoggedIn = false;
+
+            // DOM 节点引用
+            const btnLoginShow = document.getElementById('btn-login-show');
+            const userInfo = document.getElementById('user-info');
+            const btnLogout = document.getElementById('btn-logout');
+            
+            const loginModal = document.getElementById('login-modal');
+            const loginBox = document.getElementById('login-box');
+            const loginOverlay = document.getElementById('login-overlay');
+            const btnDoLogin = document.getElementById('btn-do-login');
+            const closeLoginBtn = document.getElementById('close-login');
+
+            const paymentModal = document.getElementById('payment-modal');
+            const paymentBox = document.getElementById('payment-box');
+            const paymentOverlay = document.getElementById('payment-overlay');
+            const closePaymentBtn = document.getElementById('close-payment');
+            const paymentAmountText = document.getElementById('payment-amount');
+
+            // 购买按钮集合
+            const buyButtons = document.querySelectorAll('.btn-buy');
+
+            // 1. ======= 状态切换逻辑 =======
+            function updateNavState() {
+                if (isLoggedIn) {
+                    btnLoginShow.classList.add('hidden');
+                    userInfo.classList.remove('hidden');
+                    userInfo.classList.add('flex');
+                } else {
+                    btnLoginShow.classList.remove('hidden');
+                    userInfo.classList.add('hidden');
+                    userInfo.classList.remove('flex');
+                }
+            }
+            updateNavState(); // 初始化渲染
+
+            // 2. ======= 模态框控制辅助函数 =======
+            function openModal(modalEl, boxEl) {
+                modalEl.classList.remove('hidden');
+                // 强制重绘，触发过渡动画
+                void modalEl.offsetWidth; 
+                modalEl.classList.remove('opacity-0');
+                boxEl.classList.remove('scale-95');
+            }
+            function closeModal(modalEl, boxEl) {
+                modalEl.classList.add('opacity-0');
+                boxEl.classList.add('scale-95');
+                setTimeout(() => {
+                    modalEl.classList.add('hidden');
+                }, 300); // 和 CSS duration 一致
+            }
+
+            // 登录弹窗开关
+            btnLoginShow.addEventListener('click', () => openModal(loginModal, loginBox));
+            closeLoginBtn.addEventListener('click', () => closeModal(loginModal, loginBox));
+            loginOverlay.addEventListener('click', () => closeModal(loginModal, loginBox));
+
+            // 支付弹窗开关
+            closePaymentBtn.addEventListener('click', () => closeModal(paymentModal, paymentBox));
+            paymentOverlay.addEventListener('click', () => closeModal(paymentModal, paymentBox));
+
+            // 3. ======= 模拟登录 / 登出操作 =======
+            btnDoLogin.addEventListener('click', () => {
+                const originalText = btnDoLogin.innerText;
+                btnDoLogin.innerHTML = `<span class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span> 登录中...`;
+                
+                setTimeout(() => {
+                    isLoggedIn = true;
+                    updateNavState();
+                    closeModal(loginModal, loginBox);
+                    btnDoLogin.innerText = originalText;
+                }, 800); // 模拟网络延迟
+            });
+
+            btnLogout.addEventListener('click', () => {
+                isLoggedIn = false;
+                updateNavState();
+            });
+
+            // 4. ======= 核心购买拦截逻辑 =======
+            buyButtons.forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const price = this.getAttribute('data-price');
+                    
+                    if (!isLoggedIn) {
+                        console.log(`[拦截购买] 未登录状态尝试购买 ${price} 元套餐，需先登录。`);
+                        openModal(loginModal, loginBox);
+                    } else {
+                        console.log(`[发起支付] -> 请求后台获取虎皮椒收款链接，订单金额: ${price} 元`);
+                        paymentAmountText.innerText = `￥${price}.00`;
+                        openModal(paymentModal, paymentBox);
+                        
+                        try {
+                            // 调用现有的 Vercel Serverless API (api/pay.js)
+                            // 注意：此处假设 localStorage 中存有 userId。这里暂用 mock_user_123 演示。
+                            const userId = localStorage.getItem('userId') || 'mock_user_123';
+                            const response = await fetch('/api/pay', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId: userId, amount: price })
+                            });
+                            
+                            const data = await response.json();
+                            if (data.url) {
+                                // 成功获取支付链接，跳转到虎皮椒收银台或者在 iframe/弹窗 中展示
+                                window.location.href = data.url;
+                            } else {
+                                alert('获取支付链接失败: ' + (data.error || '未知错误'));
+                            }
+                        } catch (err) {
+                            console.error('支付请求出错:', err);
+                            alert('支付请求发送失败，请检查网络');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

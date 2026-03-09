@@ -10,187 +10,109 @@
       margin: 0;
       background: #fff;
     }
-    h3 { margin: 0 0 14px 0; font-size: 14px; color: #333; font-weight: 600; }
-    .section { margin-bottom: 14px; }
-    .section-label { font-size: 12px; color: #666; margin-bottom: 6px; font-weight: 500; }
+    h3 { margin: 0 0 14px 0; font-size: 15px; color: #333; font-weight: 700; text-align: center; }
+    .section { margin-bottom: 16px; }
+    .section-label { font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600; }
     button {
-      width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;
+      width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;
       font-size: 13px; cursor: pointer; transition: all 0.2s; font-weight: 600;
     }
-    button:hover { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    button:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
     .btn-primary { background: #4f46e5; color: white; border-color: #4f46e5; }
     .btn-primary.active { background: #10b981; border-color: #10b981; }
     .btn-secondary { background: #f3f4f6; color: #333; border-color: #e5e7eb; }
     .btn-secondary.active { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
-    .status-item { display: flex; align-items: center; font-size: 12px; color: #666; margin-top: 6px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; margin-right: 6px; }
-    .status-dot.active { background: #10b981; }
-    .lang-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
-    .lang-row label { font-size: 12px; color: #666; white-space: nowrap; }
+    .status-item { display: flex; align-items: center; font-size: 12px; color: #666; margin-top: 8px; justify-content: center; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; margin-right: 6px; transition: background 0.3s; }
+    .status-dot.active { background: #10b981; box-shadow: 0 0 4px #10b981; }
+    .lang-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+    .lang-row label { font-size: 12px; color: #555; white-space: nowrap; width: 32px; flex-shrink: 0; font-weight: 500; }
     select {
-      flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 12px; background: #fff; cursor: pointer; color: #333;
+      flex: 1; padding: 8px; border: 1px solid #e5e7eb; border-radius: 8px;
+      font-size: 12px; background: #fff; cursor: pointer; color: #333; transition: border-color 0.2s;
     }
-    select:focus { outline: none; border-color: #4f46e5; }
-    .arrow { font-size: 14px; color: #bbb; }
-    .engine-row { display: flex; gap: 6px; margin-bottom: 4px; }
-    .engine-btn {
-      flex: 1; padding: 8px 4px; border: 1px solid #ddd; border-radius: 6px;
-      font-size: 12px; cursor: pointer; background: #f3f4f6; color: #555;
-      font-weight: 500; text-align: center;
-    }
-    .engine-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+    select:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1); }
+    .arrow { font-size: 14px; color: #9ca3af; font-weight: bold; }
+    
     .sub-panel {
-      background: #f8f9ff; border: 1px solid #e0e3ff; border-radius: 8px;
-      padding: 10px; margin-top: 6px;
+      background: #f8f9ff; border: 1px solid #e0e3ff; border-radius: 10px;
+      padding: 14px 12px; margin-top: 6px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
     }
-    .mode-tab-row { display: flex; gap: 4px; margin-bottom: 8px; }
-    .mode-tab {
-      flex: 1; padding: 6px 4px; border: 1px solid #ddd; border-radius: 5px;
-      font-size: 11px; cursor: pointer; background: #f3f4f6; color: #555;
-      font-weight: 500; text-align: center;
+    
+    .tip { margin-top: 14px; font-size: 11px; color: #888; border-top: 1px solid #f3f4f6; padding-top: 12px; line-height: 1.6; }
+    
+    /* 余额行保护 */
+    .balance-row { 
+      display: flex; align-items: center; justify-content: space-between; 
+      margin-top: 12px; padding-top: 12px; border-top: 1px dashed #c7d2fe; 
     }
-    .mode-tab.active { background: #4f46e5; color: white; border-color: #4f46e5; }
-    .btn-wechat {
-      width: 100%; padding: 8px; border: 1px solid #07c160; border-radius: 6px;
-      font-size: 12px; cursor: pointer; background: #07c160; color: white;
-      font-weight: 500; margin-top: 6px; box-sizing: border-box;
-    }
-    .btn-wechat:hover { background: #06ad56; }
-    .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 600; margin: 4px 0 2px;
-    }
-    .badge-free { background: #d1fae5; color: #065f46; }
-    .lang-row label { font-size: 12px; color: #666; white-space: nowrap; width: 36px; flex-shrink: 0; }
-    select:disabled { background: #f5f5f5; color: #bbb; cursor: not-allowed; }
-    .api-key-input {
-      width: 100%; box-sizing: border-box; padding: 7px 8px;
-      border: 1px solid #ddd; border-radius: 6px; font-size: 12px;
-      font-family: monospace; margin-top: 4px; color: #333; background: #fff;
-    }
-    .api-key-input:focus { outline: none; border-color: #4f46e5; }
-    .key-hint { font-size: 10px; color: #bbb; margin-top: 3px; }
-    .tip { margin-top: 10px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; line-height: 1.7; }
-    /* 余额行 */
-    .balance-row { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
-    .balance-text { font-size: 11px; color: #555; font-weight: 500; }
+    .balance-text { font-size: 13px; color: #374151; font-weight: 700; }
     .btn-topup {
-      padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
-      cursor: pointer; border: none; background: #4f46e5; color: white;
+      padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: none; background: #8b5cf6; color: white; transition: background 0.2s; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
     }
-    .btn-topup:hover { background: #4338ca; }
+    .btn-topup:hover { background: #7c3aed; box-shadow: 0 4px 6px rgba(124, 58, 237, 0.4); transform: translateY(-1px); }
+    .btn-topup:active { transform: translateY(0); }
+    
     /* 充值套餐卡片 */
-    .pkg-row { display: flex; gap: 6px; margin: 10px 0 8px; }
+    .pkg-row { display: flex; gap: 8px; margin: 12px 0 10px; }
     .pkg-card {
-      flex: 1; padding: 8px 4px; border: 2px solid #e5e7eb; border-radius: 8px;
-      text-align: center; cursor: pointer; transition: all 0.15s;
+      flex: 1; padding: 10px 4px; border: 2px solid #f3f4f6; border-radius: 10px;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: #fff;
     }
-    .pkg-card:hover { border-color: #4f46e5; }
-    .pkg-card.selected { border-color: #4f46e5; background: #eef2ff; }
-    .pkg-card .pkg-price { font-size: 15px; font-weight: 700; color: #4f46e5; }
-    .pkg-card .pkg-qty   { font-size: 10px; color: #888; margin-top: 2px; }
-    .pkg-card .pkg-tag   { font-size: 9px; background: #ef4444; color: #fff; border-radius: 4px; padding: 1px 4px; margin-top: 2px; display: inline-block; }
+    .pkg-card:hover { border-color: #8b5cf6; }
+    .pkg-card.selected { border-color: #8b5cf6; background: #f5f3ff; }
+    .pkg-card .pkg-price { font-size: 16px; font-weight: 800; color: #7c3aed; }
+    .pkg-card .pkg-qty   { font-size: 11px; color: #6b7280; margin-top: 4px; font-weight: 500;}
+    .pkg-card .pkg-tag   { font-size: 9px; background: #ef4444; color: #fff; border-radius: 4px; padding: 2px 6px; margin-top: 4px; display: inline-block; font-weight: 600; letter-spacing: 0.5px;}
+    
     /* 充值模态框 */
     .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
       z-index: 100; align-items: center; justify-content: center;
     }
-    .modal-overlay.open { display: flex; }
+    .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
     .modal-box {
-      background: #fff; border-radius: 14px; padding: 18px 16px 14px;
-      width: 258px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+      background: #fff; border-radius: 16px; padding: 20px 18px 16px;
+      width: 258px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      transform: scale(1); animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
-    .modal-box h4 { margin: 0 0 4px; font-size: 14px; color: #222; font-weight: 700; }
-    .modal-price { font-size: 11px; color: #888; margin-bottom: 10px; }
-    .modal-price b { color: #ef4444; font-size: 13px; }
-    /* QR 码付款面板 */
-    .modal-qr-img { width: 170px; height: 170px; object-fit: contain; border-radius: 10px; border: 1px solid #eee; display: block; margin: 0 auto 8px; }
-    .wechat-name-input {
-      width: 100%; box-sizing: border-box; padding: 9px 10px;
-      border: 1px solid #ddd; border-radius: 8px; font-size: 13px;
-      text-align: center; color: #333; margin: 6px 0 2px;
-    }
-    .wechat-name-input:focus { outline: none; border-color: #07c160; }
-    .modal-btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    @keyframes popUp { from { transform: scale(0.95); } to { transform: scale(1); } }
+    
+    .modal-box h4 { margin: 0 0 6px; font-size: 15px; color: #111; font-weight: 800; }
+    .modal-price { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
+    .modal-btn-row { display: flex; gap: 10px; margin-top: 12px; }
     .modal-btn {
-      flex: 1; padding: 9px; border-radius: 8px; font-size: 12px;
-      font-weight: 600; cursor: pointer; border: none;
+      flex: 1; padding: 10px; border-radius: 8px; font-size: 13px;
+      font-weight: 700; cursor: pointer; border: none; transition: all 0.2s;
     }
-    .modal-btn.cancel  { background: #f3f4f6; color: #666; }
-    .modal-btn.confirm { background: #4f46e5; color: white; }
-    .modal-btn.wechat  { background: #07c160; color: white; }
+    .modal-btn.cancel  { background: #f3f4f6; color: #4b5563; }
+    .modal-btn.cancel:hover { background: #e5e7eb; color: #111; }
+    .modal-btn.confirm { background: #4f46e5; color: white; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3); }
+    .modal-btn.confirm:hover { background: #4338ca; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.4); }
   </style>
 </head>
 <body>
-  <h3>🌐 页面翻译助手</h3>
+  <h3> AI 智能翻译助手</h3>
 
-  <!-- 翻译引擎 -->
+  <!-- 核心翻译引擎 -->
   <div class="section">
-    <div class="section-label">翻译引擎</div>
-    <div class="engine-row">
-      <div class="engine-btn" id="engineFree">🆓 免费翻译</div>
-      <div class="engine-btn" id="engineAI">🤖 AI 翻译</div>
-    </div>
-
-    <!-- AI 子面板：仅选 AI 时显示 -->
-    <div class="sub-panel" id="aiSubPanel" style="display:none">
-      <div class="mode-tab-row">
-        <div class="mode-tab" id="tabManaged">🏪 托管版</div>
-        <div class="mode-tab" id="tabByok">🔑 自带 API</div>
+    <div class="section-label">翻译模型与计费</div>
+    <div class="sub-panel">
+      <div class="lang-row">
+        <label>模型</label>
+        <select id="managedModel">
+          <option value="free-translation">【免费】硅基流动基础翻译</option>
+          <option value="deepseek-v3.2">【经济】DeepSeek-V3.2</option>
+          <option value="gpt-5-mini">【大厂】GPT-5 mini</option>
+          <option value="claude-4.5-sonnet">【专业】Claude 4.5 Sonnet</option>
+        </select>
       </div>
-
-      <!-- 托管版 -->
-      <div id="panelManaged">
-        <div class="lang-row">
-          <label>模型</label>
-          <select id="managedModel">
-            <optgroup label="── 经济版 ──">
-              <option value="deepseek">⚡ DeepSeek V3.2</option>
-              <option value="glm" disabled>⚡ GLM-4.7（即将开放）</option>
-              <option value="qwen" disabled>⚡ Qwen Plus（即将开放）</option>
-            </optgroup>
-            <optgroup label="── 高级版 ──">
-              <option value="gpt5-mini" disabled>🌟 GPT-5 mini（升级会员）</option>
-              <option value="claude-haiku" disabled>🌟 Claude 4.5 Haiku（升级会员）</option>
-              <option value="gemini-flash" disabled>🌟 Gemini 3 Flash（升级会员）</option>
-              <option value="grok-fast" disabled>🌟 Grok 4.1 Fast（升级会员）</option>
-            </optgroup>
-            <optgroup label="── 顶级版 ──">
-              <option value="gpt5" disabled>🚀 GPT-5.2（升级 Max）</option>
-              <option value="claude-sonnet" disabled>🚀 Claude 4.5 Sonnet（升级 Max）</option>
-              <option value="gemini-pro" disabled>🚀 Gemini 3 Pro（升级 Max）</option>
-              <option value="kimi-k2" disabled>🚀 Kimi K2（升级 Max）</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="balance-row">
-          <span class="balance-text" id="balanceText">💳 余额: 加载中…</span>
-          <button class="btn-topup" id="topupBtn">充值</button>
-        </div>
-      </div>
-
-      <!-- 自带 API -->
-      <div id="panelByok" style="display:none">
-        <div class="lang-row">
-          <label>服务商</label>
-          <select id="byokProvider">
-            <option value="deepseek">DeepSeek</option>
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="gemini">Google Gemini</option>
-            <option value="xai">xAI (Grok)</option>
-            <option value="moonshot">Moonshot (Kimi)</option>
-            <option value="zhipu">智谱 AI (GLM)</option>
-            <option value="qwen">阿里云 (Qwen)</option>
-          </select>
-        </div>
-        <div class="lang-row">
-          <label>模型</label>
-          <select id="byokModel"></select>
-        </div>
-        <input id="byokApiKey" class="api-key-input" type="password" placeholder="粘贴 API Key" />
-        <div class="key-hint">🔒 Key 仅存于本地浏览器，不经过任何服务器</div>
+      <div class="balance-row">
+        <span class="balance-text" id="balanceText"> 余额: 加载中</span>
+        <button class="btn-topup" id="topupBtn">充值</button>
       </div>
     </div>
   </div>
@@ -215,7 +137,7 @@
         <option value="ar">阿拉伯语</option>
         <option value="it">意大利语</option>
       </select>
-      <span class="arrow">→</span>
+      <span class="arrow"></span>
       <select id="targetLang">
         <option value="zh-CN">中文（简体）</option>
         <option value="zh-TW">中文（繁体）</option>
@@ -235,60 +157,57 @@
 
   <!-- 自动翻译 -->
   <div class="section">
-    <div class="section-label">自动翻译</div>
     <button id="autoTranslateBtn" class="btn-primary">启用自动翻译</button>
     <div class="status-item">
       <span class="status-dot" id="autoDot"></span>
-      <span id="autoStatus">已禁用</span>
+      <span id="autoStatus">已禁用自动翻译</span>
     </div>
   </div>
 
   <!-- 显示模式 -->
   <div class="section">
-    <div class="section-label">显示模式</div>
     <button id="displayModeBtn" class="btn-secondary">切换为译文只显</button>
     <div class="status-item">
-      <span id="modeText">当前: 双语显示</span>
+      <span id="modeText" style="font-weight: 500;">当前: 双语对照显示</span>
     </div>
   </div>
 
   <div class="tip">
-    🆓 免费翻译：Microsoft Edge 服务，无需 Key<br>
-    🏪 托管版：按量计费，充値后自动到账<br>
-    🔑 自带API：DeepSeek / OpenAI / Anthropic / Gemini
+     免费翻译：使用基础免费网络通道<br>
+     托管版：按量计费，充值后自动到账无过期时间限制
   </div>
 
   <!-- 充值套餐模态框 -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal-box">
-      <h4>&#128179; 选择充值套餐</h4>
-      <div class="modal-price">支付后自动到账 &middot; 按 token 扣费 &middot; 永不过期</div>
+      <h4> 选择流量套餐</h4>
+      <div class="modal-price">支付成功秒到账 &middot; 按点数扣费不过期</div>
 
       <div class="pkg-row">
         <div class="pkg-card" data-amount="10" data-credits="100000">
           <div class="pkg-price">&yen;10</div>
-          <div class="pkg-qty">10万字</div>
+          <div class="pkg-qty">1万点数</div>
         </div>
         <div class="pkg-card selected" data-amount="30" data-credits="350000">
           <div class="pkg-price">&yen;30</div>
-          <div class="pkg-qty">35万字</div>
-          <div class="pkg-tag">最划算</div>
+          <div class="pkg-qty">3.5万点数</div>
+          <div class="pkg-tag">超划算</div>
         </div>
         <div class="pkg-card" data-amount="50" data-credits="620000">
           <div class="pkg-price">&yen;50</div>
-          <div class="pkg-qty">62万字</div>
+          <div class="pkg-qty">6.2万点数</div>
         </div>
       </div>
 
-      <div id="modalStatus" style="font-size:11px;color:#888;min-height:16px;margin-bottom:6px;"></div>
+      <div id="modalStatus" style="font-size:12px;color:#6b7280;min-height:18px;margin-bottom:8px;font-weight:500;"></div>
       <div class="modal-btn-row">
-        <button class="modal-btn cancel" id="modalCancel">取消</button>
-        <button class="modal-btn confirm" id="modalPay">去支付</button>
+        <button class="modal-btn cancel" id="modalCancel">先看看</button>
+        <button class="modal-btn confirm" id="modalPay">确认支付</button>
       </div>
-      <div style="margin-top:8px;">
+      <div style="margin-top:12px;">
         <button class="modal-btn" id="modalRefresh"
-          style="width:100%;background:#f3f4f6;color:#555;font-size:11px;">
-          已付款，刷新余额
+          style="width:100%;background:#f9fafb;color:#4b5563;font-size:12px;border:1px solid #e5e7eb;">
+          支付完成？点击刷新余额
         </button>
       </div>
     </div>
