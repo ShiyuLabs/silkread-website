@@ -218,8 +218,17 @@
     <!-- 交互逻辑 JS -->
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // === 全局模拟登录状态 ===
-            let isLoggedIn = false;
+            // === 全局真实登录状态（基于 URL uid 和 localStorage） ===
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUid = urlParams.get('uid');
+            if (urlUid) {
+                localStorage.setItem('userId', urlUid);
+                // 移除 URL 中的 uid，保持地址栏干净
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
+            let userId = localStorage.getItem('userId');
+            let isLoggedIn = !!userId;
 
             // DOM 节点引用
             const btnLoginShow = document.getElementById('btn-login-show');
@@ -280,20 +289,16 @@
             closePaymentBtn.addEventListener('click', () => closeModal(paymentModal, paymentBox));
             paymentOverlay.addEventListener('click', () => closeModal(paymentModal, paymentBox));
 
-            // 3. ======= 模拟登录 / 登出操作 =======
+            // 3. ======= 真实登录 / 登出逻辑 =======
+            // 点击右上角登录时
             btnDoLogin.addEventListener('click', () => {
-                const originalText = btnDoLogin.innerText;
-                btnDoLogin.innerHTML = `<span class="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span> 登录中...`;
-                
-                setTimeout(() => {
-                    isLoggedIn = true;
-                    updateNavState();
-                    closeModal(loginModal, loginBox);
-                    btnDoLogin.innerText = originalText;
-                }, 800); // 模拟网络延迟
+                alert('请在 Chrome 浏览器中安装并打开插件，在插件面板中点击"充值"即可自动登录免密账号！');
+                closeModal(loginModal, loginBox);
             });
 
             btnLogout.addEventListener('click', () => {
+                localStorage.removeItem('userId');
+                userId = null;
                 isLoggedIn = false;
                 updateNavState();
             });
@@ -313,12 +318,12 @@
                         
                         try {
                             // 调用现有的 Vercel Serverless API (api/pay.js)
-                            // 注意：此处假设 localStorage 中存有 userId。这里暂用 mock_user_123 演示。
-                            const userId = localStorage.getItem('userId') || 'mock_user_123';
+                            // 传入从插件同步过来并存在 localStorage 中的 userId
+                            const currentUserId = localStorage.getItem('userId');
                             const response = await fetch('/api/pay', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: userId, amount: price })
+                                body: JSON.stringify({ userId: currentUserId, amount: price })
                             });
                             
                             const data = await response.json();

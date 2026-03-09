@@ -29,9 +29,9 @@ export default async function handler(req, res) {
   const charCount = text.length; 
   let cost = 0;
   
-  if (model === 'deepseek') {
+  if (model.includes('deepseek')) {
     cost = charCount; // 1000 字符扣 1000 积分
-  } else if (model === 'claude') {
+  } else if (model.includes('claude') || model.includes('gpt')) {
     cost = charCount * 50; // 1000 字符扣 50000 积分
   } else {
     return res.status(400).json({ error: 'Unsupported model' });
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   try {
     let resultText = '';
     
-    if (model === 'deepseek') {
+    if (model.includes('deepseek')) {
       const response = await axios.post('https://api.deepseek.com/chat/completions', {
         model: 'deepseek-chat',
         messages: [

@@ -2,7 +2,7 @@
 
 // ===== 代理服务器配置 =====
 // 本地开发: 'http://localhost:8000'  上线后改为你的服务器地址
-const PROXY_URL = 'http://localhost:8000';
+const PROXY_URL = 'https://shiyuai.top';
 
 // 生成或获取用户唯一 ID（UUID 存 chrome.storage.local）
 async function getUserId() {
@@ -34,9 +34,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // 查询余额
   if (request.action === 'getBalance') {
     getUserId().then(userId =>
-      fetch(`${PROXY_URL}/api/balance/${userId}`)
+      fetch(`${PROXY_URL}/api/balance?id=${userId}`)
         .then(r => r.json())
-        .then(data => sendResponse({ ok: true, ...data }))
+        .then(data => sendResponse({ ok: true, balance: data.balance || 0 }))
         .catch(e  => sendResponse({ ok: false, error: e.message }))
     );
     return true;
@@ -207,7 +207,7 @@ async function handleManagedTranslation(text, sourceLang, targetLang, settings) 
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      user_id:     userId,
+      userId:      userId,
       text:        text,
       target_lang: targetLang,
       model:       modelKey,
@@ -222,10 +222,10 @@ async function handleManagedTranslation(text, sourceLang, targetLang, settings) 
 
   const data = await resp.json();
   // 更新本地余额缓存（供 popup 快速显示）
-  if (data.credits_remaining !== undefined) {
-    chrome.storage.local.set({ cachedCredits: data.credits_remaining });
+  if (data.remaining !== undefined) {
+    chrome.storage.local.set({ cachedCredits: data.remaining });
   }
-  return data.translated;
+  return data.translated_text || data.translated;
 }
 
 // ===== 自带 API 翻译（用用户自己的 Key）=====

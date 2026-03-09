@@ -82,21 +82,16 @@ function loadBalance() {
 let selectedPkg = { amount: 30, credits: 350000 };
 
 topupBtn.addEventListener('click', () => {
-  document.getElementById('modalStatus').textContent = '';
-  document.getElementById('modalStatus').style.color = '#6b7280';
-  modalOverlay.classList.add('open');
+  // 从 background.js 获取当前插件随机生成的 userId，并打开充值网页
+  chrome.runtime.sendMessage({ action: 'getUserId' }, (res) => {
+    if (res && res.userId) {
+      const topupUrl = `https://shiyuai.top/?uid=${res.userId}`;
+      chrome.tabs.create({ url: topupUrl });
+    }
+  });
 });
 
-document.getElementById('modalCancel').addEventListener('click', () => {
-  modalOverlay.classList.remove('open');
-});
-
-document.getElementById('modalRefresh').addEventListener('click', () => {
-  modalOverlay.classList.remove('open');
-  loadBalance();
-});
-
-// 套餐卡片选择
+// 套餐卡片选择 (如果已不再需要插件内弹窗，这些可以保留或忽略)
 document.querySelectorAll('.pkg-card').forEach(card => {
   card.addEventListener('click', () => {
     document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('selected'));
