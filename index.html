@@ -237,13 +237,17 @@
             <h3 class="text-xl font-bold text-gray-900 mb-1">微信扫码支付</h3>
             <p class="text-sm text-gray-500 mb-2">订单安全支付，即时充值</p>
             <p id="payment-amount" class="text-4xl font-extrabold text-blue-600 mb-6">￥0.00</p>
-            <!-- 模拟二维码占位 -->
-            <div class="w-48 h-48 mx-auto bg-gray-50 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center mb-6 relative overflow-hidden group hover:border-blue-400 transition">
-                <div class="text-center">
+            <!-- 真实二维码 -->
+            <div id="qrcode-wrap" class="w-48 h-48 mx-auto bg-gray-50 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center mb-6 relative overflow-hidden transition">
+                <div id="qrcode-loading" class="text-center">
                     <svg class="mx-auto h-10 w-10 text-blue-400 mb-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     <span class="text-blue-500 text-sm font-medium">二维码加载中...</span>
+                </div>
+                <img id="qrcode-img" src="" alt="微信支付二维码" class="hidden w-full h-full object-contain rounded-xl" />
+                <div id="qrcode-error" class="hidden text-center px-3">
+                    <span class="text-red-500 text-sm">加载失败，请重试</span>
                 </div>
             </div>
             <div class="bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg inline-flex items-center">
@@ -483,9 +487,15 @@
                         if (!isLoggedIn) {
                             openModal(loginModal, loginBox);
                         } else {
-                            const origText = btn.textContent;
-                            btn.textContent = '加载中...';
-                            btn.disabled = true;
+                            // 先弹窗，显示加载状态
+                            if(paymentAmountText) paymentAmountText.innerText = '￥' + price + '.00';
+                            const qrImg = document.getElementById('qrcode-img');
+                            const qrLoading = document.getElementById('qrcode-loading');
+                            const qrError = document.getElementById('qrcode-error');
+                            qrImg.classList.add('hidden');
+                            qrError.classList.add('hidden');
+                            qrLoading.classList.remove('hidden');
+                            openModal(paymentModal, paymentBox);
                             
                             try {
                                 const currentUserId = localStr.getItem('userId');
@@ -494,18 +504,23 @@
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ userId: currentUserId, amount: price })
                                 });
-                                
                                 const data = await response.json();
-                                if (data.url) {
+                                qrLoading.classList.add('hidden');
+                                if (data.qrcode) {
+                                    qrImg.src = data.qrcode;
+                                    qrImg.classList.remove('hidden');
+                                } else if (data.url) {
+                                    // 降级：没有二维码则新标签页跳转
                                     window.open(data.url, '_blank');
+                                    closeModal(paymentModal, paymentBox);
                                 } else {
-                                    alert('获取支付链接失败: ' + (data.error || '未知错误'));
+                                    qrError.querySelector('span').textContent = data.error || '获取二维码失败';
+                                    qrError.classList.remove('hidden');
                                 }
                             } catch (err) {
-                                alert('网络错误，请稍后再试。');
-                            } finally {
-                                btn.textContent = origText;
-                                btn.disabled = false;
+                                qrLoading.classList.add('hidden');
+                                qrError.querySelector('span').textContent = '网络错误，请稍后再试';
+                                qrError.classList.remove('hidden');
                             }
                         }
                     });

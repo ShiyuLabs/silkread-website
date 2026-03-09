@@ -1,4 +1,5 @@
 ﻿const crypto = require('crypto');
+const axios = require('axios');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -21,7 +22,7 @@ module.exports = async function handler(req, res) {
     appid: appid,
     trade_order_id: 'ORDER_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
     total_fee: amount,
-    title: 'credit recharge',
+    title: '翻译积分充值',
     time: Math.floor(Date.now() / 1000),
     notify_url: 'https://' + req.headers.host + '/api/callback',
     return_url: 'https://' + req.headers.host,
@@ -29,16 +30,33 @@ module.exports = async function handler(req, res) {
     nonce_str: crypto.randomBytes(16).toString('hex')
   };
 
-  const keys = Object.keys(params).sort();
+  // 签名：key ASCII 排序，拼接 key=value&...，末尾直接加 appsecret，MD5
+  const sortedKeys = Object.keys(params).sort();
   let signStr = '';
-  for (const key of keys) {
-    if (params[key] !== '' && params[key] != null) signStr += key + '=' + params[key] + '&';
+  for (const key of sortedKeys) {
+    const val = params[key];
+    if (val !== '' && val != null) {
+      if (signStr) signStr += '&';
+      signStr += key + '=' + val;
+    }
   }
-  signStr = signStr.slice(0, -1) + appsecret;
+  signStr += appsecret;
   params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
-  // Build redirect URL - client's browser hits xunhupay directly, bypassing server-to-server connectivity issues
-  const qs = Object.entries(params).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const payUrl = 'https://api.xunhupay.com/payment/do.html?' + qs;
-  return res.status(200).json({ url: payUrl });
+  try {
+    const formData = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) formData.append(k, String(v));
+    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', formData.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 10000
+    });
+    const data = resp.data;
+    if (data.errcode === 0) {
+      return res.status(200).json({ qrcode: data.url_qrcode, url: data.url });
+    }
+    return res.status(200).json({ error: data.errmsg || 'xunhupay error', code: data.errcode });
+  } catch (e) {
+    const detail = e.response ? JSON.stringify(e.response.data) : e.message;
+    return res.status(200).json({ error: 'request failed: ' + detail });
+  }
 };
