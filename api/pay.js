@@ -1,4 +1,5 @@
 ﻿const crypto = require('crypto');
+const axios = require('axios');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -38,16 +39,14 @@ module.exports = async function handler(req, res) {
   params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
   try {
-    const body = new URLSearchParams(params).toString();
-    const resp = await fetch('https://api.xunhupay.com/payment/do.html', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body
+    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
-    const data = await resp.json();
+    const data = resp.data;
     if (data.errcode === 0) return res.status(200).json({ url: data.url });
-    return res.status(200).json({ error: data.errmsg || 'xunhupay error' });
+    return res.status(200).json({ error: data.errmsg || 'xunhupay error', detail: data });
   } catch (e) {
-    return res.status(200).json({ error: 'request failed: ' + e.message });
+    const msg = e.response ? JSON.stringify(e.response.data) : e.message;
+    return res.status(200).json({ error: 'request failed: ' + msg });
   }
 };
