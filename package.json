@@ -1,1 +1,13 @@
-﻿{"name":"translator-extension-backend","version":"1.0.0"}
+{
+  "name": "translator-extension-backend",
+  "version": "1.0.0",
+  "description": "Vercel serverless backend for translator extension",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@vercel/kv": "^1.0.0",
+    "axios": "^1.6.0"
+  }
+}
