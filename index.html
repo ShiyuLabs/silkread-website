@@ -42,8 +42,8 @@
                         
                         <!-- 已登录状态 -->
                         <div id="user-info" class="hidden items-center space-x-4">
-                            <span class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="user@example.com">user@example.com</span>
-                            <span class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">余额：10000 豆</span>
+                            <span id="nav-user-id" class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="用户ID"></span>
+                            <span id="nav-user-balance" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">已连接插件</span>
                             <button id="btn-logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">退出</button>
                         </div>
                     </div>
@@ -308,12 +308,19 @@
 
             const buyButtons = document.querySelectorAll('.btn-buy');
 
+            const navUserId = document.getElementById('nav-user-id');
+            const navUserBalance = document.getElementById('nav-user-balance');
+
             function updateNavState() {
                 if (isLoggedIn) {
                     if(btnLoginShow) btnLoginShow.classList.add('hidden');
                     if(userInfo) {
                         userInfo.classList.remove('hidden');
                         userInfo.classList.add('flex');
+                    }
+                    if(navUserId && userId) {
+                        navUserId.innerText = userId;
+                        navUserId.title = userId;
                     }
                 } else {
                     if(btnLoginShow) btnLoginShow.classList.remove('hidden');
@@ -514,6 +521,7 @@
     </script>
 </body>
 </html>
+
 
 
 
