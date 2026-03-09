@@ -1,21 +1,18 @@
-﻿const crypto = require('crypto');
-
-module.exports = async function handler(req, res) {
+﻿module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
-
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const { userId, text, model } = req.body;
+  const userId = req.body && req.body.userId;
+  const text = req.body && req.body.text;
+  const model = req.body && req.body.model;
   if (!userId || !text || !model) return res.status(400).json({ error: 'Missing parameters' });
 
   const kvUrl = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
-
-  // 查询余额
   let currentCredits = 0;
   if (kvUrl && kvToken) {
     try {
@@ -25,49 +22,25 @@ module.exports = async function handler(req, res) {
     } catch(e) {}
   }
 
-  const charCount = text.length;
-  let cost = 0;
-  if (model.includes('deepseek')) {
-    cost = charCount;
-  } else if (model.includes('claude') || model.includes('gpt')) {
-    cost = charCount * 50;
-  } else {
-    return res.status(400).json({ error: 'Unsupported model' });
-  }
-
-  if (currentCredits < cost) {
-    return res.status(402).json({ error: 'CREDITS_EXHAUSTED', message: '积分不足，请充值' });
-  }
+  const cost = model.includes('deepseek') ? text.length : text.length * 50;
+  if (currentCredits < cost) return res.status(402).json({ error: 'CREDITS_EXHAUSTED' });
 
   try {
-    let resultText = '';
-
-    if (model.includes('deepseek')) {
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: 'You are a professional translator. Translate the text directly without additional notes.' },
-            { role: 'user', content: text }
-          ]
-        })
-      });
-      const data = await response.json();
-      resultText = data.choices[0].message.content;
-    }
-
-    // 扣费
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'deepseek-chat', messages: [
+        { role: 'system', content: 'You are a professional translator. Translate directly without notes.' },
+        { role: 'user', content: text }
+      ]})
+    });
+    const data = await resp.json();
+    const result = data.choices[0].message.content;
     if (kvUrl && kvToken) {
-      await fetch(kvUrl + '/decrby/user:' + userId + ':credits/' + cost, { headers: { Authorization: 'Bearer ' + kvToken } });
+      await fetch(kvUrl + '/decrby/user:' + userId + ':credits/' + cost, { headers: { Authorization: 'Bearer ' + kvToken } }).catch(()=>{});
     }
-
-    res.status(200).json({ translated_text: resultText, cost: cost, remaining: currentCredits - cost });
-  } catch (error) {
-    res.status(500).json({ error: 'Translation failed: ' + error.message });
+    return res.status(200).json({ translated_text: result, cost, remaining: currentCredits - cost });
+  } catch(e) {
+    return res.status(500).json({ error: 'Translation failed: ' + e.message });
   }
 };

@@ -1,34 +1,30 @@
 ﻿module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method Not Allowed' });
-  const { action, uid, pass } = req.body;
-  
-  if (!uid || typeof uid !== 'string') return res.status(400).json({ success: false, error: '缺少账号标识(UUID)' });
-  if (!pass || typeof pass !== 'string' || pass.length < 4) return res.status(400).json({ success: false, error: '密码最少4位' });
-
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return res.status(200).json({ success: false, error: 'Vercel KV 数据库未配置！' });
-
-  const passKey = 'pass_' + uid;
-
+  const action = req.body && req.body.action;
+  const uid = req.body && req.body.uid;
+  const pass = req.body && req.body.pass;
+  if (!uid || typeof uid !== 'string') return res.status(400).json({ success: false, error: 'missing uid' });
+  if (!pass || pass.length < 4) return res.status(400).json({ success: false, error: 'password too short' });
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  if (!kvUrl || !kvToken) return res.status(200).json({ success: false, error: 'KV not configured' });
   try {
+    const key = 'pass_' + uid;
     if (action === 'bind') {
-      const getRes = await fetch(url + '/get/' + passKey, { headers: { Authorization: 'Bearer ' + token } });
-      const getData = await getRes.json();
-      if (getData.result) return res.status(200).json({ success: false, error: '该插件ID已被绑定，请直接找回！' });
-      
-      await fetch(url + '/set/' + passKey + '/' + pass, { headers: { Authorization: 'Bearer ' + token } });
-      return res.status(200).json({ success: true, message: '绑定成功' });
-    } 
-    else if (action === 'recover') {
-      const getRes = await fetch(url + '/get/' + passKey, { headers: { Authorization: 'Bearer ' + token } });
-      const getData = await getRes.json();
-      if (!getData.result) return res.status(200).json({ success: false, error: '账号不存在或未绑定恢复密码' });
-      if (String(getData.result) !== pass) return res.status(200).json({ success: false, error: '密码错误！' });
-      return res.status(200).json({ success: true, message: '找回成功' });
+      const r = await fetch(kvUrl + '/get/' + key, { headers: { Authorization: 'Bearer ' + kvToken } });
+      const d = await r.json();
+      if (d.result) return res.status(200).json({ success: false, error: 'already bound' });
+      await fetch(kvUrl + '/set/' + key + '/' + pass, { headers: { Authorization: 'Bearer ' + kvToken } });
+      return res.status(200).json({ success: true });
+    } else if (action === 'recover') {
+      const r = await fetch(kvUrl + '/get/' + key, { headers: { Authorization: 'Bearer ' + kvToken } });
+      const d = await r.json();
+      if (!d.result) return res.status(200).json({ success: false, error: 'not found' });
+      if (String(d.result) !== pass) return res.status(200).json({ success: false, error: 'wrong password' });
+      return res.status(200).json({ success: true });
     }
-    return res.status(400).json({ success: false, error: '未知操作' });
-  } catch (e) {
-    return res.status(200).json({ success: false, error: '服务器运行异常: ' + e.message });
+    return res.status(400).json({ success: false, error: 'unknown action' });
+  } catch(e) {
+    return res.status(200).json({ success: false, error: e.message });
   }
 };
