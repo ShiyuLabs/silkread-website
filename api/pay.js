@@ -1,5 +1,4 @@
-﻿const axios = require('axios');
-const crypto = require('crypto');
+﻿const crypto = require('crypto');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true)
@@ -15,14 +14,14 @@ module.exports = async function handler(req, res) {
 
   const { userId, amount } = req.body;
   if (!userId || !amount) {
-    return res.status(400).json({ error: 'Missing userId or amount' });
+    return res.status(400).json({ error: '缺少必填字段' });
   }
 
   const appid = process.env.XUNHU_APPID;
   const appsecret = process.env.XUNHU_APPSECRET;
 
   if (!appid || !appsecret) {
-    return res.status(200).json({ error: '服务器未配置XUNHU环境变量' }); // Return 200 so it can display as JSON error instead of crashing fetch
+    return res.status(200).json({ error: '服务器未配置XUNHU环境变量' });
   }
 
   try {
@@ -31,7 +30,7 @@ module.exports = async function handler(req, res) {
       appid: appid,
       trade_order_id: ORDER_ + Date.now() + _ + Math.floor(Math.random() * 1000),
       total_fee: amount,
-      title: '翻译插件充值',
+      title: '点数充值',
       time: Math.floor(Date.now() / 1000),
       notify_url: https:// + req.headers.host + /api/callback,
       return_url: https:// + req.headers.host,
@@ -50,17 +49,22 @@ module.exports = async function handler(req, res) {
     params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
     const data = new URLSearchParams(params).toString();
-    const response = await axios.post('https://api.xunhupay.com/payment/do.html', data, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    
+    // Replace axios with native global fetch to avoid dependency issues
+    const xunhuRes = await fetch('https://api.xunhupay.com/payment/do.html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: data
     });
+    
+    const responseData = await xunhuRes.json();
 
-    if (response.data.errcode === 0) {
-      res.status(200).json({ url: response.data.url });
+    if (responseData.errcode === 0) {
+      res.status(200).json({ url: responseData.url });
     } else {
-      res.status(200).json({ error: response.data.errmsg || 'Failed to get payment url' });
+      res.status(200).json({ error: responseData.errmsg || 'Failed to get payment url' });
     }
   } catch (error) {
-    console.error('Payment error:', error.message);
     res.status(200).json({ error: '支付请求异常: ' + error.message });
   }
 };
