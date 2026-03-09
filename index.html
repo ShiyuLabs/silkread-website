@@ -216,21 +216,27 @@
     </div>
 
     <!-- 交互逻辑 JS -->
-    <script>
+        <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // === 全局真实登录状态（基于 URL uid 和 localStorage） ===
+            // 安全读取 localStorage，防止在 file:// 协议下抛出异常导致整个脚本崩溃
+            let localStr = {
+                getItem: function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } },
+                setItem: function(k, v) { try { localStorage.setItem(k, v); } catch(e) {} },
+                removeItem: function(k) { try { localStorage.removeItem(k); } catch(e) {} }
+            };
+
             const urlParams = new URLSearchParams(window.location.search);
             const urlUid = urlParams.get('uid');
             if (urlUid) {
-                localStorage.setItem('userId', urlUid);
-                // 移除 URL 中的 uid，保持地址栏干净
-                window.history.replaceState({}, document.title, window.location.pathname);
+                localStr.setItem('userId', urlUid);
+                try {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } catch(e) {}
             }
             
-            let userId = localStorage.getItem('userId');
+            let userId = localStr.getItem('userId');
             let isLoggedIn = !!userId;
 
-            // DOM 节点引用
             const btnLoginShow = document.getElementById('btn-login-show');
             const userInfo = document.getElementById('user-info');
             const btnLogout = document.getElementById('btn-logout');
@@ -247,100 +253,101 @@
             const closePaymentBtn = document.getElementById('close-payment');
             const paymentAmountText = document.getElementById('payment-amount');
 
-            // 购买按钮集合
             const buyButtons = document.querySelectorAll('.btn-buy');
 
-            // 1. ======= 状态切换逻辑 =======
             function updateNavState() {
                 if (isLoggedIn) {
-                    btnLoginShow.classList.add('hidden');
-                    userInfo.classList.remove('hidden');
-                    userInfo.classList.add('flex');
+                    if(btnLoginShow) btnLoginShow.classList.add('hidden');
+                    if(userInfo) {
+                        userInfo.classList.remove('hidden');
+                        userInfo.classList.add('flex');
+                    }
                 } else {
-                    btnLoginShow.classList.remove('hidden');
-                    userInfo.classList.add('hidden');
-                    userInfo.classList.remove('flex');
+                    if(btnLoginShow) btnLoginShow.classList.remove('hidden');
+                    if(userInfo) {
+                        userInfo.classList.add('hidden');
+                        userInfo.classList.remove('flex');
+                    }
                 }
             }
-            updateNavState(); // 初始化渲染
+            updateNavState();
 
-            // 2. ======= 模态框控制辅助函数 =======
             function openModal(modalEl, boxEl) {
+                if(!modalEl || !boxEl) return;
                 modalEl.classList.remove('hidden');
-                // 强制重绘，触发过渡动画
                 void modalEl.offsetWidth; 
                 modalEl.classList.remove('opacity-0');
                 boxEl.classList.remove('scale-95');
             }
+            
             function closeModal(modalEl, boxEl) {
+                if(!modalEl || !boxEl) return;
                 modalEl.classList.add('opacity-0');
                 boxEl.classList.add('scale-95');
                 setTimeout(() => {
                     modalEl.classList.add('hidden');
-                }, 300); // 和 CSS duration 一致
+                }, 300);
             }
 
-            // 登录弹窗开关
-            btnLoginShow.addEventListener('click', () => openModal(loginModal, loginBox));
-            closeLoginBtn.addEventListener('click', () => closeModal(loginModal, loginBox));
-            loginOverlay.addEventListener('click', () => closeModal(loginModal, loginBox));
+            if(btnLoginShow) btnLoginShow.addEventListener('click', () => openModal(loginModal, loginBox));
+            if(closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal, loginBox));
+            if(loginOverlay) loginOverlay.addEventListener('click', () => closeModal(loginModal, loginBox));
 
-            // 支付弹窗开关
-            closePaymentBtn.addEventListener('click', () => closeModal(paymentModal, paymentBox));
-            paymentOverlay.addEventListener('click', () => closeModal(paymentModal, paymentBox));
+            if(closePaymentBtn) closePaymentBtn.addEventListener('click', () => closeModal(paymentModal, paymentBox));
+            if(paymentOverlay) paymentOverlay.addEventListener('click', () => closeModal(paymentModal, paymentBox));
 
-            // 3. ======= 真实登录 / 登出逻辑 =======
-            // 点击右上角登录时
-            btnDoLogin.addEventListener('click', () => {
-                alert('请在 Chrome 浏览器中安装并打开插件，在插件面板中点击"充值"即可自动登录免密账号！');
-                closeModal(loginModal, loginBox);
-            });
-
-            btnLogout.addEventListener('click', () => {
-                localStorage.removeItem('userId');
-                userId = null;
-                isLoggedIn = false;
-                updateNavState();
-            });
-
-            // 4. ======= 核心购买拦截逻辑 =======
-            buyButtons.forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const price = this.getAttribute('data-price');
-                    
-                    if (!isLoggedIn) {
-                        console.log(`[拦截购买] 未登录状态尝试购买 ${price} 元套餐，需先登录。`);
-                        openModal(loginModal, loginBox);
-                    } else {
-                        console.log(`[发起支付] -> 请求后台获取虎皮椒收款链接，订单金额: ${price} 元`);
-                        paymentAmountText.innerText = `￥${price}.00`;
-                        openModal(paymentModal, paymentBox);
-                        
-                        try {
-                            // 调用现有的 Vercel Serverless API (api/pay.js)
-                            // 传入从插件同步过来并存在 localStorage 中的 userId
-                            const currentUserId = localStorage.getItem('userId');
-                            const response = await fetch('/api/pay', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: currentUserId, amount: price })
-                            });
-                            
-                            const data = await response.json();
-                            if (data.url) {
-                                // 成功获取支付链接，跳转到虎皮椒收银台或者在 iframe/弹窗 中展示
-                                window.location.href = data.url;
-                            } else {
-                                alert('获取支付链接失败: ' + (data.error || '未知错误'));
-                            }
-                        } catch (err) {
-                            console.error('支付请求出错:', err);
-                            alert('支付请求发送失败，请检查网络');
-                        }
-                    }
+            if(btnDoLogin) {
+                btnDoLogin.addEventListener('click', () => {
+                    alert('请在 Chrome 浏览器中安装并打开插件，在插件面板中点击"充值"即可自动登录您的专属账号！');
+                    closeModal(loginModal, loginBox);
                 });
-            });
+            }
+
+            if(btnLogout) {
+                btnLogout.addEventListener('click', () => {
+                    localStr.removeItem('userId');
+                    userId = null;
+                    isLoggedIn = false;
+                    updateNavState();
+                });
+            }
+
+            if(buyButtons) {
+                buyButtons.forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const price = this.getAttribute('data-price');
+                        
+                        if (!isLoggedIn) {
+                            openModal(loginModal, loginBox);
+                        } else {
+                            if(paymentAmountText) paymentAmountText.innerText = '￥' + price + '.00';
+                            openModal(paymentModal, paymentBox);
+                            
+                            try {
+                                const currentUserId = localStr.getItem('userId');
+                                const response = await fetch('https://shiyuai.top/api/pay', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ userId: currentUserId, amount: price })
+                                });
+                                
+                                const data = await response.json();
+                                if (data.url) {
+                                    window.location.href = data.url;
+                                } else {
+                                    alert('获取支付链接失败: ' + (data.error || '未知错误'));
+                                }
+                            } catch (err) {
+                                // 静默失败或给轻量级提示
+                                console.log('当前在本地环境或网络错误，无法请求真实支付接口', err);
+                                alert('请将代码部署后，或在在线官网尝试真实付款。');
+                            }
+                        }
+                    });
+                });
+            }
         });
     </script>
 </body>
 </html>
+
