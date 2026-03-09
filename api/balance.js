@@ -1,32 +1,23 @@
-const { kv } = require('@vercel/kv');
-
-export default async function handler(req, res) {
-  // 允许跨域（方便插件调用）
+﻿module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  const id = req.query.id;
+  if (!id) return res.status(400).json({ error: 'Missing user id' });
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
-  const { id } = req.query; // 从 /api/balance?id=xxx 获取
-
-  if (!id) {
-    return res.status(400).json({ error: 'Missing user id' });
-  }
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  if (!kvUrl || !kvToken) return res.status(200).json({ balance: 0 });
 
   try {
-    const creditsStr = await kv.get(`user:${id}:credits`);
-    const credits = creditsStr ? parseInt(creditsStr, 10) : 0;
-    
+    const r = await fetch(kvUrl + '/get/user:' + id + ':credits', { headers: { Authorization: 'Bearer ' + kvToken } });
+    const d = await r.json();
+    const credits = d.result ? parseInt(d.result, 10) : 0;
     return res.status(200).json({ balance: credits });
-  } catch (error) {
-    console.error('KV Error:', error);
+  } catch (e) {
     return res.status(500).json({ error: 'Failed to fetch balance' });
   }
-}
+};
