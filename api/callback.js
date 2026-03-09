@@ -1,15 +1,11 @@
 ﻿const crypto = require('crypto');
-const { kv } = require('@vercel/kv');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed'); 
-
   const appsecret = process.env.XUNHU_APPSECRET;
   const data = req.body;
-
-  if (!data || !data.hash) {
-    return res.status(400).send('fail');
-  }
+  
+  if (!data || !data.hash) return res.status(400).send('fail');
 
   const receivedHash = data.hash;
   const params = { ...data };
@@ -25,15 +21,18 @@ module.exports = async function handler(req, res) {
   signStr = signStr.slice(0, -1) + appsecret;
   const calculatedHash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
-  if (calculatedHash !== receivedHash) {
-    return res.status(403).send('fail');
-  }
+  if (calculatedHash !== receivedHash) return res.status(403).send('fail');
 
   if (data.status === 'OD') {
     const pointsToAdd = Math.floor(parseFloat(data.total_fee) * 10000);
+    const url = process.env.KV_REST_API_URL;
+    const token = process.env.KV_REST_API_TOKEN;
+    
     try {
-      if (process.env.KV_REST_API_URL) {
-        await kv.incrby('user:' + data.attach + ':credits', pointsToAdd);
+      if (url && token) {
+        await fetch(url + '/incrby/user:' + data.attach + ':credits/' + pointsToAdd, {
+          headers: { Authorization: 'Bearer ' + token }
+        });
       }
       return res.status(200).send('success');
     } catch (err) {
