@@ -1,5 +1,4 @@
 ﻿const crypto = require('crypto');
-const axios = require('axios');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -38,17 +37,8 @@ module.exports = async function handler(req, res) {
   signStr = signStr.slice(0, -1) + appsecret;
   params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
-  try {
-    const formData = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) formData.append(k, String(v));
-    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', formData.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-    const data = resp.data;
-    if (data.errcode === 0) return res.status(200).json({ url: data.url });
-    return res.status(200).json({ error: data.errmsg || 'xunhupay error', detail: data });
-  } catch (e) {
-    const msg = e.response ? JSON.stringify(e.response.data) : e.message;
-    return res.status(200).json({ error: 'request failed: ' + msg });
-  }
+  // Build redirect URL - client's browser hits xunhupay directly, bypassing server-to-server connectivity issues
+  const qs = Object.entries(params).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+  const payUrl = 'https://api.xunhupay.com/payment/do.html?' + qs;
+  return res.status(200).json({ url: payUrl });
 };
