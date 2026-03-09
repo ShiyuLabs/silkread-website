@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 智能翻译插件 - 支持全球顶级大模型的沉浸式翻译</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com">        // 和插件通信，实现账号跨端恢复
+        window.addEventListener("message", (event) => {
+            if (event.source !== window || !event.data || event.data.type !== 'UPDATE_EXTENSION_UID') return;
+            // 通过扩展程序的 background 去修改真正的 chrome.storage
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({ action: 'forceUpdateUserId', newUserId: event.data.newUid });
+            }
+        });
+    </script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; scroll-behavior: smooth; }
         .blur-sm { backdrop-filter: blur(4px); }
@@ -169,25 +177,55 @@
             <button id="close-login" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
-            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">登录账号</h3>
-            <div class="space-y-5">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">绑定恢复密钥</h3>
+            <p class="text-xs text-gray-500 mb-4 text-center">您的账号由插件自动分配，请设置一个恢复密钥，以便在换电脑或重装系统时找回您的余额记录。</p>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="email">邮箱</label>
-                    <input id="email" type="email" placeholder="your@email.com" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="sync-code">您的系统分配 ID (只读)</label>
+                    <input id="sync-code" type="text" readonly placeholder="打开插件获取最新ID..." class="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 font-mono text-sm outline-none">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="password">密码 / 验证码</label>
-                    <input id="password" type="password" placeholder="******" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="recovery-pass">设置恢复密钥 (请牢记牢记!) </label>
+                    <input id="recovery-pass" type="password" placeholder="建议输入常用密码或手机号" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
                 </div>
-                <button id="btn-do-login" class="w-full mt-2 py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-colors flex justify-center items-center">
-                    <span>发送验证码 / 登录</span>
+                <!-- 预留的注册功能按钮入口，其实是个占位符，因为 ID 是自动获取的 -->
+                <button id="btn-bind-save" class="w-full mt-2 py-3 px-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition-colors flex justify-center items-center">
+                    <span>确认绑定并登录</span>
                 </button>
+                <div class="flex items-center justify-between mt-4 border-t pt-4">
+                     <button id="btn-show-import" class="text-sm text-blue-600 hover:underline">我是老用户，我要找回资产点此</button>
+                </div>
             </div>
-            <p class="text-center text-xs text-gray-400 mt-6">未注册的邮箱验证后将自动创建账号</p>
+            <p id="bind-msg" class="text-center text-xs text-green-600 font-semibold mt-4 h-4"></p>
+        </div>
+
+        <!-- 找回老账号版面 (默认隐藏) -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 transform scale-95 transition-transform duration-300 hidden" id="import-box">
+             <button id="close-import" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">找回原有资产</h3>
+            <div class="space-y-4">
+                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="old-sync-code">原有分配的 ID 账号</label>
+                    <input id="old-sync-code" type="text" placeholder="输入 uid_xxxx " class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="old-recovery-pass">当时设置的恢复密码</label>
+                    <input id="old-recovery-pass" type="password" placeholder="输入密码" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
+                </div>
+                <button id="btn-import-save" class="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-colors flex justify-center items-center">
+                    <span>验证并找回资产</span>
+                </button>
+                 <div class="flex items-center justify-between mt-4 border-t pt-4">
+                     <button id="btn-show-bind" class="text-sm text-gray-500 hover:text-gray-800">返回新用户注册</button>
+                </div>
+            </div>
+            <p id="import-msg" class="text-center text-xs text-red-500 mt-4 h-4"></p>
         </div>
     </div>
 
-    <!-- ========== 支付扫码弹窗 (Payment Modal) ========== -->
+    <!-- ========== 支付二维码弹窗 (Payment Modal) ========== -->
     <div id="payment-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
         <!-- 半透明遮罩层 -->
         <div class="absolute inset-0 bg-black bg-opacity-60 blur-sm" id="payment-overlay"></div>
@@ -240,12 +278,27 @@
             const btnLoginShow = document.getElementById('btn-login-show');
             const userInfo = document.getElementById('user-info');
             const btnLogout = document.getElementById('btn-logout');
-            
+
             const loginModal = document.getElementById('login-modal');
             const loginBox = document.getElementById('login-box');
+            const importBox = document.getElementById('import-box');
             const loginOverlay = document.getElementById('login-overlay');
-            const btnDoLogin = document.getElementById('btn-do-login');
             const closeLoginBtn = document.getElementById('close-login');
+            const closeImportBtn = document.getElementById('close-import');
+            
+            const btnShowImport = document.getElementById('btn-show-import');
+            const btnShowBind = document.getElementById('btn-show-bind');
+            
+            const btnBindSave = document.getElementById('btn-bind-save');
+            const btnImportSave = document.getElementById('btn-import-save');
+            
+            const syncCodeInput = document.getElementById('sync-code');
+            const recoveryPassInput = document.getElementById('recovery-pass');
+            const bindMsg = document.getElementById('bind-msg');
+
+            const oldSyncCodeInput = document.getElementById('old-sync-code');
+            const oldRecoveryPassInput = document.old-recovery-pass = document.getElementById('old-recovery-pass');
+            const importMsg = document.getElementById('import-msg');
 
             const paymentModal = document.getElementById('payment-modal');
             const paymentBox = document.getElementById('payment-box');
@@ -275,31 +328,134 @@
             function openModal(modalEl, boxEl) {
                 if(!modalEl || !boxEl) return;
                 modalEl.classList.remove('hidden');
+                
+                // Hide all boxes initially
+                if(loginBox) loginBox.classList.add('hidden');
+                if(importBox) importBox.classList.add('hidden');
+                if(paymentBox) paymentBox.classList.add('hidden');
+                
+                // Show the requested box
+                boxEl.classList.remove('hidden');
+                
                 void modalEl.offsetWidth; 
                 modalEl.classList.remove('opacity-0');
                 boxEl.classList.remove('scale-95');
+                
+                // Set initial user ID into sync box
+                if(boxEl === loginBox && userId && syncCodeInput) {
+                    syncCodeInput.value = userId;
+                }
             }
             
-            function closeModal(modalEl, boxEl) {
-                if(!modalEl || !boxEl) return;
+            function closeModal(modalEl, boxEls) {
+                if(!modalEl) return;
                 modalEl.classList.add('opacity-0');
-                boxEl.classList.add('scale-95');
+                if (Array.isArray(boxEls)) {
+                   boxEls.forEach(b => { if(b) b.classList.add('scale-95'); });
+                } else if(boxEls) {
+                   boxEls.classList.add('scale-95');
+                }
+                
                 setTimeout(() => {
                     modalEl.classList.add('hidden');
                 }, 300);
             }
 
+            // Bind Events
             if(btnLoginShow) btnLoginShow.addEventListener('click', () => openModal(loginModal, loginBox));
-            if(closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal, loginBox));
-            if(loginOverlay) loginOverlay.addEventListener('click', () => closeModal(loginModal, loginBox));
+            if(closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal, [loginBox, importBox]));
+            if(closeImportBtn) closeImportBtn.addEventListener('click', () => closeModal(loginModal, [loginBox, importBox]));
+            if(loginOverlay) loginOverlay.addEventListener('click', () => closeModal(loginModal, [loginBox, importBox]));
+
+            if(btnShowImport) btnShowImport.addEventListener('click', () => openModal(loginModal, importBox));
+            if(btnShowBind) btnShowBind.addEventListener('click', () => openModal(loginModal, loginBox));
 
             if(closePaymentBtn) closePaymentBtn.addEventListener('click', () => closeModal(paymentModal, paymentBox));
             if(paymentOverlay) paymentOverlay.addEventListener('click', () => closeModal(paymentModal, paymentBox));
 
-            if(btnDoLogin) {
-                btnDoLogin.addEventListener('click', () => {
-                    alert('请在 Chrome 浏览器中安装并打开插件，在插件面板中点击"充值"即可自动登录您的专属账号！');
-                    closeModal(loginModal, loginBox);
+            if(btnBindSave) {
+                btnBindSave.addEventListener('click', async () => {
+                    if(!userId) {
+                        bindMsg.style.color = 'red';
+                        bindMsg.innerText = '错误：未能获取到插件ID，请重试跨端跳转';
+                        return;
+                    }
+                    const pass = recoveryPassInput.value.trim();
+                    if(pass.length < 4) {
+                        bindMsg.style.color = 'red';
+                        bindMsg.innerText = '恢复密码不可少于4位';
+                        return;
+                    }
+                    
+                    btnBindSave.disabled = true;
+                    btnBindSave.innerText = '绑定中...';
+                    try {
+                        const res = await fetch('https://shiyuai.top/api/auth', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ action: 'bind', uid: userId, pass: pass })
+                        });
+                        const data = await res.json();
+                        if(data.success) {
+                            bindMsg.style.color = 'green';
+                            bindMsg.innerText = '绑定成功！请牢记您的密钥。';
+                            setTimeout(() => {
+                                isLoggedIn = true;
+                                updateNavState();
+                                closeModal(loginModal, [loginBox, importBox]);
+                            }, 1000);
+                        } else {
+                            bindMsg.style.color = 'red';
+                            bindMsg.innerText = data.error || '绑定失败';
+                        }
+                    } catch(e) {
+                         bindMsg.style.color = 'red';
+                         bindMsg.innerText = '请部署后测试网络请求';
+                    } finally {
+                        btnBindSave.disabled = false;
+                        btnBindSave.innerHTML = '<span>确认绑定并登录</span>';
+                    }
+                });
+            }
+
+            if(btnImportSave) {
+                btnImportSave.addEventListener('click', async () => {
+                    const uid = oldSyncCodeInput.value.trim();
+                    const pass = document.getElementById('old-recovery-pass').value.trim();
+                    if(!uid || !pass) {
+                        importMsg.innerText = '请填写完整的原ID和密码';
+                        return;
+                    }
+                    btnImportSave.disabled = true;
+                    try {
+                        const res = await fetch('https://shiyuai.top/api/auth', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ action: 'recover', uid: uid, pass: pass })
+                        });
+                        const data = await res.json();
+                        if(data.success) {
+                            importMsg.style.color = 'green';
+                            importMsg.innerText = '成功找回！将覆盖当前插件ID。';
+                            // 告知插件更新ID
+                            window.postMessage({ type: 'UPDATE_EXTENSION_UID', newUid: uid }, '*');
+                            localStr.setItem('userId', uid);
+                            userId = uid;
+                            setTimeout(() => {
+                                isLoggedIn = true;
+                                updateNavState();
+                                closeModal(loginModal, [loginBox, importBox]);
+                            }, 1500);
+                        } else {
+                            importMsg.style.color = 'red';
+                            importMsg.innerText = data.error || '找回失败，请检查密码';
+                        }
+                    } catch(e) {
+                        importMsg.style.color = 'red';
+                        importMsg.innerText = '请部署后测试网络请求';
+                    } finally {
+                        btnImportSave.disabled = false;
+                    }
                 });
             }
 
@@ -347,7 +503,17 @@
                 });
             }
         });
+            // 和插件通信，实现账号跨端恢复
+        window.addEventListener("message", (event) => {
+            if (event.source !== window || !event.data || event.data.type !== 'UPDATE_EXTENSION_UID') return;
+            // 通过扩展程序的 background 去修改真正的 chrome.storage
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({ action: 'forceUpdateUserId', newUserId: event.data.newUid });
+            }
+        });
     </script>
 </body>
 </html>
+
+
 
