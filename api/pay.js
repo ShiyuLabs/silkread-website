@@ -39,7 +39,9 @@ module.exports = async function handler(req, res) {
   params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
 
   try {
-    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', params, {
+    const formData = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) formData.append(k, String(v));
+    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', formData.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
     const data = resp.data;
