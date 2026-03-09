@@ -46,17 +46,29 @@ module.exports = async function handler(req, res) {
   try {
     const formData = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) formData.append(k, String(v));
-    const resp = await axios.post('https://api.xunhupay.com/payment/do.html', formData.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 10000
-    });
-    const data = resp.data;
-    if (data.errcode === 0) {
-      return res.status(200).json({ qrcode: data.url_qrcode, url: data.url });
+    // 优先主域名，失败自动重试备用域名
+    const endpoints = [
+      'https://api.xunhupay.com/payment/do.html',
+      'https://api.dpweixin.com/payment/do.html'
+    ];
+    let lastErr = null;
+    for (const endpoint of endpoints) {
+      try {
+        const resp = await axios.post(endpoint, formData.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 10000
+        });
+        const data = resp.data;
+        if (data.errcode === 0) {
+          return res.status(200).json({ qrcode: data.url_qrcode, url: data.url });
+        }
+        return res.status(200).json({ error: data.errmsg || 'xunhupay error', code: data.errcode });
+      } catch (e) {
+        lastErr = { msg: e.message, code: e.code, cause: e.cause ? String(e.cause) : undefined };
+      }
     }
-    return res.status(200).json({ error: data.errmsg || 'xunhupay error', code: data.errcode });
+    return res.status(200).json({ error: 'all endpoints failed', detail: lastErr });
   } catch (e) {
-    const detail = e.response ? JSON.stringify(e.response.data) : e.message;
-    return res.status(200).json({ error: 'request failed: ' + detail });
+    return res.status(200).json({ error: e.message });
   }
 };
