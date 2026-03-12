@@ -2,37 +2,28 @@
 // ALL API keys are loaded from server-side environment variables only.
 
 // ─── Model registry ────────────────────────────────────────────────────────────
+// All models route through ONE API proxy (BASE_URL + OPENAI_API_KEY).
 // rate: credits charged per 1 000 actual tokens consumed
 const MODEL_CONFIG = {
   'deepseek-chat': {
-    apiUrl:    'https://api.deepseek.com/chat/completions',
-    apiKeyEnv: 'DEEPSEEK_API_KEY',
-    format:    'openai',
-    rate:      10,
+    format: 'openai',
+    rate:   10,
   },
   'qwen3-235b-a22b': {
-    apiUrl:    'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-    apiKeyEnv: 'QWEN_API_KEY',
-    format:    'openai',
-    rate:      20,
+    format: 'openai',
+    rate:   20,
   },
   'gemini-2.5-flash': {
-    apiUrl:    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    apiKeyEnv: 'GEMINI_API_KEY',
-    format:    'openai',
-    rate:      30,
+    format: 'openai',
+    rate:   30,
   },
   'gpt-5-mini': {
-    apiUrl:    'https://api.openai.com/v1/chat/completions',
-    apiKeyEnv: 'OPENAI_API_KEY',
-    format:    'openai',
-    rate:      50,
+    format: 'openai',
+    rate:   50,
   },
   'claude-sonnet-4-6': {
-    apiUrl:    'https://api.anthropic.com/v1/messages',
-    apiKeyEnv: 'ANTHROPIC_API_KEY',
-    format:    'anthropic',
-    rate:      200,
+    format: 'openai',
+    rate:   200,
   },
 };
 
@@ -41,12 +32,14 @@ function estimateTokens(text) {
   return Math.ceil(text.length * 1.5);
 }
 
-// ─── OpenAI-compatible call ────────────────────────────────────────────────────
+// ─── OpenAI-compatible call (via ONE API proxy) ───────────────────────────────
 async function callOpenAI(cfg, model, text, targetLang) {
-  const apiKey = process.env[cfg.apiKeyEnv];
-  if (!apiKey) throw new Error('Server misconfiguration: missing API key for model');
+  const baseUrl = (process.env.BASE_URL || '').replace(/\/$/, '');
+  const apiKey  = process.env.OPENAI_API_KEY;
+  if (!baseUrl || !apiKey) throw new Error('Server misconfiguration: missing BASE_URL or OPENAI_API_KEY');
 
-  const resp = await fetch(cfg.apiUrl, {
+  const apiUrl = baseUrl + '/chat/completions';
+  const resp = await fetch(apiUrl, {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -156,9 +149,7 @@ module.exports = async function handler(req, res) {
   // ── Step 4: Call the upstream AI model ────────────────────────────────────
   let result;
   try {
-    result = cfg.format === 'anthropic'
-      ? await callAnthropic(cfg, model, text, targetLang)
-      : await callOpenAI(cfg, model, text, targetLang);
+    result = await callOpenAI(cfg, model, text, targetLang);
   } catch (e) {
     return res.status(500).json({ error: 'Translation failed: ' + e.message });
   }
