@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI ï¿½ï¿½ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ - Ö§ï¿½ï¿½È«ï¿½ò¶¥¼ï¿½ï¿½ï¿½Ä£ï¿½ÍµÄ³ï¿½ï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½</title>
-    <script src="https://cdn.tailwindcss.com">        // ï¿½Í²ï¿½ï¿½Í¨ï¿½Å£ï¿½Êµï¿½ï¿½ï¿½ËºÅ¿ï¿½Ë»Ö¸ï¿½
+    <title>AI ÖÇÄÜ·­Òë²å¼þ - Ö§³ÖÈ«Çò¶¥¼¶´óÄ£ÐÍµÄ³Á½þÊ½·­Òë</title>
+    <script src="https://cdn.tailwindcss.com">        // ºÍ²å¼þÍ¨ÐÅ£¬ÊµÏÖÕËºÅ¿ç¶Ë»Ö¸´
         window.addEventListener("message", (event) => {
             if (event.source !== window || !event.data || event.data.type !== 'UPDATE_EXTENSION_UID') return;
-            // Í¨ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½ï¿½ background È¥ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ chrome.storage
+            // Í¨¹ýÀ©Õ¹³ÌÐòµÄ background È¥ÐÞ¸ÄÕæÕýµÄ chrome.storage
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                 chrome.runtime.sendMessage({ action: 'forceUpdateUserId', newUserId: event.data.newUid });
             }
@@ -19,32 +19,32 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased font-sans">
-    <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -->
+    <!-- µ¼º½À¸ -->
     <nav class="bg-white shadow fixed w-full top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <!-- Æ·ï¿½Æºï¿½ logo -->
+                <!-- Æ·ÅÆºÍ logo -->
                 <div class="flex items-center">
-                    <span class="text-xl font-bold text-blue-600 tracking-tight">AI ï¿½ï¿½ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½</span>
+                    <span class="text-xl font-bold text-blue-600 tracking-tight">AI ÖÇÄÜ·­Òë²å¼þ</span>
                 </div>
-                <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½×´Ì¬ -->
+                <!-- µ¼º½Á´½ÓÓëÓÃ»§×´Ì¬ -->
                 <div class="flex items-center">
                     <div class="hidden md:flex space-x-6 text-sm font-medium text-gray-600">
-                        <a href="#hero" class="hover:text-blue-600 transition-colors">ï¿½ï¿½ï¿½Ü½ï¿½ï¿½ï¿½</a>
-                        <a href="#pricing" class="hover:text-blue-600 transition-colors">ï¿½×²Í¶ï¿½ï¿½ï¿½</a>
-                        <a href="#contact" class="hover:text-blue-600 transition-colors">ï¿½ï¿½Ïµï¿½ï¿½ï¿½ï¿½</a>
+                        <a href="#hero" class="hover:text-blue-600 transition-colors">¹¦ÄÜ½éÉÜ</a>
+                        <a href="#pricing" class="hover:text-blue-600 transition-colors">Ì×²Í¶¨¼Û</a>
+                        <a href="#contact" class="hover:text-blue-600 transition-colors">ÁªÏµÎÒÃÇ</a>
                     </div>
                     
-                    <!-- ï¿½Ã»ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ -->
+                    <!-- ÓÃ»§×´Ì¬ÇøÓò -->
                     <div class="flex items-center ml-8 md:pl-8 md:border-l border-gray-200">
-                        <!-- Î´ï¿½ï¿½Â¼×´Ì¬ -->
-                        <button id="btn-login-show" class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full shadow-sm transition transform hover:-translate-y-0.5">ï¿½ï¿½Â¼ / ×¢ï¿½ï¿½</button>
+                        <!-- Î´µÇÂ¼×´Ì¬ -->
+                        <button id="btn-login-show" class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full shadow-sm transition transform hover:-translate-y-0.5">µÇÂ¼ / ×¢²á</button>
                         
-                        <!-- ï¿½Ñµï¿½Â¼×´Ì¬ -->
+                        <!-- ÒÑµÇÂ¼×´Ì¬ -->
                         <div id="user-info" class="hidden items-center space-x-4">
-                            <span id="nav-user-id" class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="ï¿½Ã»ï¿½ID"></span>
-                            <span id="nav-user-balance" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">ï¿½ï¿½ï¿½ï¿½ï¿½Ó²ï¿½ï¿½</span>
-                            <button id="btn-logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">ï¿½Ë³ï¿½</button>
+                            <span id="nav-user-id" class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="ÓÃ»§ID"></span>
+                            <span id="nav-user-balance" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">ÒÑÁ¬½Ó²å¼þ</span>
+                            <button id="btn-logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">ÍË³ö</button>
                         </div>
                     </div>
                 </div>
@@ -52,209 +52,209 @@
         </div>
     </nav>
 
-    <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Hero Section) -->
+    <!-- Ê×ÆÁÇøÓò (Hero Section) -->
     <main id="hero" class="pt-32 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight mb-6">
-            Ö§ï¿½ï¿½È«ï¿½ò¶¥¼ï¿½ï¿½ï¿½Ä£ï¿½Íµï¿½<br><span class="text-blue-600">ï¿½ï¿½ï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</span>
+            Ö§³ÖÈ«Çò¶¥¼¶´óÄ£ÐÍµÄ<br><span class="text-blue-600">³Á½þÊ½·­Òë²å¼þ</span>
         </h1>
         <p class="mt-4 max-w-2xl mx-auto text-xl text-gray-500 mb-10">
-            ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ð°º¹ï¿½Ä°ï¿½ï¿½Â·ï¿½ï¿½Ã¡ï¿½ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½Ô´ï¿½Ä£ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¿ï¿½ï¿½ï¿½Ä¶ï¿½ï¿½ï¿½ï¿½é¡£
+            °´Ðè³äÖµ£¬¸æ±ð°º¹óµÄ°üÔÂ·ÑÓÃ¡£ÈÃ×ÔÈ»ÓïÑÔ´óÄ£ÐÍÎªÄú´øÀ´ÈçÄ¸Óï°ãÁ÷³©µÄË¿»¬ÔÄ¶ÁÌåÑé¡£
         </p>
         <div class="flex justify-center flex-col items-center">
             <button class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 shadow-lg transform transition hover:-translate-y-1">
-                ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×° (Chrome ï¿½ï¿½Õ¹)
+                Á¢¼´°²×° (Chrome À©Õ¹)
             </button>
-            <p class="mt-4 text-sm text-gray-400">Ä¿Ç°ï¿½ï¿½È«Ö§ï¿½ï¿½ Chrome, Edge ï¿½ï¿½ Chromium ï¿½Úºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</p>
+            <p class="mt-4 text-sm text-gray-400">Ä¿Ç°ÍêÈ«Ö§³Ö Chrome, Edge µÈ Chromium ÄÚºËä¯ÀÀÆ÷</p>
         </div>
     </main>
 
-    <!-- ï¿½ï¿½Òµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×²ï¿½ -->
+    <!-- ÉÌÒµ¶¨¼ÛÓëÌ×²Í -->
     <section id="pricing" class="bg-white py-20 px-4 sm:px-6 lg:px-8 border-t border-gray-100">
         <div class="max-w-7xl mx-auto">
             <div class="text-center mb-16">
-                <h2 class="text-3xl font-extrabold text-gray-900">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½</h2>
-                <p class="mt-4 text-lg text-gray-500">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë·Ñ£ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½Æ·Ñ³ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¡ï¿½</p>
+                <h2 class="text-3xl font-extrabold text-gray-900">Áé»îµÄÁ÷Á¿³äÖµ·½°¸</h2>
+                <p class="mt-4 text-lg text-gray-500">ÕæÕýµÄÁãÏÐÖÃÀË·Ñ£¬°´×Ö·û¼Æ·Ñ³äÖµ£¬·á¼óÓÉÈË¡£</p>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -->
+                <!-- Ãâ·ÑÌåÑé -->
                 <div class="border rounded-2xl shadow-sm p-8 hover:shadow-xl transition-shadow bg-gray-50 flex flex-col">
-                    <h3 class="text-xl font-bold text-gray-900">ï¿½ï¿½×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</h3>
-                    <p class="mt-2 text-sm text-gray-500">ï¿½Êºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½</p>
+                    <h3 class="text-xl font-bold text-gray-900">ÐÂ×¢²áÌåÑé</h3>
+                    <p class="mt-2 text-sm text-gray-500">ÊÊºÏÏë¼òµ¥ÌåÑé²å¼þ·­ÒëÄÜÁ¦µÄÓÃ»§</p>
                     <div class="my-6">
-                        <span class="text-4xl font-extrabold text-gray-900">ï¿½ï¿½ï¿½</span>
+                        <span class="text-4xl font-extrabold text-gray-900">Ãâ·Ñ</span>
                     </div>
                     <ul class="mb-8 space-y-4 text-gray-600 flex-1">
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>×¢ï¿½á¼´ï¿½Í³ï¿½Ê¼ï¿½ï¿½ï¿½Ã¶ï¿½ï¿½</span>
+                            <span>×¢²á¼´ËÍ³õÊ¼µ÷ÓÃ¶î¶È</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>ï¿½ï¿½Ñ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ï¿½Ê½</span>
+                            <span>Ãâ·Ñ½ÓÈëËùÓÐÄÚÖÃ·­ÒëÅÅ°æÑùÊ½</span>
                         </li>
                     </ul>
-                    <button class="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½</button>
+                    <button class="w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50">Á¢¼´×¢²á</button>
                 </div>
 
-                <!-- ï¿½ï¿½ï¿½ï¿½ï¿½×²ï¿½ -->
+                <!-- »ù´¡Ì×²Í -->
                 <div class="border-2 border-blue-600 rounded-2xl shadow-xl p-8 transform md:-translate-y-4 bg-white relative flex flex-col z-10">
                     <div class="absolute top-0 inset-x-0 transform -translate-y-1/2 flex justify-center">
-                        <span class="inline-flex rounded-full bg-blue-600 px-4 py-1 text-xs font-bold uppercase tracking-wider text-white">ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½Ô¼Û±ï¿½</span>
+                        <span class="inline-flex rounded-full bg-blue-600 px-4 py-1 text-xs font-bold uppercase tracking-wider text-white">Á¦¼ö - ×î¾ßÐÔ¼Û±È</span>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</h3>
-                    <p class="mt-2 text-sm text-gray-500">ï¿½Êºï¿½Å¼ï¿½ï¿½ï¿½ï¿½ï¿½â¹ºï¿½ï¼°ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½Ã»ï¿½</p>
+                    <h3 class="text-xl font-bold text-gray-900">»ù´¡Á÷Á¿°ü</h3>
+                    <p class="mt-2 text-sm text-gray-500">ÊÊºÏÅ¼¶ûº£Íâ¹ºÎï¼°¿´ÎÄµµµÄÓÃ»§</p>
                     <div class="my-6 flex items-baseline">
-                        <span class="text-4xl font-extrabold text-gray-900">ï¿½ï¿½10</span>
-                        <span class="ml-2 text-lg text-gray-500">/ 10,000 ï¿½ï¿½ï¿½ï¿½</span>
+                        <span class="text-4xl font-extrabold text-gray-900">£¤10</span>
+                        <span class="ml-2 text-lg text-gray-500">/ 10,000 µãÊý</span>
                     </div>
                     <ul class="mb-8 space-y-4 text-gray-600 flex-1">
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>ï¿½ï¿½Öµï¿½Þ¹ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</span>
+                            <span>³äÖµÎÞ¹ýÆÚÊ±³¤ÏÞÖÆ</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>Ä¬ï¿½Ïµï¿½ï¿½Ã¼ï¿½ï¿½Ù¸ï¿½ï¿½Ô¼Û±ï¿½Ä£ï¿½ï¿½Æ¥ï¿½ï¿½ï¿½Õ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¶ï¿½</span>
+                            <span>Ä¬ÈÏµ÷ÓÃ¼«ËÙ¸ßÐÔ¼Û±ÈÄ£ÐÍÆ¥ÅäÈÕ³£ÍâÎÄÔÄ¶Á</span>
                         </li>
                     </ul>
-                    <!-- ï¿½ï¿½Í¨ï¿½ï¿½ class "btn-buy" ï¿½ï¿½ data-price ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -->
-                    <button class="btn-buy w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md transition" data-price="10">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</button>
+                    <!-- °ó¶¨Í¨¹ý class "btn-buy" ºÍ data-price ´¥·¢Ö§¸¶Á÷³Ì -->
+                    <button class="btn-buy w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md transition" data-price="10">Á¢¼´¹ºÂò</button>
                 </div>
 
-                <!-- ï¿½ß¼ï¿½ï¿½×²ï¿½ -->
+                <!-- ¸ß¼¶Ì×²Í -->
                 <div class="border rounded-2xl shadow-sm p-8 hover:shadow-xl transition-shadow bg-gray-50 flex flex-col">
-                    <h3 class="text-xl font-bold text-gray-900">ï¿½ß¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</h3>
-                    <p class="mt-2 text-sm text-gray-500">ï¿½ÊºÏ³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë¡ï¿½ï¿½ï¿½ï¿½ï¿½Ð¾ï¿½ï¿½ï¿½Ô±</p>
+                    <h3 class="text-xl font-bold text-gray-900">¸ß¼¶Á÷Á¿°ü</h3>
+                    <p class="mt-2 text-sm text-gray-500">ÊÊºÏ³öº£´ò¹¤ÈË¡¢Éî¶ÈÑÐ¾¿ÈËÔ±</p>
                     <div class="my-6 flex items-baseline">
-                        <span class="text-4xl font-extrabold text-gray-900">ï¿½ï¿½50</span>
-                        <span class="ml-2 text-lg text-gray-500">/ 60,000 ï¿½ï¿½ï¿½ï¿½</span>
+                        <span class="text-4xl font-extrabold text-gray-900">£¤50</span>
+                        <span class="ml-2 text-lg text-gray-500">/ 60,000 µãÊý</span>
                     </div>
                     <div class="mb-4">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">ï¿½ï¿½Ê¡ï¿½ï¿½ï¿½ï¿½ 20% ï¿½ï¿½ï¿½</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">Á¢Ê¡¼ÓÔù 20% ¶î¶È</span>
                     </div>
                     <ul class="mb-8 space-y-4 text-gray-600 flex-1">
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>ï¿½ï¿½Ñ¡ Claude / GPT-4o ï¿½È¸ß¼ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Ö§ï¿½ï¿½</span>
+                            <span>¿ÉÑ¡ Claude / GPT-4o µÈ¸ß¼¶ÍÆÀíÄ£ÐÍÖ§³Ö</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>ï¿½á¹©ï¿½ï¿½ï¿½ï¿½×¨Òµï¿½Ê¿â·­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</span>
+                            <span>Ìá¹©×îÓÅ×¨Òµ´Ê¿â·­Òë¾ÀÕýÄÜÁ¦</span>
                         </li>
                     </ul>
-                    <button class="btn-buy w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition" data-price="50">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</button>
+                    <button class="btn-buy w-full py-3 px-4 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition" data-price="50">Á¢¼´¹ºÂò</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ï¿½Ï¹ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ÏµÒ³ï¿½ï¿½ (Footer) -->
+    <!-- ºÏ¹æÐÅÏ¢ÓëÁªÏµÒ³½Å (Footer) -->
     <footer id="contact" class="bg-gray-900 text-gray-300 py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-                <span class="text-2xl font-bold text-white mb-4 block">AI ï¿½ï¿½ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½</span>
-                <p class="text-gray-400 max-w-sm">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¶ï¿½Ö§ï¿½Ö£ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Ø´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½ï¿½Ý¡ï¿½</p>
+                <span class="text-2xl font-bold text-white mb-4 block">AI ÖÇÄÜ·­Òë²å¼þ</span>
+                <p class="text-gray-400 max-w-sm">ÎÒÃÇÖÂÁ¦ÓÚÌá¹©×îÁ÷³©µÄÖÇÄÜÍâÎÄÔÄ¶ÁÖ§³Ö£¬ËæÊ±ËæµØ´òÆÆÓïÑÔ±ÚÀÝ¡£</p>
             </div>
             <div class="flex flex-col md:items-end space-y-2">
-                <p class="font-medium text-white mb-2">ï¿½ï¿½Ïµï¿½ï¿½Ê½ï¿½ï¿½Ö§ï¿½ï¿½</p>
-                <p>ï¿½ï¿½ï¿½ï¿½ï¿½Ûºï¿½ Emailï¿½ï¿½<a href="mailto:support@yourdomain.com" class="text-blue-400 hover:text-blue-300 transition">support@yourdomain.com</a></p>
+                <p class="font-medium text-white mb-2">ÁªÏµ·½Ê½¼°Ö§³Ö</p>
+                <p>ÉÌÎñ¼°ÊÛºó Email£º<a href="mailto:support@yourdomain.com" class="text-blue-400 hover:text-blue-300 transition">support@yourdomain.com</a></p>
                 <div class="flex space-x-6 pt-4 mt-4 border-t border-gray-700 w-full md:w-auto">
-                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">ï¿½Ã»ï¿½Ð­ï¿½ï¿½</a>
-                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">ï¿½ï¿½Ë½ï¿½ï¿½ï¿½ï¿½</a>
+                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">ÓÃ»§Ð­Òé</a>
+                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">ÒþË½Õþ²ß</a>
                 </div>
-                <p class="text-xs text-gray-500 pt-6 mt-6 w-full md:text-right">&copy; 2026 AI ï¿½ï¿½ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¶ï¿½. All rights reserved.</p>
+                <p class="text-xs text-gray-500 pt-6 mt-6 w-full md:text-right">&copy; 2026 AI ÖÇÄÜ·­Òë²å¼þÍÅ¶Ó. All rights reserved.</p>
             </div>
         </div>
     </footer>
 
-    <!-- ========== ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ (Email + Code) ========== -->
+    <!-- ========== µÇÂ¼µ¯´° (Email + Code) ========== -->
     <div id="login-modal" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);">
         <div id="login-box" style="background:#fff;border-radius:16px;padding:32px 28px 24px;width:360px;max-width:90vw;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
             <button id="close-login" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;">?</button>
 
-            <!-- Step 1: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -->
+            <!-- Step 1: ÊäÈëÓÊÏä -->
             <div id="login-step1">
                 <div style="text-align:center;margin-bottom:24px;">
                     <div style="font-size:36px;margin-bottom:8px;">??</div>
-                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">ï¿½ï¿½Â¼ / ×¢ï¿½ï¿½</h3>
-                    <p style="margin:0;font-size:13px;color:#6b7280;">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ä£¬ï¿½ï¿½ï¿½Ç½ï¿½ï¿½ï¿½ï¿½ï¿½ 6 Î»ï¿½ï¿½Ö¤ï¿½ï¿½</p>
+                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">µÇÂ¼ / ×¢²á</h3>
+                    <p style="margin:0;font-size:13px;color:#6b7280;">ÊäÈëÓÊÏä£¬ÎÒÃÇ½«·¢ËÍ 6 Î»ÑéÖ¤Âë</p>
                 </div>
                 <input id="login-email" type="email" placeholder="your@email.com"
                     style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;">
                 <button id="btn-send-code"
                     style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-                    ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½
+                    ·¢ËÍÑéÖ¤Âë
                 </button>
             </div>
 
-            <!-- Step 2: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ -->
+            <!-- Step 2: ÊäÈëÑéÖ¤Âë -->
             <div id="login-step2" style="display:none;">
                 <div style="text-align:center;margin-bottom:24px;">
                     <div style="font-size:36px;margin-bottom:8px;">??</div>
-                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½</h3>
-                    <p style="margin:0;font-size:13px;color:#6b7280;">ï¿½Ñ·ï¿½ï¿½ï¿½ï¿½ï¿½ <span id="login-email-display" style="color:#2563eb;font-weight:600;"></span></p>
+                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">ÊäÈëÑéÖ¤Âë</h3>
+                    <p style="margin:0;font-size:13px;color:#6b7280;">ÒÑ·¢ËÍÖÁ <span id="login-email-display" style="color:#2563eb;font-weight:600;"></span></p>
                 </div>
-                <input id="login-code" type="text" inputmode="numeric" maxlength="6" placeholder="6 Î»ï¿½ï¿½Ö¤ï¿½ï¿½"
+                <input id="login-code" type="text" inputmode="numeric" maxlength="6" placeholder="6 Î»ÑéÖ¤Âë"
                     style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:22px;font-family:monospace;letter-spacing:0.4em;text-align:center;outline:none;margin-bottom:12px;">
                 <button id="btn-verify-code"
                     style="width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
-                    È·ï¿½Ïµï¿½Â¼
+                    È·ÈÏµÇÂ¼
                 </button>
                 <button id="btn-resend-code"
                     style="width:100%;padding:8px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;">
-                    ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½
+                    ¡û ÖØÐÂÌîÐ´ÓÊÏä
                 </button>
             </div>
 
             <p id="login-msg" style="text-align:center;font-size:13px;font-weight:600;margin:14px 0 0;min-height:20px;"></p>
         </div>
 
-    <!-- ========== Ö§ï¿½ï¿½ï¿½ï¿½Î¬ï¿½ëµ¯ï¿½ï¿½ (Payment Modal) ========== -->
+    <!-- ========== Ö§¸¶¶þÎ¬Âëµ¯´° (Payment Modal) ========== -->
     <div id="payment-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
-        <!-- ï¿½ï¿½Í¸ï¿½ï¿½ï¿½ï¿½ï¿½Ö²ï¿½ -->
+        <!-- °ëÍ¸Ã÷ÕÚÕÖ²ã -->
         <div class="absolute inset-0 bg-black bg-opacity-60 blur-sm" id="payment-overlay"></div>
-        <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -->
+        <!-- µ¯´°ÄÚÈÝ -->
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 text-center transform scale-95 transition-transform duration-300" id="payment-box">
             <button id="close-payment" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
-            <h3 class="text-xl font-bold text-gray-900 mb-1">Î¢ï¿½ï¿½É¨ï¿½ï¿½Ö§ï¿½ï¿½</h3>
-            <p class="text-sm text-gray-500 mb-2">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È«Ö§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½Öµ</p>
-            <p id="payment-amount" class="text-4xl font-extrabold text-blue-600 mb-6">ï¿½ï¿½0.00</p>
-            <!-- ï¿½ï¿½Êµï¿½ï¿½Î¬ï¿½ï¿½ -->
+            <h3 class="text-xl font-bold text-gray-900 mb-1">Î¢ÐÅÉ¨ÂëÖ§¸¶</h3>
+            <p class="text-sm text-gray-500 mb-2">¶©µ¥°²È«Ö§¸¶£¬¼´Ê±³äÖµ</p>
+            <p id="payment-amount" class="text-4xl font-extrabold text-blue-600 mb-6">£¤0.00</p>
+            <!-- ÕæÊµ¶þÎ¬Âë -->
             <div id="qrcode-wrap" class="w-48 h-48 mx-auto bg-gray-50 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center mb-6 relative overflow-hidden transition">
                 <div id="qrcode-loading" class="text-center">
                     <svg class="mx-auto h-10 w-10 text-blue-400 mb-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    <span class="text-blue-500 text-sm font-medium">ï¿½ï¿½Î¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½...</span>
+                    <span class="text-blue-500 text-sm font-medium">¶þÎ¬Âë¼ÓÔØÖÐ...</span>
                 </div>
-                <img id="qrcode-img" src="" alt="Î¢ï¿½ï¿½Ö§ï¿½ï¿½ï¿½ï¿½Î¬ï¿½ï¿½" class="hidden w-full h-full object-contain rounded-xl" />
+                <img id="qrcode-img" src="" alt="Î¢ÐÅÖ§¸¶¶þÎ¬Âë" class="hidden w-full h-full object-contain rounded-xl" />
                 <div id="qrcode-error" class="hidden text-center px-3">
-                    <span class="text-red-500 text-sm">ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</span>
+                    <span class="text-red-500 text-sm">¼ÓÔØÊ§°Ü£¬ÇëÖØÊÔ</span>
                 </div>
             </div>
             <div class="bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg inline-flex items-center">
                 <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                ï¿½ï¿½Ê¹ï¿½ï¿½Î¢ï¿½ï¿½É¨ï¿½ë£¬Ö§ï¿½ï¿½ï¿½É¹ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
+                ÇëÊ¹ÓÃÎ¢ÐÅÉ¨Âë£¬Ö§¸¶³É¹¦ºó×Ô¶¯µ½ÕË
             </div>
         </div>
     </div>
 
-    <!-- ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ JS -->
+    <!-- ½»»¥Âß¼­ JS -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const API = 'https://shiyuai.top';
 
-            // ===== localStorage ï¿½ï¿½È«ï¿½ï¿½×° =====
+            // ===== localStorage °²È«·â×° =====
             const store = {
                 get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                 set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
                 del: (k) => { try { localStorage.removeItem(k); } catch {} },
             };
 
-            // ===== ï¿½ï¿½È¡ URL ï¿½Ðµï¿½ tokenï¿½ï¿½ï¿½Ó²ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½=====
+            // ===== ¶ÁÈ¡ URL ÖÐµÄ token£¨´Ó²å¼þ³äÖµÌø×ª¹ýÀ´£©=====
             const urlParams = new URLSearchParams(window.location.search);
             const urlToken = urlParams.get('token');
             if (urlToken) {
@@ -306,7 +306,7 @@
             }
             updateNav();
 
-            // ===== ï¿½Ë³ï¿½ =====
+            // ===== ÍË³ö =====
             if (btnLogout) btnLogout.addEventListener('click', () => {
                 store.del('authToken');
                 store.del('authEmail');
@@ -314,7 +314,7 @@
                 updateNav();
             });
 
-            // ===== Ä£Ì¬ï¿½ï¿½ï¿½ï¿½ =====
+            // ===== Ä£Ì¬¿ò¸¨Öú =====
             function openModal(modalEl) {
                 if (!modalEl) return;
                 modalEl.style.display = 'flex';
@@ -324,7 +324,7 @@
                 modalEl.style.display = 'none';
             }
 
-            // ===== ï¿½ï¿½Â¼Ä£Ì¬ï¿½ï¿½ =====
+            // ===== µÇÂ¼Ä£Ì¬¿ò =====
             function openLoginModal() {
                 if (loginStep1) loginStep1.style.display = '';
                 if (loginStep2) loginStep2.style.display = 'none';
@@ -345,13 +345,13 @@
             if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal));
             if (loginOverlay) loginOverlay.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
 
-            // Step 1: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½
+            // Step 1: ·¢ËÍÑéÖ¤Âë
             if (btnSendCode) btnSendCode.addEventListener('click', async () => {
                 const email = loginEmailInput.value.trim();
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    setLoginMsg('ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·', false); return;
+                    setLoginMsg('ÇëÊäÈëÓÐÐ§µÄÓÊÏäµØÖ·', false); return;
                 }
-                btnSendCode.disabled = true; btnSendCode.textContent = 'ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½...';
+                btnSendCode.disabled = true; btnSendCode.textContent = '·¢ËÍÖÐ...';
                 setLoginMsg('', true);
                 try {
                     const resp = await fetch(API + '/api/sendCode', {
@@ -363,23 +363,23 @@
                         if (loginEmailDisplay) loginEmailDisplay.textContent = email;
                         loginStep1.style.display = 'none';
                         loginStep2.style.display = '';
-                        setLoginMsg('ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½Ñ·ï¿½ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ ??', true);
+                        setLoginMsg('ÑéÖ¤ÂëÒÑ·¢ËÍ£¬Çë²éÊÕÓÊ¼þ ??', true);
                         setTimeout(() => loginCodeInput && loginCodeInput.focus(), 100);
                     } else {
-                        setLoginMsg(data.error || 'ï¿½ï¿½ï¿½ï¿½Ê§ï¿½Ü£ï¿½ï¿½ï¿½ï¿½Ôºï¿½ï¿½ï¿½ï¿½ï¿½', false);
+                        setLoginMsg(data.error || '·¢ËÍÊ§°Ü£¬ÇëÉÔºóÖØÊÔ', false);
                     }
-                } catch { setLoginMsg('ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôºï¿½ï¿½ï¿½ï¿½ï¿½', false); }
-                finally { btnSendCode.disabled = false; btnSendCode.textContent = 'ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½'; }
+                } catch { setLoginMsg('ÍøÂç´íÎó£¬ÇëÉÔºóÖØÊÔ', false); }
+                finally { btnSendCode.disabled = false; btnSendCode.textContent = '·¢ËÍÑéÖ¤Âë'; }
             });
 
             if (loginEmailInput) loginEmailInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnSendCode && btnSendCode.click(); });
 
-            // Step 2: ï¿½ï¿½Ö¤ï¿½ï¿½Ö¤ï¿½ï¿½
+            // Step 2: ÑéÖ¤ÑéÖ¤Âë
             if (btnVerifyCode) btnVerifyCode.addEventListener('click', async () => {
                 const email = loginEmailDisplay ? loginEmailDisplay.textContent : '';
                 const code  = loginCodeInput ? loginCodeInput.value.trim() : '';
-                if (!code || code.length !== 6) { setLoginMsg('ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½6Î»ï¿½ï¿½Ö¤ï¿½ï¿½', false); return; }
-                btnVerifyCode.disabled = true; btnVerifyCode.textContent = 'ï¿½ï¿½Ö¤ï¿½ï¿½...';
+                if (!code || code.length !== 6) { setLoginMsg('ÇëÊäÈë6Î»ÑéÖ¤Âë', false); return; }
+                btnVerifyCode.disabled = true; btnVerifyCode.textContent = 'ÑéÖ¤ÖÐ...';
                 try {
                     const resp = await fetch(API + '/api/verifyCode', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -390,20 +390,20 @@
                         authToken = data.token; authEmail = data.email; isLoggedIn = true;
                         store.set('authToken', authToken);
                         store.set('authEmail', authEmail);
-                        // Í¨Öªï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ò±£´ï¿½ token
+                        // Í¨ÖªÀ©Õ¹³ÌÐò±£´æ token
                         window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
-                        setLoginMsg('ï¿½ï¿½Â¼ï¿½É¹ï¿½ï¿½ï¿½??', true);
+                        setLoginMsg('µÇÂ¼³É¹¦£¡??', true);
                         setTimeout(() => { closeModal(loginModal); updateNav(); }, 800);
                     } else {
-                        setLoginMsg(data.error || 'ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½', false);
+                        setLoginMsg(data.error || 'ÑéÖ¤Âë´íÎó£¬ÇëÖØÊÔ', false);
                     }
-                } catch { setLoginMsg('ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôºï¿½ï¿½ï¿½ï¿½ï¿½', false); }
-                finally { btnVerifyCode.disabled = false; btnVerifyCode.textContent = 'È·ï¿½Ïµï¿½Â¼'; }
+                } catch { setLoginMsg('ÍøÂç´íÎó£¬ÇëÉÔºóÖØÊÔ', false); }
+                finally { btnVerifyCode.disabled = false; btnVerifyCode.textContent = 'È·ÈÏµÇÂ¼'; }
             });
 
             if (loginCodeInput) loginCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnVerifyCode && btnVerifyCode.click(); });
 
-            // ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½
+            // ÖØÐÂ·¢ËÍ
             if (btnResendCode) btnResendCode.addEventListener('click', () => {
                 loginStep2.style.display = 'none';
                 loginStep1.style.display = '';
@@ -411,7 +411,7 @@
                 setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
             });
 
-            // ===== Ö§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ =====
+            // ===== Ö§¸¶µ¯´° =====
             if (closePaymentBtn) closePaymentBtn.addEventListener('click', () => closeModal(paymentModal));
             if (paymentOverlay) paymentOverlay.addEventListener('click', () => closeModal(paymentModal));
 
@@ -419,7 +419,7 @@
                 btn.addEventListener('click', async function () {
                     if (!isLoggedIn) { openLoginModal(); return; }
                     const price = this.getAttribute('data-price');
-                    if (paymentAmountText) paymentAmountText.innerText = 'ï¿½ï¿½' + price + '.00';
+                    if (paymentAmountText) paymentAmountText.innerText = '£¤' + price + '.00';
                     const qrImg     = document.getElementById('qrcode-img');
                     const qrLoading = document.getElementById('qrcode-loading');
                     const qrError   = document.getElementById('qrcode-error');
@@ -439,12 +439,12 @@
                         } else if (data.url) {
                             window.open(data.url, '_blank'); closeModal(paymentModal);
                         } else {
-                            qrError.querySelector('span').textContent = data.error || 'ï¿½ï¿½È¡ï¿½ï¿½Î¬ï¿½ï¿½Ê§ï¿½ï¿½';
+                            qrError.querySelector('span').textContent = data.error || '»ñÈ¡¶þÎ¬ÂëÊ§°Ü';
                             qrError.classList.remove('hidden');
                         }
                     } catch {
                         qrLoading.classList.add('hidden');
-                        qrError.querySelector('span').textContent = 'ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôºï¿½ï¿½ï¿½ï¿½ï¿½';
+                        qrError.querySelector('span').textContent = 'ÍøÂç´íÎó£¬ÇëÉÔºóÔÙÊÔ';
                         qrError.classList.remove('hidden');
                     }
                 });
