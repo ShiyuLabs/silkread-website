@@ -32,7 +32,10 @@ module.exports = async function handler(req, res) {
   // Store order->email mapping so callback can identify the user
   if (kvUrl && kvToken && userEmail.includes('@')) {
     try {
-      await fetch(kvUrl + '/set/' + encodeURIComponent('order:' + trade_order_id) + '/' + encodeURIComponent(userEmail) + '/ex/86400', {
+      await fetch(kvUrl + '/set/' + encodeURIComponent('order:' + trade_order_id) + '/' + encodeURIComponent(userEmail), {
+        headers: { Authorization: 'Bearer ' + kvToken }
+      });
+      await fetch(kvUrl + '/expire/' + encodeURIComponent('order:' + trade_order_id) + '/86400', {
         headers: { Authorization: 'Bearer ' + kvToken }
       });
     } catch (_) {}
@@ -51,7 +54,7 @@ module.exports = async function handler(req, res) {
     });
     const data = await resp.json();
     if (data.errcode === 0) {
-      return res.status(200).json({ qrcode: data.url_qrcode, url: data.url });
+      return res.status(200).json({ qrcode: data.url_qrcode, url: data.url, orderId: trade_order_id });
     }
     return res.status(200).json({ error: data.errmsg || 'Payment error: ' + data.errcode });
   } catch (e) {

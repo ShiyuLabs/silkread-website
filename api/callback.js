@@ -41,6 +41,14 @@ module.exports = async function handler(req, res) {
   const tradeStatus = data.trade_status || data.status;
   if (tradeStatus === 'OD') {
     const points = Math.floor(parseFloat(data.total_fee) * 1000);
+    const orderId = data.trade_order_id;
+
+    if (orderId && kvUrl && kvToken) {
+      try {
+        await fetch(kvUrl + '/set/' + encodeURIComponent('order:paid:' + orderId) + '/1', { headers: kvHdr });
+        await fetch(kvUrl + '/expire/' + encodeURIComponent('order:paid:' + orderId) + '/86400', { headers: kvHdr });
+      } catch (_) {}
+    }
 
     // Get email: prefer attach field, fallback to order->email mapping in KV
     let email = data.attach && data.attach.includes('@') ? data.attach : null;

@@ -33,7 +33,8 @@ module.exports = async function handler(req, res) {
 
     const r = await fetch(kvUrl + '/get/' + encodeURIComponent(creditsKey), { headers });
     const d = await r.json();
-    return res.status(200).json({ credits: d.result ? parseInt(d.result, 10) : 0 });
+    const credits = d.result ? parseInt(d.result, 10) : 0;
+    return res.status(200).json({ credits: Math.max(0, credits) });
   } catch (e) {
     return res.status(200).json({ credits: 0 });
   }

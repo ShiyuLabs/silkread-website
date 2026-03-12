@@ -583,26 +583,26 @@
                         qrLoading.classList.add('hidden');
                         if (data.qrcode) {
                             qrImg.src = data.qrcode; qrImg.classList.remove('hidden');
-                            // Poll for payment success every 3s
-                            const baseCreditsResp = await fetch(API + '/api/balance?token=' + authToken);
-                            const baseData = await baseCreditsResp.json();
-                            const baseCredits = baseData.credits || 0;
-                            pollTimer = setInterval(async () => {
-                                try {
-                                    const pr = await fetch(API + '/api/balance?token=' + authToken);
-                                    const pd = await pr.json();
-                                    if ((pd.credits || 0) > baseCredits) {
-                                        stopPoll();
-                                        closeModal(paymentModal);
-                                        loadWebBalance();
-                                        const toast = document.createElement('div');
-                                        toast.textContent = '\u652f\u4ed8\u6210\u529f\uff01\u5df2\u5145\u5024 ' + Math.floor(parseFloat(price) * 1000) + ' \u70b9\u6570';
-                                        toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
-                                        document.body.appendChild(toast);
-                                        setTimeout(() => toast.remove(), 4000);
-                                    }
-                                } catch {}
-                            }, 3000);
+                            const orderId = data.orderId;
+                            if (orderId) {
+                                // Poll payment status by order ID every 3s
+                                pollTimer = setInterval(async () => {
+                                    try {
+                                        const ps = await fetch(API + '/api/pay-status?orderId=' + encodeURIComponent(orderId));
+                                        const pd = await ps.json();
+                                        if (pd.paid) {
+                                            stopPoll();
+                                            closeModal(paymentModal);
+                                            loadWebBalance();
+                                            const toast = document.createElement('div');
+                                            toast.textContent = '\u652f\u4ed8\u6210\u529f\uff01\u5df2\u5145\u503c ' + Math.floor(parseFloat(price) * 1000) + ' \u70b9\u6570';
+                                            toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
+                                            document.body.appendChild(toast);
+                                            setTimeout(() => toast.remove(), 4000);
+                                        }
+                                    } catch {}
+                                }, 3000);
+                            }
                         } else if (data.url) {
                             window.open(data.url, '_blank'); closeModal(paymentModal);
                         } else {

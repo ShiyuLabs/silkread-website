@@ -156,17 +156,26 @@ module.exports = async function handler(req, res) {
 
   // ── Step 5: Precise deduction based on actual usage.total_tokens ──────────
   const actualCost = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.rate));
+  let remainingCredits = currentCredits - actualCost;
   try {
-    await fetch(
+    const dr = await fetch(
       kvUrl + '/decrby/' + encodeURIComponent(creditsKey) + '/' + actualCost,
       { headers: kvHeaders }
     );
-  } catch (_) {}
+    const dd = await dr.json().catch(() => ({}));
+    if (typeof dd.result === 'number') remainingCredits = dd.result;
+    if (remainingCredits < 0) {
+      await fetch(kvUrl + '/set/' + encodeURIComponent(creditsKey) + '/0', { headers: kvHeaders });
+      remainingCredits = 0;
+    }
+  } catch (_) {
+    remainingCredits = Math.max(0, remainingCredits);
+  }
 
   return res.status(200).json({
     translated_text: result.text,
     cost:            actualCost,
-    remaining:       currentCredits - actualCost,
+    remaining:       Math.max(0, remainingCredits),
   });
 };
 
