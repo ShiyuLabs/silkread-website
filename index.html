@@ -168,47 +168,61 @@
         </div>
     </footer>
 
-    <!-- ========== 登录弹窗 (Email + Code) ========== -->
+    <!-- ========== 登录弹窗 ========== -->
     <div id="login-modal" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);">
-        <div id="login-box" style="background:#fff;border-radius:16px;padding:32px 28px 24px;width:360px;max-width:90vw;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-            <button id="close-login" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;">?</button>
+        <div id="login-box" style="background:#fff;border-radius:16px;padding:28px 28px 24px;width:400px;max-width:92vw;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+            <button id="close-login" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:18px;line-height:1;padding:4px;">&times;</button>
 
-            <!-- Step 1: 输入邮箱 -->
-            <div id="login-step1">
-                <div style="text-align:center;margin-bottom:24px;">
-                    <div style="font-size:36px;margin-bottom:8px;">??</div>
-                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">登录 / 注册</h3>
-                    <p style="margin:0;font-size:13px;color:#6b7280;">输入邮箱，我们将发送 6 位验证码</p>
-                </div>
-                <input id="login-email" type="email" placeholder="your@email.com"
-                    style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;">
-                <button id="btn-send-code"
+            <!-- Tab 切换 -->
+            <div style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:22px;">
+                <button id="tab-login-btn" style="flex:1;padding:10px 0;font-size:15px;font-weight:700;color:#2563eb;background:none;border:none;border-bottom:2px solid #2563eb;margin-bottom:-2px;cursor:pointer;">登录</button>
+                <button id="tab-register-btn" style="flex:1;padding:10px 0;font-size:15px;font-weight:600;color:#9ca3af;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">注册</button>
+            </div>
+
+            <!-- 登录面板 -->
+            <div id="panel-login">
+                <input id="lg-email" type="email" placeholder="邮箱地址"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
+                <input id="lg-password" type="password" placeholder="密码"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;">
+                <button id="btn-do-login"
                     style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-                    发送验证码
+                    登录
                 </button>
             </div>
 
-            <!-- Step 2: 输入验证码 -->
-            <div id="login-step2" style="display:none;">
-                <div style="text-align:center;margin-bottom:24px;">
-                    <div style="font-size:36px;margin-bottom:8px;">??</div>
-                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">输入验证码</h3>
-                    <p style="margin:0;font-size:13px;color:#6b7280;">已发送至 <span id="login-email-display" style="color:#2563eb;font-weight:600;"></span></p>
-                </div>
-                <input id="login-code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码"
-                    style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:22px;font-family:monospace;letter-spacing:0.4em;text-align:center;outline:none;margin-bottom:12px;">
-                <button id="btn-verify-code"
-                    style="width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
-                    确认登录
+            <!-- 注册面板 Step 1: 填写信息 -->
+            <div id="panel-register-1" style="display:none;">
+                <input id="reg-email" type="email" placeholder="邮箱地址"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
+                <input id="reg-password" type="password" placeholder="设置密码（至少6位）"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
+                <input id="reg-password2" type="password" placeholder="确认密码"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;">
+                <button id="btn-send-reg-code"
+                    style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
+                    发送验证码到邮箱
                 </button>
-                <button id="btn-resend-code"
+            </div>
+
+            <!-- 注册面板 Step 2: 输入验证码 -->
+            <div id="panel-register-2" style="display:none;">
+                <p style="text-align:center;font-size:13px;color:#6b7280;margin:0 0 16px;">验证码已发送至 <span id="reg-email-display" style="color:#2563eb;font-weight:600;"></span></p>
+                <input id="reg-code" type="text" inputmode="numeric" maxlength="6" placeholder="输入6位验证码"
+                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:22px;font-family:monospace;letter-spacing:0.4em;text-align:center;outline:none;margin-bottom:14px;">
+                <button id="btn-complete-register"
+                    style="width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
+                    完成注册
+                </button>
+                <button id="btn-back-register"
                     style="width:100%;padding:8px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;">
-                    ← 重新填写邮箱
+                    ← 返回修改
                 </button>
             </div>
 
             <p id="login-msg" style="text-align:center;font-size:13px;font-weight:600;margin:14px 0 0;min-height:20px;"></p>
         </div>
+    </div>
 
     <!-- ========== 支付二维码弹窗 (Payment Modal) ========== -->
     <div id="payment-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
@@ -272,19 +286,30 @@
             const navUserId    = document.getElementById('nav-user-id');
             const btnLogout    = document.getElementById('btn-logout');
 
-            const loginModal   = document.getElementById('login-modal');
-            const loginOverlay = document.getElementById('login-overlay');
-            const closeLoginBtn = document.getElementById('close-login');
+            const loginModal      = document.getElementById('login-modal');
+            const closeLoginBtn  = document.getElementById('close-login');
+            const loginMsg       = document.getElementById('login-msg');
 
-            const loginStep1        = document.getElementById('login-step1');
-            const loginStep2        = document.getElementById('login-step2');
-            const loginEmailInput   = document.getElementById('login-email');
-            const loginEmailDisplay = document.getElementById('login-email-display');
-            const loginCodeInput    = document.getElementById('login-code');
-            const btnSendCode       = document.getElementById('btn-send-code');
-            const btnVerifyCode     = document.getElementById('btn-verify-code');
-            const btnResendCode     = document.getElementById('btn-resend-code');
-            const loginMsg          = document.getElementById('login-msg');
+            const tabLoginBtn    = document.getElementById('tab-login-btn');
+            const tabRegBtn      = document.getElementById('tab-register-btn');
+            const panelLogin     = document.getElementById('panel-login');
+            const panelReg1      = document.getElementById('panel-register-1');
+            const panelReg2      = document.getElementById('panel-register-2');
+
+            const lgEmail        = document.getElementById('lg-email');
+            const lgPassword     = document.getElementById('lg-password');
+            const btnDoLogin     = document.getElementById('btn-do-login');
+
+            const regEmail       = document.getElementById('reg-email');
+            const regPassword    = document.getElementById('reg-password');
+            const regPassword2   = document.getElementById('reg-password2');
+            const regEmailDisp   = document.getElementById('reg-email-display');
+            const regCode        = document.getElementById('reg-code');
+            const btnSendRegCode = document.getElementById('btn-send-reg-code');
+            const btnCompleteReg = document.getElementById('btn-complete-register');
+            const btnBackReg     = document.getElementById('btn-back-register');
+
+            const loginMsg2 = loginMsg; // alias kept for setLoginMsg
 
             const paymentModal     = document.getElementById('payment-modal');
             const paymentBox       = document.getElementById('payment-box');
@@ -324,34 +349,85 @@
                 modalEl.style.display = 'none';
             }
 
-            // ===== 登录模态框 =====
-            function openLoginModal() {
-                if (loginStep1) loginStep1.style.display = '';
-                if (loginStep2) loginStep2.style.display = 'none';
-                if (loginEmailInput) loginEmailInput.value = '';
-                if (loginCodeInput) loginCodeInput.value = '';
-                if (loginMsg) { loginMsg.textContent = ''; loginMsg.style.color = ''; }
-                openModal(loginModal);
-                setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
-            }
-
+            // ===== 登录/注册模态框 =====
             function setLoginMsg(text, ok) {
                 if (!loginMsg) return;
                 loginMsg.textContent = text;
                 loginMsg.style.color = ok ? '#16a34a' : '#dc2626';
             }
 
+            function switchTab(tab) {
+                const isLogin = tab === 'login';
+                tabLoginBtn.style.color    = isLogin ? '#2563eb' : '#9ca3af';
+                tabLoginBtn.style.borderBottomColor  = isLogin ? '#2563eb' : 'transparent';
+                tabRegBtn.style.color      = isLogin ? '#9ca3af' : '#2563eb';
+                tabRegBtn.style.borderBottomColor    = isLogin ? 'transparent' : '#2563eb';
+                panelLogin.style.display   = isLogin ? '' : 'none';
+                panelReg1.style.display    = (!isLogin) ? '' : 'none';
+                panelReg2.style.display    = 'none';
+                setLoginMsg('', true);
+                setTimeout(() => {
+                    if (isLogin && lgEmail) lgEmail.focus();
+                    else if (!isLogin && regEmail) regEmail.focus();
+                }, 100);
+            }
+
+            function openLoginModal() {
+                if (lgEmail) lgEmail.value = '';
+                if (lgPassword) lgPassword.value = '';
+                if (regEmail) regEmail.value = '';
+                if (regPassword) regPassword.value = '';
+                if (regPassword2) regPassword2.value = '';
+                if (regCode) regCode.value = '';
+                switchTab('login');
+                openModal(loginModal);
+            }
+
             if (btnLoginShow) btnLoginShow.addEventListener('click', openLoginModal);
             if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal));
-            if (loginOverlay) loginOverlay.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
+            loginModal.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
 
-            // Step 1: 发送验证码
-            if (btnSendCode) btnSendCode.addEventListener('click', async () => {
-                const email = loginEmailInput.value.trim();
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    setLoginMsg('请输入有效的邮箱地址', false); return;
-                }
-                btnSendCode.disabled = true; btnSendCode.textContent = '发送中...';
+            if (tabLoginBtn) tabLoginBtn.addEventListener('click', () => switchTab('login'));
+            if (tabRegBtn)   tabRegBtn.addEventListener('click',   () => switchTab('register'));
+
+            // ===== 登录 =====
+            async function doLogin() {
+                const email    = lgEmail ? lgEmail.value.trim() : '';
+                const password = lgPassword ? lgPassword.value : '';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginMsg('请输入有效的邮箱地址', false); return; }
+                if (!password) { setLoginMsg('请输入密码', false); return; }
+                btnDoLogin.disabled = true; btnDoLogin.textContent = '登录中...';
+                try {
+                    const resp = await fetch(API + '/api/login', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await resp.json();
+                    if (data.ok && data.token) {
+                        authToken = data.token; authEmail = data.email; isLoggedIn = true;
+                        store.set('authToken', authToken);
+                        store.set('authEmail', authEmail);
+                        window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
+                        setLoginMsg('登录成功！', true);
+                        setTimeout(() => { closeModal(loginModal); updateNav(); }, 600);
+                    } else {
+                        setLoginMsg(data.error || '登录失败，请重试', false);
+                    }
+                } catch { setLoginMsg('网络错误，请稍后重试', false); }
+                finally { btnDoLogin.disabled = false; btnDoLogin.textContent = '登录'; }
+            }
+            if (btnDoLogin) btnDoLogin.addEventListener('click', doLogin);
+            if (lgPassword) lgPassword.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+            // ===== 注册 Step 1: 发送验证码 =====
+            if (btnSendRegCode) btnSendRegCode.addEventListener('click', async () => {
+                const email = regEmail ? regEmail.value.trim() : '';
+                const pw1   = regPassword ? regPassword.value : '';
+                const pw2   = regPassword2 ? regPassword2.value : '';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginMsg('请输入有效的邮箱地址', false); return; }
+                if (!pw1 || pw1.length < 6) { setLoginMsg('密码至少需要6位', false); return; }
+                if (pw1 !== pw2) { setLoginMsg('两次密码输入不一致', false); return; }
+                btnSendRegCode.disabled = true; btnSendRegCode.textContent = '发送中...';
                 setLoginMsg('', true);
                 try {
                     const resp = await fetch(API + '/api/sendCode', {
@@ -360,55 +436,50 @@
                     });
                     const data = await resp.json();
                     if (data.ok) {
-                        if (loginEmailDisplay) loginEmailDisplay.textContent = email;
-                        loginStep1.style.display = 'none';
-                        loginStep2.style.display = '';
-                        setLoginMsg('验证码已发送，请查收邮件 ??', true);
-                        setTimeout(() => loginCodeInput && loginCodeInput.focus(), 100);
+                        if (regEmailDisp) regEmailDisp.textContent = email;
+                        panelReg1.style.display = 'none';
+                        panelReg2.style.display = '';
+                        setLoginMsg('验证码已发送，请查收邮件', true);
+                        setTimeout(() => regCode && regCode.focus(), 100);
                     } else {
                         setLoginMsg(data.error || '发送失败，请稍后重试', false);
                     }
                 } catch { setLoginMsg('网络错误，请稍后重试', false); }
-                finally { btnSendCode.disabled = false; btnSendCode.textContent = '发送验证码'; }
+                finally { btnSendRegCode.disabled = false; btnSendRegCode.textContent = '发送验证码到邮箱'; }
             });
 
-            if (loginEmailInput) loginEmailInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnSendCode && btnSendCode.click(); });
-
-            // Step 2: 验证验证码
-            if (btnVerifyCode) btnVerifyCode.addEventListener('click', async () => {
-                const email = loginEmailDisplay ? loginEmailDisplay.textContent : '';
-                const code  = loginCodeInput ? loginCodeInput.value.trim() : '';
+            // ===== 注册 Step 2: 完成注册 =====
+            if (btnCompleteReg) btnCompleteReg.addEventListener('click', async () => {
+                const email    = regEmailDisp ? regEmailDisp.textContent : '';
+                const password = regPassword ? regPassword.value : '';
+                const code     = regCode ? regCode.value.trim() : '';
                 if (!code || code.length !== 6) { setLoginMsg('请输入6位验证码', false); return; }
-                btnVerifyCode.disabled = true; btnVerifyCode.textContent = '验证中...';
+                btnCompleteReg.disabled = true; btnCompleteReg.textContent = '注册中...';
                 try {
-                    const resp = await fetch(API + '/api/verifyCode', {
+                    const resp = await fetch(API + '/api/register', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, code })
+                        body: JSON.stringify({ email, password, code })
                     });
                     const data = await resp.json();
                     if (data.ok && data.token) {
                         authToken = data.token; authEmail = data.email; isLoggedIn = true;
                         store.set('authToken', authToken);
                         store.set('authEmail', authEmail);
-                        // 通知扩展程序保存 token
                         window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
-                        setLoginMsg('登录成功！??', true);
+                        setLoginMsg('注册成功，赠送1000点数！', true);
                         setTimeout(() => { closeModal(loginModal); updateNav(); }, 800);
                     } else {
-                        setLoginMsg(data.error || '验证码错误，请重试', false);
+                        setLoginMsg(data.error || '注册失败，请重试', false);
                     }
                 } catch { setLoginMsg('网络错误，请稍后重试', false); }
-                finally { btnVerifyCode.disabled = false; btnVerifyCode.textContent = '确认登录'; }
+                finally { btnCompleteReg.disabled = false; btnCompleteReg.textContent = '完成注册'; }
             });
+            if (regCode) regCode.addEventListener('keydown', e => { if (e.key === 'Enter') btnCompleteReg && btnCompleteReg.click(); });
 
-            if (loginCodeInput) loginCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnVerifyCode && btnVerifyCode.click(); });
-
-            // 重新发送
-            if (btnResendCode) btnResendCode.addEventListener('click', () => {
-                loginStep2.style.display = 'none';
-                loginStep1.style.display = '';
+            if (btnBackReg) btnBackReg.addEventListener('click', () => {
+                panelReg2.style.display = 'none';
+                panelReg1.style.display = '';
                 setLoginMsg('', true);
-                setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
             });
 
             // ===== 支付弹窗 =====
