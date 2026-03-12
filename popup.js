@@ -1,17 +1,30 @@
 ﻿// popup.js
 
-const autoTranslateBtn = document.getElementById("autoTranslateBtn");
-const displayModeBtn   = document.getElementById("displayModeBtn");
-const autoDot          = document.getElementById("autoDot");
-const autoStatus       = document.getElementById("autoStatus");
-const modeText         = document.getElementById("modeText");
+const autoTranslateBtn = document.getElementById('autoTranslateBtn');
+const displayModeBtn   = document.getElementById('displayModeBtn');
+const autoDot          = document.getElementById('autoDot');
+const autoStatus       = document.getElementById('autoStatus');
+const modeText         = document.getElementById('modeText');
 
-const sourceLangSel    = document.getElementById("sourceLang");
-const targetLangSel    = document.getElementById("targetLang");
-const managedModelSel  = document.getElementById("managedModel");
-const balanceText      = document.getElementById("balanceText");
-const topupBtn         = document.getElementById("topupBtn");
-const modalOverlay     = document.getElementById("modalOverlay");
+const sourceLangSel    = document.getElementById('sourceLang');
+const targetLangSel    = document.getElementById('targetLang');
+const managedModelSel  = document.getElementById('managedModel');
+const balanceText      = document.getElementById('balanceText');
+const topupBtn         = document.getElementById('topupBtn');
+const accountEmail     = document.getElementById('accountEmail');
+const accountActionBtn = document.getElementById('accountActionBtn');
+
+const WEBSITE = 'https://shiyuai.top/';
+
+// 每个模型的计费比率（积分 / 1K Token）
+const MODEL_RATES = {
+  'free-translation':  0,
+  'deepseek-chat':    10,
+  'qwen3-235b-a22b':  20,
+  'gemini-2.5-flash': 30,
+  'gpt-5-mini':       50,
+  'claude-sonnet-4-6': 200,
+};
 
 // 浏览器语言 -> 目标语言 映射
 function detectBrowserLang() {
@@ -37,31 +50,84 @@ chrome.storage.sync.get(
     setSelectValue(targetLangSel, targetLang);
     if (!syncResult.targetLang) chrome.storage.sync.set({ targetLang, sourceLang: 'auto' });
 
-    // 处理模型选择状态
     if (syncResult.translationEngine === 'free') {
       setSelectValue(managedModelSel, 'free-translation');
     } else {
-      setSelectValue(managedModelSel, syncResult.managedModel || 'deepseek-v3.2');
+      const targetModel = syncResult.managedModel || 'deepseek-chat';
+      setSelectValue(managedModelSel, targetModel);
+      // 如果存储的模型在新选项列表里找不到（旧版本遗留），自动回退到免费档并修正存储
+      if (managedModelSel.value !== targetModel) {
+        managedModelSel.value = 'free-translation';
+        chrome.storage.sync.set({ translationEngine: 'free' });
+      }
     }
 
-    // 加载余额
+    // 加载余额（先用缓存，再刷新）
     chrome.storage.local.get(['cachedCredits'], (local) => {
       if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
     });
+    checkLoginState();
     loadBalance();
   }
 );
 
+// ===== 账户状态 =====
+function checkLoginState() {
+  chrome.storage.local.get(['authToken', 'authEmail'], (stored) => {
+    if (stored.authToken && stored.authEmail) {
+      accountEmail.textContent     = stored.authEmail;
+      accountActionBtn.textContent = '退出';
+      accountActionBtn.onclick     = doLogout;
+    } else {
+      accountEmail.textContent     = '未登录';
+      accountActionBtn.textContent = '去登录';
+      accountActionBtn.onclick     = openWebsite;
+    }
+  });
+}
+
+function doLogout() {
+  chrome.runtime.sendMessage({ action: 'logout' }, () => {
+    accountEmail.textContent     = '未登录';
+    accountActionBtn.textContent = '去登录';
+    accountActionBtn.onclick     = openWebsite;
+    balanceText.textContent = ' 余额：未登录';
+    balanceText.style.color = '#9ca3af';
+  });
+}
+
+function openWebsite() {
+  chrome.tabs.create({ url: WEBSITE });
+}
+
+// ===== 充值按钮  直接跳转网站 =====
+topupBtn.addEventListener('click', () => {
+  chrome.storage.local.get(['authToken'], (stored) => {
+    const url = stored.authToken
+      ? WEBSITE + '?token=' + stored.authToken
+      : WEBSITE;
+    chrome.tabs.create({ url });
+  });
+});
+
 // ===== 余额显示 =====
 function updateBalanceUI(credits) {
-  const chars = Math.round(credits * 4 / 10000); // 1万credits4万字符
+  const rate = MODEL_RATES[managedModelSel.value];
   if (credits <= 0) {
     balanceText.textContent = ' 余额：已用尽';
     balanceText.style.color = '#ef4444';
-  } else {
-    balanceText.textContent = ` 余额：约 ${chars} 万字`;
-    balanceText.style.color = '#10b981';
+    return;
   }
+  if (!rate) {
+    // 免费模式下只显示积分
+    balanceText.textContent = ` 余额：${credits.toLocaleString()} 积分`;
+    balanceText.style.color = '#10b981';
+    return;
+  }
+  // 积分 ÷ 费率 * 1000 tokens * ~1.2字/token ÷ 10000 = 万字
+  const wanChars = Math.round(credits * 1.2 / (rate * 10));
+  balanceText.textContent = ` 余额：约 ${wanChars || 1} 万字`;
+  balanceText.style.color = '#10b981';
 }
 
 function loadBalance() {
@@ -69,8 +135,10 @@ function loadBalance() {
   balanceText.style.color = '#9ca3af';
   chrome.runtime.sendMessage({ action: 'getBalance' }, (res) => {
     if (res && res.ok) {
-      chrome.storage.local.set({ cachedCredits: res.credits });
       updateBalanceUI(res.credits);
+    } else if (res && res.loggedOut) {
+      balanceText.textContent = ' 余额：未登录';
+      balanceText.style.color = '#9ca3af';
     } else {
       balanceText.textContent = ' 余额：获取失败';
       balanceText.style.color = '#9ca3af';
@@ -78,147 +146,91 @@ function loadBalance() {
   });
 }
 
-// ===== 充值模态框 =====
-let selectedPkg = { amount: 30, credits: 350000 };
-
-topupBtn.addEventListener('click', () => {
-  // 从 background.js 获取当前插件随机生成的 userId，并打开充值网页
-  chrome.runtime.sendMessage({ action: 'getUserId' }, (res) => {
-    if (res && res.userId) {
-      const topupUrl = `https://shiyuai.top/?uid=${res.userId}`;
-      chrome.tabs.create({ url: topupUrl });
-    }
-  });
-});
-
-// 套餐卡片选择 (如果已不再需要插件内弹窗，这些可以保留或忽略)
-document.querySelectorAll('.pkg-card').forEach(card => {
-  card.addEventListener('click', () => {
-    document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    selectedPkg = {
-      amount:  parseInt(card.dataset.amount),
-      credits: parseInt(card.dataset.credits)
-    };
-  });
-});
-
-document.getElementById('modalPay').addEventListener('click', () => {
-  const btn    = document.getElementById('modalPay');
-  const status = document.getElementById('modalStatus');
-  btn.disabled = true;
-  btn.textContent = '请求中';
-  status.style.color = '#6b7280';
-  status.textContent = '';
-  chrome.runtime.sendMessage({ action: 'topup', amountCny: selectedPkg.amount }, (res) => {
-    btn.disabled = false;
-    btn.textContent = '确认支付';
-    if (res && res.ok && res.pay_url) {
-      status.textContent = '正在打开支付页面';
-      chrome.tabs.create({ url: res.pay_url });
-    } else {
-      status.style.color = '#ef4444';
-      status.textContent = res?.error || '服务器未配置，请联系开发者';
-    }
-  });
-});
-
 // ===== 核心模型切换 =====
 managedModelSel.addEventListener('change', () => {
   const val = managedModelSel.value;
   if (val === 'free-translation') {
     chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
   } else {
-    // 设置为 AI 引擎和对应的托管模型
     chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
   }
+  // 切换模型后刷新余额估算
+  chrome.storage.local.get(['cachedCredits'], (local) => {
+    if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
+  });
 });
 
 // ===== 语言选择 =====
 sourceLangSel.addEventListener('change', () => {
-  chrome.storage.sync.set({ sourceLang: sourceLangSel.value }, () => {
-    retranslateIfAuto();
-  });
+  chrome.storage.sync.set({ sourceLang: sourceLangSel.value }, () => retranslateIfAuto());
 });
 targetLangSel.addEventListener('change', () => {
-  chrome.storage.sync.set({ targetLang: targetLangSel.value }, () => {
-    retranslateIfAuto();
-  });
+  chrome.storage.sync.set({ targetLang: targetLangSel.value }, () => retranslateIfAuto());
 });
 
 // ===== 自动翻译按钮 =====
-autoTranslateBtn.addEventListener("click", () => {
-  chrome.storage.sync.get(["autoTranslateEnabled"], (result) => {
+autoTranslateBtn.addEventListener('click', () => {
+  chrome.storage.sync.get(['autoTranslateEnabled'], (result) => {
     const newState = !(result.autoTranslateEnabled || false);
     chrome.storage.sync.set({ autoTranslateEnabled: newState }, () => {
       updateAutoTranslateUI(newState);
-      if (newState) {
-        sendToCurrentTab({ action: "translate" });
-      }
+      if (newState) sendToCurrentTab({ action: 'translate' });
     });
   });
 });
 
 // ===== 显示模式按钮 =====
-displayModeBtn.addEventListener("click", () => {
-  chrome.storage.sync.get(["displayMode"], (result) => {
+displayModeBtn.addEventListener('click', () => {
+  chrome.storage.sync.get(['displayMode'], (result) => {
     const newMode = (result.displayMode || 'bilingual') === 'bilingual' ? 'translationOnly' : 'bilingual';
     chrome.storage.sync.set({ displayMode: newMode }, () => {
       updateDisplayModeUI(newMode);
-      sendToCurrentTab({ action: "changeDisplayMode", mode: newMode });
+      sendToCurrentTab({ action: 'changeDisplayMode', mode: newMode });
     });
   });
 });
 
-// ===== 辅助：如果开了自动翻译，重新翻译当前 tab =====
+// ===== 辅助 =====
 function retranslateIfAuto() {
   chrome.storage.sync.get(['autoTranslateEnabled'], (result) => {
-    if (result.autoTranslateEnabled) {
-      sendToCurrentTab({ action: 'translate' });
-    }
+    if (result.autoTranslateEnabled) sendToCurrentTab({ action: 'translate' });
   });
 }
 
-// ===== 辅助：发消息到当前 tab =====
 function sendToCurrentTab(msg) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) return;
-    chrome.tabs.sendMessage(tabs[0].id, msg, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("Message error:", chrome.runtime.lastError.message);
-      }
-    });
+    chrome.tabs.sendMessage(tabs[0].id, msg, () => { chrome.runtime.lastError; });
   });
-}
-
-// ===== UI 更新 =====
-function updateAutoTranslateUI(enabled) {
-  if (enabled) {
-    autoTranslateBtn.textContent = "禁用自动翻译";
-    autoTranslateBtn.classList.add("active");
-    autoDot.classList.add("active");
-    autoStatus.textContent = "已启用自动翻译";
-  } else {
-    autoTranslateBtn.textContent = "启用自动翻译";
-    autoTranslateBtn.classList.remove("active");
-    autoDot.classList.remove("active");
-    autoStatus.textContent = "已禁用自动翻译";
-  }
-}
-
-function updateDisplayModeUI(mode) {
-  if (mode === "translationOnly") {
-    displayModeBtn.textContent = "切换为双语对照";
-    displayModeBtn.classList.add("active");
-    modeText.textContent = "当前: 译文只显";
-  } else {
-    displayModeBtn.textContent = "切换为译文只显";
-    displayModeBtn.classList.remove("active");
-    modeText.textContent = "当前: 双语对照";
-  }
 }
 
 function setSelectValue(sel, value) {
   const option = sel.querySelector(`option[value="${value}"]`);
   if (option) sel.value = value;
+}
+
+function updateAutoTranslateUI(enabled) {
+  if (enabled) {
+    autoTranslateBtn.textContent = '禁用自动翻译';
+    autoTranslateBtn.classList.add('active');
+    autoDot.classList.add('active');
+    autoStatus.textContent = '已启用自动翻译';
+  } else {
+    autoTranslateBtn.textContent = '启用自动翻译';
+    autoTranslateBtn.classList.remove('active');
+    autoDot.classList.remove('active');
+    autoStatus.textContent = '已禁用自动翻译';
+  }
+}
+
+function updateDisplayModeUI(mode) {
+  if (mode === 'translationOnly') {
+    displayModeBtn.textContent = '切换为双语对照';
+    displayModeBtn.classList.add('active');
+    modeText.textContent = '当前: 译文只显';
+  } else {
+    displayModeBtn.textContent = '切换为译文只显';
+    displayModeBtn.classList.remove('active');
+    modeText.textContent = '当前: 双语对照';
+  }
 }

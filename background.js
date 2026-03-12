@@ -4,15 +4,11 @@
 // 本地开发: 'http://localhost:8000'  上线后改为你的服务器地址
 const PROXY_URL = 'https://shiyuai.top';
 
-// 生成或获取用户唯一 ID（UUID 存 chrome.storage.local）
-async function getUserId() {
-  const stored = await chrome.storage.local.get(['userId']);
-  if (stored.userId) return stored.userId;
-  const buf = new Uint8Array(12);
-  crypto.getRandomValues(buf);
-  const userId = 'uid_' + Array.from(buf).map(b => b.toString(16).padStart(2,'0')).join('');
-  await chrome.storage.local.set({ userId });
-  return userId;
+// 获取已登录用户的 session token（返回 null 表示未登录）
+async function getAuthToken() {
+  const stored = await chrome.storage.local.get(['authToken', 'authEmail']);
+  if (stored.authToken && stored.authEmail) return stored.authToken;
+  return null;
 }
 
 // 目标语言代码 -> 自然语言名称（用于 AI 翻译的 prompt）
@@ -25,58 +21,83 @@ const LANG_NAMES = {
 
 // 监听来自 content.js 的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // 获取用户 ID
-  if (request.action === 'getUserId') {
-    getUserId().then(id => sendResponse({ userId: id }));
+  // 获取登录状态
+  if (request.action === 'getLoginState') {
+    chrome.storage.local.get(['authToken', 'authEmail'], (stored) => {
+      if (stored.authToken && stored.authEmail) {
+        sendResponse({ loggedIn: true, email: stored.authEmail });
+      } else {
+        sendResponse({ loggedIn: false });
+      }
+    });
+    return true;
+  }
+
+  // 发送邮箱验证码
+  if (request.action === 'sendLoginCode') {
+    fetch(`${PROXY_URL}/api/sendCode`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: request.email }),
+    })
+      .then(r => r.json())
+      .then(data => sendResponse(data))
+      .catch(e  => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  // 验证验证码并登录
+  if (request.action === 'verifyLoginCode') {
+    fetch(`${PROXY_URL}/api/verifyCode`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: request.email, code: request.code }),
+    })
+      .then(r => r.json())
+      .then(async data => {
+        if (data.ok && data.token && data.email) {
+          await chrome.storage.local.set({ authToken: data.token, authEmail: data.email });
+        }
+        sendResponse(data);
+      })
+      .catch(e => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  // 退出登录
+  if (request.action === 'logout') {
+    chrome.storage.local.remove(['authToken', 'authEmail', 'cachedCredits'], () => {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+
+  // 从网页接收 token（content.js 中继转发）
+  if (request.action === 'saveAuthToken') {
+    if (request.token && request.email) {
+      chrome.storage.local.set({ authToken: request.token, authEmail: request.email }, () => {
+        sendResponse({ ok: true });
+      });
+    } else {
+      sendResponse({ ok: false });
+    }
     return true;
   }
 
   // 查询余额
   if (request.action === 'getBalance') {
-    getUserId().then(userId =>
-      fetch(`${PROXY_URL}/api/balance?id=${userId}`)
+    getAuthToken().then(token => {
+      if (!token) return sendResponse({ ok: false, loggedOut: true });
+      fetch(`${PROXY_URL}/api/balance?token=${token}`)
         .then(r => r.json())
-        .then(data => sendResponse({ ok: true, balance: data.balance || 0 }))
-        .catch(e  => sendResponse({ ok: false, error: e.message }))
-    );
-    return true;
-  }
-
-  // 创建充值订单
-  if (request.action === 'topup') {
-    getUserId().then(userId =>
-      fetch(`${PROXY_URL}/api/topup`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, amount_cny: request.amountCny })
-      })
-        .then(async r => {
-          const body = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
-          return body;
+        .then(data => {
+          if (data.expired) return sendResponse({ ok: false, expired: true });
+          const credits = data.credits || 0;
+          chrome.storage.local.set({ cachedCredits: credits });
+          sendResponse({ ok: true, credits });
         })
-        .then(data => sendResponse({ ok: true, ...data }))
-        .catch(e  => sendResponse({ ok: false, error: e.message }))
-    );
-    return true;
-  }
-
-  // 提交手动支付凭证（微信昵称）
-  if (request.action === 'submitClaim') {
-    getUserId().then(userId =>
-      fetch(`${PROXY_URL}/api/claim`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, amount_cny: request.amountCny, wechat_name: request.wechatName })
-      })
-        .then(async r => {
-          const body = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(body.detail || `HTTP ${r.status}`);
-          return body;
-        })
-        .then(data => sendResponse({ ok: true, ...data }))
-        .catch(e  => sendResponse({ ok: false, error: e.message }))
-    );
+        .catch(e => sendResponse({ ok: false, error: e.message }));
+    });
     return true;
   }
 
@@ -100,41 +121,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// ===== 免费翻译（Microsoft Edge 翻译服务） =====
-let msTokenCache = { token: null, expiry: 0 };
-
-async function getMicrosoftToken() {
-  if (msTokenCache.token && Date.now() < msTokenCache.expiry) {
-    return msTokenCache.token;
-  }
-  console.log('[Free] 正在获取 Microsoft token...');
-  const resp = await fetch('https://edge.microsoft.com/translate/auth', {
-    headers: { 'Accept': 'application/jwt' }
-  });
-  console.log('[Free] token 响应状态:', resp.status);
-  if (!resp.ok) throw new Error(`获取 Microsoft token 失败: HTTP ${resp.status}`);
-  const token = await resp.text();
-  if (!token || token.length < 20) throw new Error('Microsoft token 内容异常: ' + token.slice(0, 50));
-  console.log('[Free] token 获取成功，长度:', token.length);
-  msTokenCache = { token, expiry: Date.now() + 8 * 60 * 1000 };
-  return token;
-}
-
-function toMsLangCode(lang) {
+// ===== 免费翻译（Google Translate 非官方 API） =====
+function toGoogleLangCode(lang) {
   const map = {
-    'zh-CN': 'zh-Hans', 'zh-TW': 'zh-Hant', 'zh': 'zh-Hans',
+    'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh': 'zh-CN',
     'en': 'en', 'ja': 'ja', 'ko': 'ko', 'fr': 'fr', 'de': 'de',
     'es': 'es', 'pt': 'pt', 'ru': 'ru', 'ar': 'ar', 'it': 'it'
   };
-  return map[lang] || lang.split('-')[0];
+  return map[lang] || lang;
+}
+
+async function googleTranslate(text, sl, tl) {
+  // 通过自有服务器代理请求，避免 Service Worker 直连 Google 时的网络/CORS 问题
+  const resp = await fetch(`${PROXY_URL}/api/freeTranslate`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ text, sl: sl || 'auto', tl }),
+  });
+  if (!resp.ok) throw new Error(`免费翻译失败: HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (!data.translated) throw new Error(data.error || '翻译返回为空');
+  return data.translated;
 }
 
 async function handleFreeTranslation(text, sourceLang, targetLang) {
-  const tl = toMsLangCode(targetLang);
-  const sl = (sourceLang === 'auto') ? null : toMsLangCode(sourceLang);
-  console.log(`[Free] 翻译方向: ${sl || 'auto'} -> ${tl}`);
-
-  const token = await getMicrosoftToken();
+  const tl = toGoogleLangCode(targetLang);
+  const sl = (sourceLang === 'auto') ? 'auto' : toGoogleLangCode(sourceLang);
+  console.log(`[Free] 翻译方向: ${sl} -> ${tl}`);
 
   // 解析 "[N] text" 格式
   const entries = [];
@@ -144,50 +157,29 @@ async function handleFreeTranslation(text, sourceLang, targetLang) {
   }
 
   if (entries.length === 0) {
-    const result = await microsoftTranslateBatch([{ Text: text }], token, sl, tl);
-    return result[0];
+    return await googleTranslate(text, sl, tl);
   }
 
-  // 一次最多 100 条批量翻译
-  const BATCH = 100;
+  // 批量翻译：每批 40 条，换行拼接发送
+  const BATCH = 40;
   const results = [];
   for (let i = 0; i < entries.length; i += BATCH) {
     const batch = entries.slice(i, i + BATCH);
-    const translated = await microsoftTranslateBatch(batch.map(e => ({ Text: e.src })), token, sl, tl);
-    results.push(...translated);
+    const joined = batch.map(e => e.src).join('\n');
+    const translated = await googleTranslate(joined, sl, tl);
+    const lines = translated.split('\n');
+    if (lines.length === batch.length) {
+      results.push(...lines);
+    } else {
+      // 行数不匹配则逐条翻译兜底
+      for (const e of batch) {
+        try { results.push(await googleTranslate(e.src, sl, tl)); }
+        catch { results.push(e.src); }
+      }
+    }
   }
 
   return entries.map((e, i) => `[${e.idx}] ${results[i] ?? e.src}`).join('\n');
-}
-
-async function microsoftTranslateBatch(bodyItems, token, sl, tl) {
-  let url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=${tl}&textType=plain`;
-  if (sl) url += `&from=${sl}`;
-  console.log('[Free] 调用 Azure API, 条数:', bodyItems.length);
-
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(bodyItems)
-  });
-
-  console.log('[Free] Azure API 响应状态:', resp.status);
-  if (resp.status === 401) {
-    // token 过期，清除缓存重试一次
-    msTokenCache = { token: null, expiry: 0 };
-    const newToken = await getMicrosoftToken();
-    return microsoftTranslateBatch(bodyItems, newToken, sl, tl);
-  }
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Azure 翻译 API 失败: HTTP ${resp.status} - ${errText.slice(0, 100)}`);
-  }
-
-  const data = await resp.json();
-  return data.map(item => item.translations[0].text);
 }
 
 // ===== AI 翻译入口（路由到托管版或自带API） =====
@@ -200,14 +192,15 @@ async function handleAITranslation(text, sourceLang, targetLang, settings) {
 
 // ===== 托管版翻译（通过代理服务器，按 token 计费，自动赚取差价）=====
 async function handleManagedTranslation(text, sourceLang, targetLang, settings) {
-  const userId   = await getUserId();
+  const token = await getAuthToken();
+  if (!token) throw new Error('LOGGED_OUT');
   const modelKey = settings.managedModel || 'deepseek';
 
   const resp = await fetch(`${PROXY_URL}/api/translate`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      userId:      userId,
+      token:       token,
       text:        text,
       target_lang: targetLang,
       model:       modelKey,

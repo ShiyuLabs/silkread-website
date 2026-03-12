@@ -199,31 +199,8 @@
             <p id="bind-msg" class="text-center text-xs text-green-600 font-semibold mt-4 h-4"></p>
         </div>
 
-        <!-- 找回老账号版面 (默认隐藏) -->
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 transform scale-95 transition-transform duration-300 hidden" id="import-box">
-             <button id="close-import" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-            <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">找回原有资产</h3>
-            <div class="space-y-4">
-                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="old-sync-code">原有分配的 ID 账号</label>
-                    <input id="old-sync-code" type="text" placeholder="输入 uid_xxxx " class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5" for="old-recovery-pass">当时设置的恢复密码</label>
-                    <input id="old-recovery-pass" type="password" placeholder="输入密码" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm">
-                </div>
-                <button id="btn-import-save" class="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-colors flex justify-center items-center">
-                    <span>验证并找回资产</span>
-                </button>
-                 <div class="flex items-center justify-between mt-4 border-t pt-4">
-                     <button id="btn-show-bind" class="text-sm text-gray-500 hover:text-gray-800">返回新用户注册</button>
-                </div>
-            </div>
-            <p id="import-msg" class="text-center text-xs text-red-500 mt-4 h-4"></p>
-        </div>
-    </div>
+        <!-- 找回账号版面 (默认隐藏) -->
+        <!-- 保留为空元素，放入主 modal 里面起备用 -->
 
     <!-- ========== 支付二维码弹窗 (Payment Modal) ========== -->
     <div id="payment-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
@@ -258,14 +235,223 @@
     </div>
 
     <!-- 交互逻辑 JS -->
-        <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // 安全读取 localStorage，防止在 file:// 协议下抛出异常导致整个脚本崩溃
-            let localStr = {
-                getItem: function(k) { try { return localStorage.getItem(k); } catch(e) { return null; } },
-                setItem: function(k, v) { try { localStorage.setItem(k, v); } catch(e) {} },
-                removeItem: function(k) { try { localStorage.removeItem(k); } catch(e) {} }
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const API = 'https://shiyuai.top';
+
+            // ===== localStorage 安全封装 =====
+            const store = {
+                get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+                del: (k) => { try { localStorage.removeItem(k); } catch {} },
             };
+
+            // ===== 读取 URL 中的 token（从插件充值跳转过来）=====
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlToken = urlParams.get('token');
+            if (urlToken) {
+                store.set('authToken', urlToken);
+                try { window.history.replaceState({}, document.title, window.location.pathname); } catch {}
+            }
+
+            let authToken = store.get('authToken');
+            let authEmail = store.get('authEmail');
+            let isLoggedIn = !!(authToken && authEmail);
+
+            // ===== DOM refs =====
+            const btnLoginShow = document.getElementById('btn-login-show');
+            const userInfo     = document.getElementById('user-info');
+            const navUserId    = document.getElementById('nav-user-id');
+            const btnLogout    = document.getElementById('btn-logout');
+
+            const loginModal   = document.getElementById('login-modal');
+            const loginOverlay = document.getElementById('login-overlay');
+            const closeLoginBtn = document.getElementById('close-login');
+
+            const loginStep1        = document.getElementById('login-step1');
+            const loginStep2        = document.getElementById('login-step2');
+            const loginEmailInput   = document.getElementById('login-email');
+            const loginEmailDisplay = document.getElementById('login-email-display');
+            const loginCodeInput    = document.getElementById('login-code');
+            const btnSendCode       = document.getElementById('btn-send-code');
+            const btnVerifyCode     = document.getElementById('btn-verify-code');
+            const btnResendCode     = document.getElementById('btn-resend-code');
+            const loginMsg          = document.getElementById('login-msg');
+
+            const paymentModal     = document.getElementById('payment-modal');
+            const paymentBox       = document.getElementById('payment-box');
+            const paymentOverlay   = document.getElementById('payment-overlay');
+            const closePaymentBtn  = document.getElementById('close-payment');
+            const paymentAmountText = document.getElementById('payment-amount');
+            const buyButtons       = document.querySelectorAll('.btn-buy');
+
+            // ===== Nav 状态 =====
+            function updateNav() {
+                if (isLoggedIn) {
+                    if (btnLoginShow) btnLoginShow.classList.add('hidden');
+                    if (userInfo) { userInfo.classList.remove('hidden'); userInfo.classList.add('flex'); }
+                    if (navUserId) { navUserId.innerText = authEmail; navUserId.title = authEmail; }
+                } else {
+                    if (btnLoginShow) btnLoginShow.classList.remove('hidden');
+                    if (userInfo) { userInfo.classList.add('hidden'); userInfo.classList.remove('flex'); }
+                }
+            }
+            updateNav();
+
+            // ===== 退出 =====
+            if (btnLogout) btnLogout.addEventListener('click', () => {
+                store.del('authToken');
+                store.del('authEmail');
+                authToken = null; authEmail = null; isLoggedIn = false;
+                updateNav();
+            });
+
+            // ===== 模态框辅助 =====
+            function openModal(modalEl) {
+                if (!modalEl) return;
+                modalEl.classList.remove('hidden');
+                void modalEl.offsetWidth;
+                modalEl.classList.remove('opacity-0');
+                const box = modalEl.querySelector('[id$="-box"]');
+                if (box) box.classList.remove('scale-95');
+            }
+            function closeModal(modalEl) {
+                if (!modalEl) return;
+                modalEl.classList.add('opacity-0');
+                const box = modalEl.querySelector('[id$="-box"]');
+                if (box) box.classList.add('scale-95');
+                setTimeout(() => modalEl.classList.add('hidden'), 300);
+            }
+
+            // ===== 登录模态框 =====
+            function openLoginModal() {
+                if (loginStep1) loginStep1.classList.remove('hidden');
+                if (loginStep2) loginStep2.classList.add('hidden');
+                if (loginEmailInput) loginEmailInput.value = '';
+                if (loginCodeInput) loginCodeInput.value = '';
+                if (loginMsg) { loginMsg.textContent = ''; loginMsg.className = 'text-center text-sm font-medium mt-4 min-h-[20px]'; }
+                openModal(loginModal);
+                setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
+            }
+
+            function setLoginMsg(text, ok) {
+                if (!loginMsg) return;
+                loginMsg.textContent = text;
+                loginMsg.className = 'text-center text-sm font-medium mt-4 min-h-[20px] ' + (ok ? 'text-green-600' : 'text-red-500');
+            }
+
+            if (btnLoginShow) btnLoginShow.addEventListener('click', openLoginModal);
+            if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal));
+            if (loginOverlay) loginOverlay.addEventListener('click', () => closeModal(loginModal));
+
+            // Step 1: 发送验证码
+            if (btnSendCode) btnSendCode.addEventListener('click', async () => {
+                const email = loginEmailInput.value.trim();
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    setLoginMsg('请输入有效的邮箱地址', false); return;
+                }
+                btnSendCode.disabled = true; btnSendCode.textContent = '发送中...';
+                setLoginMsg('', true);
+                try {
+                    const resp = await fetch(API + '/api/sendCode', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email })
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        loginEmailDisplay.textContent = email;
+                        loginStep1.classList.add('hidden');
+                        loginStep2.classList.remove('hidden');
+                        setLoginMsg('验证码已发送，请查收邮件 📧', true);
+                        setTimeout(() => loginCodeInput && loginCodeInput.focus(), 100);
+                    } else {
+                        setLoginMsg(data.error || '发送失败，请稍后重试', false);
+                    }
+                } catch { setLoginMsg('网络错误，请稍后重试', false); }
+                finally { btnSendCode.disabled = false; btnSendCode.textContent = '发送验证码'; }
+            });
+
+            if (loginEmailInput) loginEmailInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnSendCode && btnSendCode.click(); });
+
+            // Step 2: 验证验证码
+            if (btnVerifyCode) btnVerifyCode.addEventListener('click', async () => {
+                const email = loginEmailDisplay ? loginEmailDisplay.textContent : '';
+                const code  = loginCodeInput ? loginCodeInput.value.trim() : '';
+                if (!code || code.length !== 6) { setLoginMsg('请输入6位验证码', false); return; }
+                btnVerifyCode.disabled = true; btnVerifyCode.textContent = '验证中...';
+                try {
+                    const resp = await fetch(API + '/api/verifyCode', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, code })
+                    });
+                    const data = await resp.json();
+                    if (data.ok && data.token) {
+                        authToken = data.token; authEmail = data.email; isLoggedIn = true;
+                        store.set('authToken', authToken);
+                        store.set('authEmail', authEmail);
+                        // 通知扩展程序保存 token
+                        window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
+                        setLoginMsg('登录成功！🎉', true);
+                        setTimeout(() => { closeModal(loginModal); updateNav(); }, 800);
+                    } else {
+                        setLoginMsg(data.error || '验证码错误，请重试', false);
+                    }
+                } catch { setLoginMsg('网络错误，请稍后重试', false); }
+                finally { btnVerifyCode.disabled = false; btnVerifyCode.textContent = '确认登录'; }
+            });
+
+            if (loginCodeInput) loginCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') btnVerifyCode && btnVerifyCode.click(); });
+
+            // 重新发送
+            if (btnResendCode) btnResendCode.addEventListener('click', () => {
+                loginStep2.classList.add('hidden');
+                loginStep1.classList.remove('hidden');
+                setLoginMsg('', true);
+                setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
+            });
+
+            // ===== 支付弹窗 =====
+            if (closePaymentBtn) closePaymentBtn.addEventListener('click', () => closeModal(paymentModal));
+            if (paymentOverlay) paymentOverlay.addEventListener('click', () => closeModal(paymentModal));
+
+            if (buyButtons) buyButtons.forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    if (!isLoggedIn) { openLoginModal(); return; }
+                    const price = this.getAttribute('data-price');
+                    if (paymentAmountText) paymentAmountText.innerText = '￥' + price + '.00';
+                    const qrImg     = document.getElementById('qrcode-img');
+                    const qrLoading = document.getElementById('qrcode-loading');
+                    const qrError   = document.getElementById('qrcode-error');
+                    qrImg.classList.add('hidden');
+                    qrError.classList.add('hidden');
+                    qrLoading.classList.remove('hidden');
+                    openModal(paymentModal);
+                    try {
+                        const resp = await fetch(API + '/api/pay', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ token: authToken, amount: price })
+                        });
+                        const data = await resp.json();
+                        qrLoading.classList.add('hidden');
+                        if (data.qrcode) {
+                            qrImg.src = data.qrcode; qrImg.classList.remove('hidden');
+                        } else if (data.url) {
+                            window.open(data.url, '_blank'); closeModal(paymentModal);
+                        } else {
+                            qrError.querySelector('span').textContent = data.error || '获取二维码失败';
+                            qrError.classList.remove('hidden');
+                        }
+                    } catch {
+                        qrLoading.classList.add('hidden');
+                        qrError.querySelector('span').textContent = '网络错误，请稍后再试';
+                        qrError.classList.remove('hidden');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
 
             const urlParams = new URLSearchParams(window.location.search);
             const urlUid = urlParams.get('uid');

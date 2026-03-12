@@ -10,9 +10,21 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const userId = req.body && req.body.userId;
+  const token  = req.body && req.body.token;
   const amount = req.body && req.body.amount;
-  if (!userId || !amount) return res.status(400).json({ error: 'Missing userId or amount' });
+  if (!token || !amount) return res.status(400).json({ error: 'Missing token or amount' });
+
+  // Resolve token → email to use as the user identifier for the order
+  const kvUrl   = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  let userIdentifier = token; // fallback
+  if (kvUrl && kvToken) {
+    try {
+      const tr = await fetch(kvUrl + '/get/' + encodeURIComponent('token:' + token), { headers: { Authorization: 'Bearer ' + kvToken } });
+      const td = await tr.json();
+      if (td.result) userIdentifier = decodeURIComponent(td.result);
+    } catch (_) {}
+  }
 
   const trade_order_id = 'ORDER_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
 

@@ -479,3 +479,15 @@ function clearTranslations() {
   observerTranslateCount.clear();
   resumeObserver();
 }
+
+// ============ 网页 → 扩展 鉴权中继 ============
+// 当用户在 shiyuai.top 完成邮箱验证码登录后，网页会发 postMessage，
+// content.js 负责把 token 转发给 background.js 保存。
+window.addEventListener('message', (event) => {
+  if (event.origin !== 'https://shiyuai.top') return;
+  if (!event.data || event.data.type !== 'SHIYU_AUTH') return;
+  const { token, email } = event.data;
+  if (token && email) {
+    chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
+  }
+}, false);
