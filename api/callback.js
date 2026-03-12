@@ -1,6 +1,17 @@
 ﻿const crypto = require('crypto');
 
 module.exports = async function handler(req, res) {
+  const kvUrl   = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+  const kvHdr   = { Authorization: 'Bearer ' + kvToken };
+
+  async function kvSet(key, val) {
+    if (!kvUrl || !kvToken) return;
+    try {
+      await fetch(kvUrl + '/set/' + encodeURIComponent(key) + '/' + encodeURIComponent(val), { headers: kvHdr });
+    } catch(_) {}
+  }
+
   if (req.method !== 'POST') return res.status(405).send('fail');
 
   // Parse body: Xunhupay sends application/x-www-form-urlencoded
@@ -8,7 +19,14 @@ module.exports = async function handler(req, res) {
   if (typeof data === 'string') {
     data = Object.fromEntries(new URLSearchParams(data));
   }
-  if (!data || !data.hash) return res.status(400).send('fail');
+
+  // Debug: log raw received data (helps diagnose callback issues)
+  await kvSet('debug:last_callback', JSON.stringify({ t: Date.now(), body: data }));
+
+  if (!data || !data.hash) {
+    await kvSet('debug:callback_error', 'no_hash_at_' + Date.now());
+    return res.status(400).send('fail');
+  }
 
   const appsecret = process.env.XUNHU_APPSECRET;
   const received = data.hash;
@@ -25,23 +43,30 @@ module.exports = async function handler(req, res) {
   }
   s += appsecret;
   const calc = crypto.createHash('md5').update(s, 'utf8').digest('hex').toLowerCase();
-  if (calc !== received) return res.status(403).send('fail');
 
-  // Xunhupay uses trade_status (not status) — 'OD' means paid
-  if (data.trade_status === 'OD') {
+  // Debug: log signature result
+  await kvSet('debug:sig_check', JSON.stringify({ received, calc, match: calc === received, t: Date.now() }));
+
+  if (calc !== received) {
+    await kvSet('debug:callback_error', 'sig_fail_at_' + Date.now());
+    return res.status(403).send('fail');
+  }
+
+  // Xunhupay uses trade_status=OD for paid
+  const tradeStatus = data.trade_status || data.status;
+  await kvSet('debug:trade_status', tradeStatus + '_at_' + Date.now());
+
+  if (tradeStatus === 'OD') {
     const points = Math.floor(parseFloat(data.total_fee) * 1000);
     const email = data.attach;
     if (!email) return res.status(200).send('success');
-    const kvUrl = process.env.KV_REST_API_URL;
-    const kvToken = process.env.KV_REST_API_TOKEN;
     try {
-      if (kvUrl && kvToken) {
-        const creditsKey = encodeURIComponent('user:' + email + ':credits');
-        await fetch(kvUrl + '/incrby/' + creditsKey + '/' + points, {
-          headers: { Authorization: 'Bearer ' + kvToken }
-        });
-      }
-    } catch(e) {}
+      const creditsKey = encodeURIComponent('user:' + email + ':credits');
+      await fetch(kvUrl + '/incrby/' + creditsKey + '/' + points, { headers: kvHdr });
+      await kvSet('debug:last_credit', JSON.stringify({ email, points, t: Date.now() }));
+    } catch(e) {
+      await kvSet('debug:credit_error', e.message);
+    }
   }
   return res.status(200).send('success');
 };
