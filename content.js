@@ -391,6 +391,7 @@ function showNotification(msg, type = 'info') {
       padding: '10px 16px', borderRadius: '8px', fontSize: '13px',
       fontFamily: 'sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
       transition: 'opacity 0.3s', maxWidth: '320px', lineHeight: '1.5',
+      pointerEvents: 'none', // 永远不拦截鼠标点击
     });
     document.body.appendChild(el);
   }
@@ -399,7 +400,11 @@ function showNotification(msg, type = 'info') {
   el.style.color       = type === 'error' ? '#991b1b' : '#1e3a8a';
   el.style.opacity = '1';
   clearTimeout(_notifTimer);
-  _notifTimer = setTimeout(() => { el.style.opacity = '0'; }, 5000);
+  _notifTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    // 淡出后从文档流中移除，彻底不遮挡任何元素
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+  }, 5000);
 }
 
 function requestTranslation(text) {
