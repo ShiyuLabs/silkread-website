@@ -53,7 +53,7 @@ module.exports = async function handler(req, res) {
           'Authorization': 'Bearer ' + resendKey,
         },
         body: JSON.stringify({
-          from: 'ShiyuAI <onboarding@resend.dev>',
+          from: '诗语翻译 <noreply@shiyuai.top>',
           to:   email,
           subject: '【诗语翻译】注册验证码',
           html: `
