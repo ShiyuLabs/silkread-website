@@ -409,6 +409,8 @@
                 store.del('authToken');
                 store.del('authEmail');
                 authToken = null; authEmail = null; isLoggedIn = false;
+                // Notify extension relay to clear extension-side login too
+                window.postMessage({ type: 'SHIYU_LOGOUT' }, '*');
                 updateNav();
             });
 

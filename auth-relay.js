@@ -9,6 +9,8 @@
     const email = localStorage.getItem('authEmail');
     if (token && email) {
       chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
+    } else {
+      chrome.runtime.sendMessage({ action: 'logout' });
     }
   } catch (e) {}
 })();
@@ -16,10 +18,18 @@
 // 2. On future logins: relay postMessage -> extension
 window.addEventListener('message', (event) => {
   if (event.origin !== 'https://shiyuai.top') return;
-  if (!event.data || event.data.type !== 'SHIYU_AUTH') return;
-  const { token, email } = event.data;
-  if (token && email) {
-    chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
+  if (!event.data || !event.data.type) return;
+
+  if (event.data.type === 'SHIYU_AUTH') {
+    const { token, email } = event.data;
+    if (token && email) {
+      chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
+    }
+    return;
+  }
+
+  if (event.data.type === 'SHIYU_LOGOUT') {
+    chrome.runtime.sendMessage({ action: 'logout' });
   }
 }, false);
 
@@ -35,7 +45,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return true;
     }
-    sendResponse({ ok: true, synced: false });
+    chrome.runtime.sendMessage({ action: 'logout' }, () => {
+      sendResponse({ ok: true, synced: true, loggedOut: true });
+    });
+    return true;
   } catch (_) {
     sendResponse({ ok: false });
   }

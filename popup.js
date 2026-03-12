@@ -97,26 +97,19 @@ function requestAuthSyncFromWebsite(done) {
 }
 
 function checkLoginState(cb) {
-  chrome.storage.local.get(['authToken', 'authEmail'], (stored) => {
-    if (stored.authToken && stored.authEmail) {
-      setLoggedInUI(stored.authEmail);
-      if (cb) cb(true);
-    } else {
-      setLoggedOutUI();
-      requestAuthSyncFromWebsite(() => {
-        // Give saveAuthToken a short moment to persist, then re-check
-        setTimeout(() => {
-          chrome.storage.local.get(['authToken', 'authEmail'], (fresh) => {
-            if (fresh.authToken && fresh.authEmail) {
-              setLoggedInUI(fresh.authEmail);
-              if (cb) cb(true);
-            } else {
-              if (cb) cb(false);
-            }
-          });
-        }, 250);
+  // Always request website-side sync first so both login and logout stay consistent.
+  requestAuthSyncFromWebsite(() => {
+    setTimeout(() => {
+      chrome.storage.local.get(['authToken', 'authEmail'], (fresh) => {
+        if (fresh.authToken && fresh.authEmail) {
+          setLoggedInUI(fresh.authEmail);
+          if (cb) cb(true);
+        } else {
+          setLoggedOutUI();
+          if (cb) cb(false);
+        }
       });
-    }
+    }, 250);
   });
 }
 
