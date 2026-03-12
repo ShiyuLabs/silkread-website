@@ -53,13 +53,13 @@ module.exports = async function handler(req, res) {
           'Authorization': 'Bearer ' + resendKey,
         },
         body: JSON.stringify({
-          from: 'ShiyuAI <noreply@shiyuai.top>',
+          from: 'ShiyuAI <onboarding@resend.dev>',
           to:   email,
-          subject: '【石语AI】登录验证码',
+          subject: '【诗语翻译】注册验证码',
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px 24px;border:1px solid #e5e7eb;border-radius:12px">
-              <h2 style="margin:0 0 16px;color:#4f46e5;font-size:20px">石语AI 翻译助手</h2>
-              <p style="margin:0 0 8px;color:#374151;font-size:15px">您的登录验证码是：</p>
+              <h2 style="margin:0 0 16px;color:#4f46e5;font-size:20px">诗语翻译</h2>
+              <p style="margin:0 0 8px;color:#374151;font-size:15px">您的注册验证码是：</p>
               <div style="font-size:36px;font-weight:800;letter-spacing:10px;color:#4f46e5;padding:16px 0;text-align:center">${code}</div>
               <p style="margin:16px 0 0;color:#9ca3af;font-size:13px">验证码10分钟内有效，请勿泄露给他人。</p>
             </div>
@@ -67,7 +67,9 @@ module.exports = async function handler(req, res) {
         }),
       });
       if (!emailResp.ok) {
-        return res.status(500).json({ ok: false, error: '邮件发送失败，请确认邮箱地址是否正确' });
+        const errBody = await emailResp.text().catch(() => '');
+        console.error('Resend error:', emailResp.status, errBody);
+        return res.status(500).json({ ok: false, error: '邮件发送失败(' + emailResp.status + ')，请稍后重试' });
       }
     } catch (e) {
       return res.status(500).json({ ok: false, error: '邮件发送失败' });
