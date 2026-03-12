@@ -70,35 +70,13 @@
             <a id="btn-install-edge" href="/extension.zip" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold text-white shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#0078d4;">
-                <!-- Microsoft Edge 官方图标 -->
-                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#0078D4"/>
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.39.838 4.584 2.225 6.31C5.23 16.95 6.977 16 9 16c.74 0 1.45.14 2.1.39A5.998 5.998 0 0 0 18 11c0-1.2-.35-2.32-.96-3.26C15.92 5.6 14.07 4.5 12 4.5" fill="#50E6FF"/>
-                  <path d="M4.225 18.31A9.959 9.959 0 0 0 12 22c3.93 0 7.337-2.27 9.024-5.587C19.75 17.42 17.94 18 16 18H9c-.74 0-1.45-.07-2.1-.21" fill="#0078D4"/>
-                  <path d="M21.024 16.413C21.647 15.04 22 13.561 22 12c0-2.83-1.18-5.384-3.075-7.199" fill="#0078D4"/>
-                </svg>
+                <img src="/microsoft-edge-1.svg" class="w-5 h-5 flex-shrink-0" alt="Edge">
                 安装到 Edge
             </a>
             <a id="btn-install-chrome" href="/extension.zip" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#fff;color:#202124;border:2px solid #e0e0e0;">
-                <!-- Google Chrome 官方图标 -->
-                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="4" fill="#4285F4"/>
-                  <path d="M12 8h10a10 10 0 0 0-10-6" fill="#EA4335"/>
-                  <path d="M22 12a10 10 0 0 1-5 8.66L12 12z" fill="#FBBC05" opacity="0"/>
-                  <path d="M12 8h10a10 10 0 1 1-5-6.27" fill="none" stroke="#EA4335" stroke-width="0"/>
-                  <!-- 红弧 -->
-                  <path d="M12 8 L22 8 A10 10 0 0 0 12 2 Z" fill="#EA4335"/>
-                  <!-- 绿弧 -->
-                  <path d="M22 8 A10 10 0 0 1 17 20.66 L12 12 Z" fill="#34A853"/>
-                  <!-- 黄弧 -->
-                  <path d="M17 20.66 A10 10 0 0 1 2 12 L12 12 Z" fill="#FBBC05"/>
-                  <!-- 蓝弧 -->
-                  <path d="M2 12 A10 10 0 0 1 12 2 L12 8 A4 4 0 0 0 8 12 Z" fill="#4285F4"/>
-                  <circle cx="12" cy="12" r="4" fill="white"/>
-                  <circle cx="12" cy="12" r="3" fill="#4285F4"/>
-                </svg>
+                <img src="/chrome.svg" class="w-5 h-5 flex-shrink-0" alt="Chrome">
                 安装到 Chrome
             </a>
         </div>
@@ -108,23 +86,12 @@
             <span class="text-xs text-gray-400 mr-2">支持：</span>
             <button onclick="document.getElementById('btn-install-edge').click()"
                     class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-blue-50 transition cursor-pointer border-0 bg-transparent">
-                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#0078D4"/>
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.39.838 4.584 2.225 6.31C5.23 16.95 6.977 16 9 16c.74 0 1.45.14 2.1.39A5.998 5.998 0 0 0 18 11c0-1.2-.35-2.32-.96-3.26C15.92 5.6 14.07 4.5 12 4.5" fill="#50E6FF"/>
-                  <path d="M4.225 18.31A9.959 9.959 0 0 0 12 22c3.93 0 7.337-2.27 9.024-5.587C19.75 17.42 17.94 18 16 18H9c-.74 0-1.45-.07-2.1-.21" fill="#0078D4"/>
-                </svg>
+                <img src="/microsoft-edge-1.svg" class="w-7 h-7" alt="Edge">
                 <span class="text-xs text-gray-500">Edge</span>
             </button>
             <button onclick="document.getElementById('btn-install-chrome').click()"
                     class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-100 transition cursor-pointer border-0 bg-transparent">
-                <svg class="w-7 h-7" viewBox="0 0 24 24">
-                  <path d="M12 8 L22 8 A10 10 0 0 0 12 2 Z" fill="#EA4335"/>
-                  <path d="M22 8 A10 10 0 0 1 17 20.66 L12 12 Z" fill="#34A853"/>
-                  <path d="M17 20.66 A10 10 0 0 1 2 12 L12 12 Z" fill="#FBBC05"/>
-                  <path d="M2 12 A10 10 0 0 1 12 2 L12 8 A4 4 0 0 0 8 12 Z" fill="#4285F4"/>
-                  <circle cx="12" cy="12" r="4" fill="white"/>
-                  <circle cx="12" cy="12" r="3" fill="#4285F4"/>
-                </svg>
+                <img src="/chrome.svg" class="w-7 h-7" alt="Chrome">
                 <span class="text-xs text-gray-500">Chrome</span>
             </button>
         </div>
