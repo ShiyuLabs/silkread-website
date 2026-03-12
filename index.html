@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>诗语翻译 - AI 沉浸式翻译插件，支持 DeepSeek / Claude / GPT</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <script src="https://cdn.tailwindcss.com">        // 和插件通信，实现账号跨端恢复
         window.addEventListener("message", (event) => {
             if (event.source !== window || !event.data || event.data.type !== 'UPDATE_EXTENSION_UID') return;
@@ -24,7 +25,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- 品牌和 logo -->
-                <div class="flex items-center">
+                <div class="flex items-center gap-2">
+                    <img src="/favicon.png" alt="诗语翻译" class="w-8 h-8 rounded-lg">
                     <span class="text-xl font-bold text-blue-600 tracking-tight">诗语翻译</span>
                 </div>
                 <!-- 导航链接与用户状态 -->
@@ -54,15 +56,13 @@
 
     <!-- 首屏区域 (Hero Section) -->
     <main id="hero" class="pt-28 pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 mb-6">
-            ✦ 精选 5 款最适合网页翻译的大模型，每一款都经过专项调优
-        </div>
-        <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-snug mb-5">
-            读懂全球，<span class="text-blue-600">一键沉浸翻译</span><br>
-            <span class="text-2xl sm:text-3xl font-bold text-gray-500">用 AI 大模型，告别机器腔</span>
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight mb-4">
+            读懂全球，<span class="text-blue-600">一键沉浸翻译</span>
         </h1>
-        <p class="max-w-xl mx-auto text-base text-gray-500 mb-10">
-            按需充值，无包月绑定。谷歌通道<strong>永久免费</strong>，付费档充值后永不过期。
+        <p class="text-xl sm:text-2xl font-semibold text-gray-400 mb-4">用 AI 大模型，告别机器腔</p>
+        <p class="inline-flex items-center gap-1.5 text-sm text-purple-600 font-medium mb-10">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            精选 5 款最适合网页翻译的大模型，每一款都经过专项调优
         </p>
 
         <!-- 双浏览器安装按钮 -->
@@ -70,19 +70,34 @@
             <a id="btn-install-edge" href="/extension.zip" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold text-white shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#0078d4;">
-                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21.86 17.86c-.56.33-1.19.57-1.86.71v.03C18.93 20.57 16.61 22 13.85 22 9.95 22 7 19.31 7 15.93c0-.37.04-.73.11-1.08-1.32.71-2.11 2.02-2.11 3.46C5 20.35 6.63 22 8.67 22H3C1.9 22 1 21.1 1 20v-3.69C1 12.93 3.95 10.24 7.85 10.24c.63 0 1.24.07 1.82.21.77-2.06 2.71-3.45 4.98-3.45 2.94 0 5.35 2.41 5.35 5.35 0 .66-.12 1.3-.33 1.89.9.12 1.71.46 2.37.96 0 0 .46 1 .82 2.66z"/>
+                <!-- Microsoft Edge 官方图标 -->
+                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#0078D4"/>
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.39.838 4.584 2.225 6.31C5.23 16.95 6.977 16 9 16c.74 0 1.45.14 2.1.39A5.998 5.998 0 0 0 18 11c0-1.2-.35-2.32-.96-3.26C15.92 5.6 14.07 4.5 12 4.5" fill="#50E6FF"/>
+                  <path d="M4.225 18.31A9.959 9.959 0 0 0 12 22c3.93 0 7.337-2.27 9.024-5.587C19.75 17.42 17.94 18 16 18H9c-.74 0-1.45-.07-2.1-.21" fill="#0078D4"/>
+                  <path d="M21.024 16.413C21.647 15.04 22 13.561 22 12c0-2.83-1.18-5.384-3.075-7.199" fill="#0078D4"/>
                 </svg>
                 安装到 Edge
             </a>
             <a id="btn-install-chrome" href="/extension.zip" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#fff;color:#202124;border:2px solid #e0e0e0;">
-                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="4.5" fill="#4285F4"/>
-                    <path d="M12 7.5h9.27A10 10 0 1 0 3.73 18" stroke="#34A853" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-                    <line x1="12" y1="7.5" x2="21.27" y2="7.5" stroke="#EA4335" stroke-width="2.2" stroke-linecap="round"/>
-                    <path d="M3.73 18L8.5 9.75" stroke="#FBBC05" stroke-width="2.2" stroke-linecap="round"/>
+                <!-- Google Chrome 官方图标 -->
+                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="4" fill="#4285F4"/>
+                  <path d="M12 8h10a10 10 0 0 0-10-6" fill="#EA4335"/>
+                  <path d="M22 12a10 10 0 0 1-5 8.66L12 12z" fill="#FBBC05" opacity="0"/>
+                  <path d="M12 8h10a10 10 0 1 1-5-6.27" fill="none" stroke="#EA4335" stroke-width="0"/>
+                  <!-- 红弧 -->
+                  <path d="M12 8 L22 8 A10 10 0 0 0 12 2 Z" fill="#EA4335"/>
+                  <!-- 绿弧 -->
+                  <path d="M22 8 A10 10 0 0 1 17 20.66 L12 12 Z" fill="#34A853"/>
+                  <!-- 黄弧 -->
+                  <path d="M17 20.66 A10 10 0 0 1 2 12 L12 12 Z" fill="#FBBC05"/>
+                  <!-- 蓝弧 -->
+                  <path d="M2 12 A10 10 0 0 1 12 2 L12 8 A4 4 0 0 0 8 12 Z" fill="#4285F4"/>
+                  <circle cx="12" cy="12" r="4" fill="white"/>
+                  <circle cx="12" cy="12" r="3" fill="#4285F4"/>
                 </svg>
                 安装到 Chrome
             </a>
@@ -93,18 +108,22 @@
             <span class="text-xs text-gray-400 mr-2">支持：</span>
             <button onclick="document.getElementById('btn-install-edge').click()"
                     class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-blue-50 transition cursor-pointer border-0 bg-transparent">
-                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="#0078d4">
-                    <path d="M21.86 17.86c-.56.33-1.19.57-1.86.71v.03C18.93 20.57 16.61 22 13.85 22 9.95 22 7 19.31 7 15.93c0-.37.04-.73.11-1.08-1.32.71-2.11 2.02-2.11 3.46C5 20.35 6.63 22 8.67 22H3C1.9 22 1 21.1 1 20v-3.69C1 12.93 3.95 10.24 7.85 10.24c.63 0 1.24.07 1.82.21.77-2.06 2.71-3.45 4.98-3.45 2.94 0 5.35 2.41 5.35 5.35 0 .66-.12 1.3-.33 1.89.9.12 1.71.46 2.37.96 0 0 .46 1 .82 2.66z"/>
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#0078D4"/>
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 2.39.838 4.584 2.225 6.31C5.23 16.95 6.977 16 9 16c.74 0 1.45.14 2.1.39A5.998 5.998 0 0 0 18 11c0-1.2-.35-2.32-.96-3.26C15.92 5.6 14.07 4.5 12 4.5" fill="#50E6FF"/>
+                  <path d="M4.225 18.31A9.959 9.959 0 0 0 12 22c3.93 0 7.337-2.27 9.024-5.587C19.75 17.42 17.94 18 16 18H9c-.74 0-1.45-.07-2.1-.21" fill="#0078D4"/>
                 </svg>
                 <span class="text-xs text-gray-500">Edge</span>
             </button>
             <button onclick="document.getElementById('btn-install-chrome').click()"
                     class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-100 transition cursor-pointer border-0 bg-transparent">
                 <svg class="w-7 h-7" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="4.5" fill="#4285F4"/>
-                    <path d="M12 7.5h9.27A10 10 0 1 0 3.73 18" stroke="#34A853" stroke-width="2.2" stroke-linecap="round" fill="none"/>
-                    <line x1="12" y1="7.5" x2="21.27" y2="7.5" stroke="#EA4335" stroke-width="2.2" stroke-linecap="round"/>
-                    <path d="M3.73 18L8.5 9.75" stroke="#FBBC05" stroke-width="2.2" stroke-linecap="round"/>
+                  <path d="M12 8 L22 8 A10 10 0 0 0 12 2 Z" fill="#EA4335"/>
+                  <path d="M22 8 A10 10 0 0 1 17 20.66 L12 12 Z" fill="#34A853"/>
+                  <path d="M17 20.66 A10 10 0 0 1 2 12 L12 12 Z" fill="#FBBC05"/>
+                  <path d="M2 12 A10 10 0 0 1 12 2 L12 8 A4 4 0 0 0 8 12 Z" fill="#4285F4"/>
+                  <circle cx="12" cy="12" r="4" fill="white"/>
+                  <circle cx="12" cy="12" r="3" fill="#4285F4"/>
                 </svg>
                 <span class="text-xs text-gray-500">Chrome</span>
             </button>
