@@ -92,6 +92,8 @@ function doLogout() {
     if (managedModelSel.value !== 'free-translation') {
       balanceText.textContent = '余额：未登录';
       balanceText.style.color = '#9ca3af';
+    } else {
+      setFreeMode();
     }
   });
 }
@@ -111,14 +113,16 @@ topupBtn.addEventListener('click', () => {
 });
 
 // ===== 余额显示 =====
+function setFreeMode() {
+  balanceText.textContent = '免费通道·无需登录';
+  balanceText.style.color = '#10b981';
+  topupBtn.textContent = '充値升级';
+}
+
 function updateBalanceUI(credits) {
   const model = managedModelSel.value;
-  const balanceRow = document.getElementById('balanceRow');
-  if (model === 'free-translation') {
-    if (balanceRow) balanceRow.style.display = 'none';
-    return;
-  }
-  if (balanceRow) balanceRow.style.display = '';
+  if (model === 'free-translation') { setFreeMode(); return; }
+  topupBtn.textContent = '充値';
   const rate = MODEL_RATES[model];
   if (credits <= 0) {
     balanceText.textContent = '余额：已用尽';
@@ -131,13 +135,9 @@ function updateBalanceUI(credits) {
 }
 
 function loadBalance() {
-  const balanceRow = document.getElementById('balanceRow');
-  if (managedModelSel.value === 'free-translation') {
-    if (balanceRow) balanceRow.style.display = 'none';
-    return;
-  }
-  if (balanceRow) balanceRow.style.display = '';
-  balanceText.textContent = '余额：刷新中';
+  if (managedModelSel.value === 'free-translation') { setFreeMode(); return; }
+  topupBtn.textContent = '充値';
+  balanceText.textContent = '余额：加载中';
   balanceText.style.color = '#9ca3af';
   chrome.runtime.sendMessage({ action: 'getBalance' }, (res) => {
     if (res && res.ok) {
@@ -155,15 +155,15 @@ function loadBalance() {
 // ===== 核心模型切换 =====
 managedModelSel.addEventListener('change', () => {
   const val = managedModelSel.value;
-  const balanceRow = document.getElementById('balanceRow');
   if (val === 'free-translation') {
     chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
-    if (balanceRow) balanceRow.style.display = 'none';
+    setFreeMode();
   } else {
     chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
-    if (balanceRow) balanceRow.style.display = '';
+    topupBtn.textContent = '充値';
     chrome.storage.local.get(['cachedCredits'], (local) => {
       if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
+      else loadBalance();
     });
   }
 });
