@@ -132,16 +132,25 @@ function toGoogleLangCode(lang) {
 }
 
 async function googleTranslate(text, sl, tl) {
-  // 通过自有服务器代理请求，避免 Service Worker 直连 Google 时的网络/CORS 问题
-  const resp = await fetch(`${PROXY_URL}/api/freeTranslate`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ text, sl: sl || 'auto', tl }),
-  });
-  if (!resp.ok) throw new Error(`免费翻译失败: HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (!data.translated) throw new Error(data.error || '翻译返回为空');
-  return data.translated;
+  // 优先走自有服务器代理（稳定），失败后回退直连 Google
+  try {
+    const resp = await fetch(`${PROXY_URL}/api/freeTranslate`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, sl: sl || 'auto', tl }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.translated) return data.translated;
+    }
+  } catch (_) { /* proxy failed, fall through to direct */ }
+
+  // 直连 Google 兜底
+  const params = new URLSearchParams({ client: 'gtx', sl: sl || 'auto', tl, dt: 't', q: text });
+  const resp2 = await fetch('https://translate.googleapis.com/translate_a/single?' + params);
+  if (!resp2.ok) throw new Error(`免费翻译失败: HTTP ${resp2.status}`);
+  const data2 = await resp2.json();
+  return data2[0].map(seg => seg[0]).join('');
 }
 
 async function handleFreeTranslation(text, sourceLang, targetLang) {
