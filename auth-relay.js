@@ -35,7 +35,22 @@ window.addEventListener('message', (event) => {
 
 // 3. On extension request: sync from page storage immediately
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.action !== 'syncAuthFromPage') return;
+  if (!message || !message.action) return;
+
+  if (message.action === 'logoutFromExtension') {
+    try {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authEmail');
+      // Notify page script to refresh UI state immediately.
+      window.postMessage({ type: 'SHIYU_LOGOUT_FROM_EXTENSION' }, '*');
+      sendResponse({ ok: true, loggedOut: true });
+    } catch (_) {
+      sendResponse({ ok: false });
+    }
+    return true;
+  }
+
+  if (message.action !== 'syncAuthFromPage') return;
   try {
     const token = localStorage.getItem('authToken');
     const email = localStorage.getItem('authEmail');

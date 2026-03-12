@@ -115,6 +115,12 @@ function checkLoginState(cb) {
 
 function doLogout() {
   chrome.runtime.sendMessage({ action: 'logout' }, () => {
+    // Push logout state to website tabs so web and extension stay in sync.
+    chrome.tabs.query({ url: ['*://shiyuai.top/*', '*://*.shiyuai.top/*'] }, (tabs) => {
+      (tabs || []).forEach((tab) => {
+        chrome.tabs.sendMessage(tab.id, { action: 'logoutFromExtension' }, () => { chrome.runtime.lastError; });
+      });
+    });
     accountEmail.textContent     = '未登录';
     accountActionBtn.textContent = '去登录';
     accountActionBtn.onclick     = openWebsite;

@@ -67,13 +67,13 @@
 
         <!-- 双浏览器安装按钮 -->
         <div class="flex justify-center items-center gap-4 mb-5 flex-wrap">
-            <a id="btn-install-edge" href="/extension.zip?v=20260312" download="诗语翻译.zip"
+            <a id="btn-install-edge" href="/extension.zip?v=20260312-2" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold text-white shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#0078d4;">
                 <img src="/microsoft-edge-1.svg" class="w-5 h-5 flex-shrink-0" alt="Edge">
                 安装到 Edge
             </a>
-            <a id="btn-install-chrome" href="/extension.zip?v=20260312" download="诗语翻译.zip"
+            <a id="btn-install-chrome" href="/extension.zip?v=20260312-2" download="诗语翻译.zip"
                class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold shadow-lg transition transform hover:-translate-y-0.5"
                style="background:#fff;color:#202124;border:2px solid #e0e0e0;">
                 <img src="/chrome.svg" class="w-5 h-5 flex-shrink-0" alt="Chrome">
@@ -150,7 +150,7 @@
                             <span>翻译速度快，适合日常大量文章阅读</span>
                         </li>
                     </ul>
-                    <a href="/extension.zip?v=20260312" download="诗语翻译.zip" class="w-full py-3 px-4 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 text-center block shadow-md transition">获取扩展程序</a>
+                    <a href="/extension.zip?v=20260312-2" download="诗语翻译.zip" class="w-full py-3 px-4 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 text-center block shadow-md transition">获取扩展程序</a>
                 </div>
 
                 <!-- 基础套餐 -->
@@ -411,6 +411,16 @@
                 authToken = null; authEmail = null; isLoggedIn = false;
                 // Notify extension relay to clear extension-side login too
                 window.postMessage({ type: 'SHIYU_LOGOUT' }, '*');
+                updateNav();
+            });
+
+            // Extension-side logout sync: clear webpage session and refresh nav state.
+            window.addEventListener('message', (event) => {
+                if (event.source !== window || !event.data) return;
+                if (event.data.type !== 'SHIYU_LOGOUT_FROM_EXTENSION') return;
+                store.del('authToken');
+                store.del('authEmail');
+                authToken = null; authEmail = null; isLoggedIn = false;
                 updateNav();
             });
 
