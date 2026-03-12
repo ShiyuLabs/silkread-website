@@ -33,6 +33,11 @@
       "exclude_matches": ["*://shiyuai.top/*", "*://*.shiyuai.top/*"],
       "js": ["content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["*://shiyuai.top/*"],
+      "js": ["auth-relay.js"],
+      "run_at": "document_end"
     }
   ]
 }

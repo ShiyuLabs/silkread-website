@@ -370,6 +370,7 @@
 
             const loginMsg2 = loginMsg; // alias kept for setLoginMsg
 
+            const navBalance        = document.getElementById('nav-user-balance');
             const paymentModal     = document.getElementById('payment-modal');
             const paymentBox       = document.getElementById('payment-box');
             const paymentOverlay   = document.getElementById('payment-overlay');
@@ -378,14 +379,27 @@
             const buyButtons       = document.querySelectorAll('.btn-buy');
 
             // ===== Nav 状态 =====
+            async function loadWebBalance() {
+                if (!authToken || !navBalance) return;
+                try {
+                    const r = await fetch(API + '/api/balance?token=' + authToken);
+                    const d = await r.json();
+                    if (d.credits !== undefined) {
+                        navBalance.textContent = d.credits.toLocaleString() + ' 点数';
+                    }
+                } catch {}
+            }
+
             function updateNav() {
                 if (isLoggedIn) {
                     if (btnLoginShow) btnLoginShow.classList.add('hidden');
                     if (userInfo) { userInfo.classList.remove('hidden'); userInfo.classList.add('flex'); }
                     if (navUserId) { navUserId.innerText = authEmail; navUserId.title = authEmail; }
+                    loadWebBalance();
                 } else {
                     if (btnLoginShow) btnLoginShow.classList.remove('hidden');
                     if (userInfo) { userInfo.classList.add('hidden'); userInfo.classList.remove('flex'); }
+                    if (navBalance) navBalance.textContent = '已连接插件';
                 }
             }
             updateNav();
@@ -557,6 +571,9 @@
                     qrError.classList.add('hidden');
                     qrLoading.classList.remove('hidden');
                     openModal(paymentModal);
+                    let pollTimer = null;
+                    function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
                     try {
                         const resp = await fetch(API + '/api/pay', {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -566,6 +583,26 @@
                         qrLoading.classList.add('hidden');
                         if (data.qrcode) {
                             qrImg.src = data.qrcode; qrImg.classList.remove('hidden');
+                            // Poll for payment success every 3s
+                            const baseCreditsResp = await fetch(API + '/api/balance?token=' + authToken);
+                            const baseData = await baseCreditsResp.json();
+                            const baseCredits = baseData.credits || 0;
+                            pollTimer = setInterval(async () => {
+                                try {
+                                    const pr = await fetch(API + '/api/balance?token=' + authToken);
+                                    const pd = await pr.json();
+                                    if ((pd.credits || 0) > baseCredits) {
+                                        stopPoll();
+                                        closeModal(paymentModal);
+                                        loadWebBalance();
+                                        const toast = document.createElement('div');
+                                        toast.textContent = '\u652f\u4ed8\u6210\u529f\uff01\u5df2\u5145\u5024 ' + Math.floor(parseFloat(price) * 1000) + ' \u70b9\u6570';
+                                        toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
+                                        document.body.appendChild(toast);
+                                        setTimeout(() => toast.remove(), 4000);
+                                    }
+                                } catch {}
+                            }, 3000);
                         } else if (data.url) {
                             window.open(data.url, '_blank'); closeModal(paymentModal);
                         } else {
@@ -577,6 +614,10 @@
                         qrError.querySelector('span').textContent = '网络错误，请稍后再试';
                         qrError.classList.remove('hidden');
                     }
+                    // Stop polling when modal is closed
+                    const origClose = closePaymentBtn && closePaymentBtn.onclick;
+                    if (closePaymentBtn) closePaymentBtn.onclick = () => { stopPoll(); closeModal(paymentModal); };
+                    if (paymentOverlay) paymentOverlay.onclick = () => { stopPoll(); closeModal(paymentModal); };
                 });
             });
         });
