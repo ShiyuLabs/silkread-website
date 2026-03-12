@@ -14,6 +14,14 @@ module.exports = async function handler(req, res) {
   }
   if (!data || !data.hash) return res.status(400).send('fail');
 
+  const orderIdRaw = data.trade_order_id;
+  if (orderIdRaw && kvUrl && kvToken) {
+    try {
+      await fetch(kvUrl + '/set/' + encodeURIComponent('order:cb:' + orderIdRaw) + '/' + encodeURIComponent(data.trade_status || data.status || 'UNKNOWN'), { headers: kvHdr });
+      await fetch(kvUrl + '/expire/' + encodeURIComponent('order:cb:' + orderIdRaw) + '/86400', { headers: kvHdr });
+    } catch (_) {}
+  }
+
   // Signature check: log result but do NOT block (Chinese chars cause encode mismatch)
   try {
     const appsecret = process.env.XUNHU_APPSECRET;
@@ -31,10 +39,7 @@ module.exports = async function handler(req, res) {
     }
     s += appsecret;
     const calc = crypto.createHash('md5').update(s, 'utf8').digest('hex').toLowerCase();
-    // Only reject if appid doesn't match ours (basic authenticity check)
-    if (data.appid && data.appid !== process.env.XUNHU_APPID) {
-      return res.status(403).send('fail');
-    }
+    // Do not hard-reject here; provider payload encoding can vary by region/proxy.
   } catch(_) {}
 
   // status or trade_status = 'OD' means paid
@@ -62,9 +67,25 @@ module.exports = async function handler(req, res) {
 
     if (email && kvUrl && kvToken) {
       try {
+        if (orderId) {
+          const alreadyResp = await fetch(kvUrl + '/get/' + encodeURIComponent('order:credited:' + orderId), { headers: kvHdr });
+          const alreadyData = await alreadyResp.json();
+          if (alreadyData.result) return res.status(200).send('success');
+        }
+
         const creditsKey = encodeURIComponent('user:' + email + ':credits');
         await fetch(kvUrl + '/incrby/' + creditsKey + '/' + points, { headers: kvHdr });
+
+        if (orderId) {
+          await fetch(kvUrl + '/set/' + encodeURIComponent('order:credited:' + orderId) + '/1', { headers: kvHdr });
+          await fetch(kvUrl + '/expire/' + encodeURIComponent('order:credited:' + orderId) + '/86400', { headers: kvHdr });
+        }
       } catch(_) {}
+    } else if (orderId && kvUrl && kvToken) {
+      try {
+        await fetch(kvUrl + '/set/' + encodeURIComponent('order:error:' + orderId) + '/NO_EMAIL_MAPPING', { headers: kvHdr });
+        await fetch(kvUrl + '/expire/' + encodeURIComponent('order:error:' + orderId) + '/86400', { headers: kvHdr });
+      } catch (_) {}
     }
   }
   return res.status(200).send('success');

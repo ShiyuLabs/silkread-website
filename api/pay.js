@@ -29,6 +29,22 @@ module.exports = async function handler(req, res) {
 
   const trade_order_id = 'SY' + Date.now() + Math.floor(Math.random() * 1000);
 
+  if (kvUrl && kvToken) {
+    try {
+      await fetch(
+        kvUrl + '/set/' + encodeURIComponent('order:meta:' + trade_order_id) + '/' + encodeURIComponent(JSON.stringify({
+          createdAt: Date.now(),
+          amount: String(amount),
+          email: userEmail,
+        })),
+        { headers: { Authorization: 'Bearer ' + kvToken } }
+      );
+      await fetch(kvUrl + '/expire/' + encodeURIComponent('order:meta:' + trade_order_id) + '/86400', {
+        headers: { Authorization: 'Bearer ' + kvToken }
+      });
+    } catch (_) {}
+  }
+
   // Store order->email mapping so callback can identify the user
   if (kvUrl && kvToken && userEmail.includes('@')) {
     try {

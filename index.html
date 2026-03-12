@@ -590,7 +590,7 @@
                                     try {
                                         const ps = await fetch(API + '/api/pay-status?orderId=' + encodeURIComponent(orderId));
                                         const pd = await ps.json();
-                                        if (pd.paid) {
+                                        if (pd.paid || pd.callbackStatus === 'OD' || pd.credited) {
                                             stopPoll();
                                             closeModal(paymentModal);
                                             loadWebBalance();
@@ -599,6 +599,9 @@
                                             toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
                                             document.body.appendChild(toast);
                                             setTimeout(() => toast.remove(), 4000);
+                                        } else if (pd.error) {
+                                            qrError.querySelector('span').textContent = '回调异常: ' + pd.error;
+                                            qrError.classList.remove('hidden');
                                         }
                                     } catch {}
                                 }, 3000);
