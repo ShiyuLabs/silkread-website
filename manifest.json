@@ -25,6 +25,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "exclude_matches": ["*://shiyuai.top/*", "*://*.shiyuai.top/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
