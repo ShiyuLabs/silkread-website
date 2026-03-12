@@ -255,8 +255,6 @@ async function translateNodes(textNodes) {
         if (err.message === 'CREDITS_EXHAUSTED') {
           creditsExhausted = true;
           showNotification('💳 翻译余额不足，请打开扩展弹窗充值', 'error');
-        } else if (err.message === 'LOGGED_OUT') {
-          showNotification('⚠️ 请先登录后使用付费翻译，或切换为免费翻译', 'error');
         } else {
           console.error(`❌ Chunk ${i + 1} failed:`, err.message);
           showNotification('❌ 翻译失败：' + err.message, 'error');

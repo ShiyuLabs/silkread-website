@@ -104,14 +104,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchTranslation") {
     // 读取引擎和语言设置
     chrome.storage.sync.get(['translationEngine', 'sourceLang', 'targetLang',
-      'aiMode', 'managedModel', 'byokProvider', 'byokModel', 'byokApiKey'], (settings) => {
+      'aiMode', 'managedModel', 'byokProvider', 'byokModel', 'byokApiKey'], async (settings) => {
       const engine     = settings.translationEngine || 'free';
       const sourceLang = settings.sourceLang || 'auto';
       const targetLang = settings.targetLang || 'zh-CN';
 
-      const task = engine === 'ai'
-        ? handleAITranslation(request.text, sourceLang, targetLang, settings)
-        : handleFreeTranslation(request.text, sourceLang, targetLang);
+      let task;
+      if (engine === 'ai') {
+        // 如果选了付费模式但未登录，自动降级为免费翻译，不报错
+        const token = await getAuthToken();
+        if (!token) {
+          task = handleFreeTranslation(request.text, sourceLang, targetLang);
+        } else {
+          task = handleAITranslation(request.text, sourceLang, targetLang, settings);
+        }
+      } else {
+        task = handleFreeTranslation(request.text, sourceLang, targetLang);
+      }
 
       task
         .then(result => sendResponse({ success: true, data: result }))
