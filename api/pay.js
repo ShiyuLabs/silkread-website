@@ -32,7 +32,8 @@ module.exports = async function handler(req, res) {
     const resp = await axios.post(PROXY_URL, {
       trade_order_id,
       total_fee: amount,
-      title: '翻译豆充值'
+      title: '翻译豆充值',
+      attach: userIdentifier
     }, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 15000

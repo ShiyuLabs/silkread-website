@@ -75,7 +75,7 @@ module.exports = async function handler(req, res) {
     );
 
     // Give new user 1000 free credits (only if no balance yet)
-    const balKey = encodeURIComponent('bal:' + email);
+    const balKey = encodeURIComponent('user:' + email + ':credits');
     const balResp = await fetch(kvUrl + '/get/' + balKey, { headers });
     const balData = await balResp.json();
     if (!balData.result) {

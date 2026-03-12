@@ -19,12 +19,15 @@ module.exports = async function handler(req, res) {
   if (calc !== received) return res.status(403).send('fail');
 
   if (data.status === 'OD') {
-    const points = Math.floor(parseFloat(data.total_fee) * 10000);
+    const points = Math.floor(parseFloat(data.total_fee) * 1000);
+    const email = data.attach;
+    if (!email) return res.status(200).send('success');
     const kvUrl = process.env.KV_REST_API_URL;
     const kvToken = process.env.KV_REST_API_TOKEN;
     try {
       if (kvUrl && kvToken) {
-        await fetch(kvUrl + '/incrby/user:' + data.attach + ':credits/' + points, {
+        const creditsKey = encodeURIComponent('user:' + email + ':credits');
+        await fetch(kvUrl + '/incrby/' + creditsKey + '/' + points, {
           headers: { Authorization: 'Bearer ' + kvToken }
         });
       }

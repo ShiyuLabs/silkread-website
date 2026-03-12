@@ -13,7 +13,7 @@ const NOTIFY_URL = process.env.NOTIFY_URL; // 例如 https://shiyuai.top/api/cal
 const RETURN_URL = process.env.RETURN_URL; // 例如 https://shiyuai.top
 
 app.post('/api/pay', async (req, res) => {
-  const { trade_order_id, total_fee, title } = req.body || {};
+  const { trade_order_id, total_fee, title, attach } = req.body || {};
   if (!trade_order_id || !total_fee || !title) {
     return res.json({ errcode: 400, errmsg: 'missing params' });
   }
@@ -29,6 +29,7 @@ app.post('/api/pay', async (req, res) => {
     return_url: RETURN_URL,
     nonce_str: crypto.randomBytes(16).toString('hex')
   };
+  if (attach) params.attach = attach;
 
   // 签名：按 key ASCII 排序，拼接 key=value&...，末尾加 APPSECRET，MD5
   const sortedKeys = Object.keys(params).sort();
