@@ -29,6 +29,15 @@ module.exports = async function handler(req, res) {
 
   const trade_order_id = 'SY' + Date.now() + Math.floor(Math.random() * 1000);
 
+  // Store order->email mapping so callback can identify the user
+  if (kvUrl && kvToken && userEmail.includes('@')) {
+    try {
+      await fetch(kvUrl + '/set/' + encodeURIComponent('order:' + trade_order_id) + '/' + encodeURIComponent(userEmail) + '/ex/86400', {
+        headers: { Authorization: 'Bearer ' + kvToken }
+      });
+    } catch (_) {}
+  }
+
   try {
     const resp = await fetch(PROXY_URL, {
       method: 'POST',
