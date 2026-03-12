@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "页面翻译助手",
+  "name": "诗语翻译 - AI 智能翻译助手",
   "version": "1.0",
-  "description": "双语对照翻译英文页面",
+  "description": "诗语翻译：支持全球顶级大模型的沉浸式双语对照翻译",
   "permissions": [
     "storage",
     "scripting",
@@ -17,10 +17,15 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icon.png",
+      "16": "icon16.png",
       "48": "icon.png",
-      "128": "icon.png"
+      "128": "icon128.png"
     }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon.png",
+    "128": "icon128.png"
   },
   "content_scripts": [
     {
