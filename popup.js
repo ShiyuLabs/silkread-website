@@ -64,22 +64,58 @@ chrome.storage.sync.get(
     chrome.storage.local.get(['cachedCredits'], (local) => {
       if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
     });
-    checkLoginState();
-    loadBalance();
+    checkLoginState(() => loadBalance());
   }
 );
 
 // ===== 账户状态 =====
-function checkLoginState() {
+function setLoggedInUI(email) {
+  accountEmail.textContent     = email;
+  accountActionBtn.textContent = '退出';
+  accountActionBtn.onclick     = doLogout;
+}
+
+function setLoggedOutUI() {
+  accountEmail.textContent     = '未登录';
+  accountActionBtn.textContent = '去登录';
+  accountActionBtn.onclick     = openWebsite;
+}
+
+function requestAuthSyncFromWebsite(done) {
+  chrome.tabs.query({ url: ['*://shiyuai.top/*', '*://*.shiyuai.top/*'] }, (tabs) => {
+    if (!tabs || tabs.length === 0) return done && done(false);
+    let pending = tabs.length;
+    let anySent = false;
+    tabs.forEach((tab) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'syncAuthFromPage' }, () => {
+        if (!chrome.runtime.lastError) anySent = true;
+        pending -= 1;
+        if (pending === 0) done && done(anySent);
+      });
+    });
+  });
+}
+
+function checkLoginState(cb) {
   chrome.storage.local.get(['authToken', 'authEmail'], (stored) => {
     if (stored.authToken && stored.authEmail) {
-      accountEmail.textContent     = stored.authEmail;
-      accountActionBtn.textContent = '退出';
-      accountActionBtn.onclick     = doLogout;
+      setLoggedInUI(stored.authEmail);
+      if (cb) cb(true);
     } else {
-      accountEmail.textContent     = '未登录';
-      accountActionBtn.textContent = '去登录';
-      accountActionBtn.onclick     = openWebsite;
+      setLoggedOutUI();
+      requestAuthSyncFromWebsite(() => {
+        // Give saveAuthToken a short moment to persist, then re-check
+        setTimeout(() => {
+          chrome.storage.local.get(['authToken', 'authEmail'], (fresh) => {
+            if (fresh.authToken && fresh.authEmail) {
+              setLoggedInUI(fresh.authEmail);
+              if (cb) cb(true);
+            } else {
+              if (cb) cb(false);
+            }
+          });
+        }, 250);
+      });
     }
   });
 }

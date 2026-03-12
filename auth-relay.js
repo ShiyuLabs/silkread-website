@@ -22,3 +22,22 @@ window.addEventListener('message', (event) => {
     chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
   }
 }, false);
+
+// 3. On extension request: sync from page storage immediately
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.action !== 'syncAuthFromPage') return;
+  try {
+    const token = localStorage.getItem('authToken');
+    const email = localStorage.getItem('authEmail');
+    if (token && email) {
+      chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email }, () => {
+        sendResponse({ ok: true, synced: true });
+      });
+      return true;
+    }
+    sendResponse({ ok: true, synced: false });
+  } catch (_) {
+    sendResponse({ ok: false });
+  }
+  return true;
+});

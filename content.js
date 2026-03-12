@@ -12,6 +12,7 @@ let domObserver = null;
 let observerDebounceTimer = null;
 let isTranslating = false;
 let pendingNewNodes = false; // 翻译进行中时有新节点进来，翻译完后补跑
+let extensionReloadNotified = false;
 
 // ============ 初始化 ============
 console.log("✅ Content script loaded");
@@ -258,6 +259,13 @@ async function translateNodes(textNodes) {
         } else if (err.message === 'LOGGED_OUT') {
           creditsExhausted = true; // 停止继续翻译
           showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
+        } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED') {
+          // Extension was reloaded/updated; old page context must refresh.
+          creditsExhausted = true;
+          if (!extensionReloadNotified) {
+            extensionReloadNotified = true;
+            showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
+          }
         } else {
           console.error(`❌ Chunk ${i + 1} failed:`, err.message);
           showNotification('❌ 翻译失败：' + err.message, 'error');
@@ -416,7 +424,12 @@ function requestTranslation(text) {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          const msg = chrome.runtime.lastError.message || 'Translation failed';
+          if (msg.includes('Extension context invalidated')) {
+            reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+          } else {
+            reject(new Error(msg));
+          }
           return;
         }
         
