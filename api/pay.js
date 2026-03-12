@@ -1,4 +1,6 @@
-﻿const crypto = require('crypto');
+﻿// Vercel (overseas) -> Alibaba Cloud proxy (China) -> Xunhupay
+// The proxy handles signing and calling api.xunhupay.com from within China
+const PROXY_URL = 'https://hupijiao-pay-xeplnxhamn.cn-hangzhou.fcapp.run/api/pay';
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,12 +13,7 @@ module.exports = async function handler(req, res) {
   const amount = req.body && req.body.amount;
   if (!token || !amount) return res.status(400).json({ error: 'Missing params' });
 
-  const appid     = process.env.XUNHU_APPID;
-  const appsecret = process.env.XUNHU_APPSECRET;
-  if (!appid || !appsecret) {
-    return res.status(500).json({ error: 'Payment not configured' });
-  }
-
+  // Look up user email from token in KV, so we can pass it as attach for callback
   const kvUrl   = process.env.KV_REST_API_URL;
   const kvToken = process.env.KV_REST_API_TOKEN;
   let userEmail = token;
@@ -32,41 +29,16 @@ module.exports = async function handler(req, res) {
 
   const trade_order_id = 'SY' + Date.now() + Math.floor(Math.random() * 1000);
 
-  const params = {
-    version:        '1.1',
-    appid:          appid,
-    trade_order_id: trade_order_id,
-    total_fee:      String(amount),
-    title:          '\u8bd7\u8bed\u7ffb\u8bd1\u70b9\u6570\u5145\u5024',
-    time:           String(Math.floor(Date.now() / 1000)),
-    notify_url:     'https://shiyuai.top/api/callback',
-    return_url:     'https://shiyuai.top',
-    nonce_str:      crypto.randomBytes(16).toString('hex'),
-    attach:         userEmail,
-  };
-
-  const sortedKeys = Object.keys(params).sort();
-  let signStr = '';
-  for (const key of sortedKeys) {
-    const val = params[key];
-    if (val !== '' && val != null) {
-      if (signStr) signStr += '&';
-      signStr += key + '=' + val;
-    }
-  }
-  signStr += appsecret;
-  params.hash = crypto.createHash('md5').update(signStr, 'utf8').digest('hex').toLowerCase();
-
-  const formData = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    formData.append(k, String(v));
-  }
-
   try {
-    const resp = await fetch('https://api.xunhupay.com/payment/do.html', {
+    const resp = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData.toString(),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trade_order_id: trade_order_id,
+        total_fee:      String(amount),
+        title:          '\u8bd7\u8bed\u7ffb\u8bd1\u70b9\u6570\u5145\u5024',
+        attach:         userEmail,
+      }),
     });
     const data = await resp.json();
     if (data.errcode === 0) {
