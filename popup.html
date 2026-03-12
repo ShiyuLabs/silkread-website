@@ -46,7 +46,26 @@
       display: flex; align-items: center; justify-content: space-between; 
       margin-top: 12px; padding-top: 12px; border-top: 1px dashed #c7d2fe; 
     }
-    .balance-text { font-size: 13px; color: #374151; font-weight: 700; }
+    .balance-text { font-size: 13px; color: #374151; font-weight: 700; white-space: nowrap; }
+
+    /* 拨动开关 */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 14px; background: #f8f9ff; border: 1px solid #e0e3ff; border-radius: 10px;
+    }
+    .toggle-label { font-size: 13px; font-weight: 600; color: #374151; }
+    .toggle-switch { position: relative; display: inline-block; width: 46px; height: 26px; cursor: pointer; flex-shrink: 0; }
+    .toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #d1d5db; border-radius: 26px; transition: background 0.28s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 20px; height: 20px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%;
+      transition: transform 0.28s; box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #10b981; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
     .btn-topup {
       padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 600;
       cursor: pointer; border: none; background: #8b5cf6; color: white; transition: background 0.2s; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
@@ -159,8 +178,8 @@
           <option value="claude-sonnet-4-6">👑 Claude 顶级版 (消耗: 200积分/1K词)</option>
         </select>
       </div>
-      <div class="balance-row">
-        <span class="balance-text" id="balanceText"> 余额: 加载中</span>
+      <div class="balance-row" id="balanceRow">
+        <span class="balance-text" id="balanceText">余额：加载中</span>
         <button class="btn-topup" id="topupBtn">充值</button>
       </div>      <div class="account-row">
         <span class="account-email" id="accountEmail">未登录</span>
@@ -208,10 +227,12 @@
 
   <!-- 自动翻译 -->
   <div class="section">
-    <button id="autoTranslateBtn" class="btn-primary">启用自动翻译</button>
-    <div class="status-item">
-      <span class="status-dot" id="autoDot"></span>
-      <span id="autoStatus">已禁用自动翻译</span>
+    <div class="toggle-row">
+      <span class="toggle-label">自动翻译</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="autoToggle">
+        <span class="toggle-slider"></span>
+      </label>
     </div>
   </div>
 

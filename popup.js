@@ -1,9 +1,7 @@
 ﻿// popup.js
 
-const autoTranslateBtn = document.getElementById('autoTranslateBtn');
+const autoToggle       = document.getElementById('autoToggle');
 const displayModeBtn   = document.getElementById('displayModeBtn');
-const autoDot          = document.getElementById('autoDot');
-const autoStatus       = document.getElementById('autoStatus');
 const modeText         = document.getElementById('modeText');
 
 const sourceLangSel    = document.getElementById('sourceLang');
@@ -91,8 +89,10 @@ function doLogout() {
     accountEmail.textContent     = '未登录';
     accountActionBtn.textContent = '去登录';
     accountActionBtn.onclick     = openWebsite;
-    balanceText.textContent = ' 余额：未登录';
-    balanceText.style.color = '#9ca3af';
+    if (managedModelSel.value !== 'free-translation') {
+      balanceText.textContent = '余额：未登录';
+      balanceText.style.color = '#9ca3af';
+    }
   });
 }
 
@@ -112,35 +112,41 @@ topupBtn.addEventListener('click', () => {
 
 // ===== 余额显示 =====
 function updateBalanceUI(credits) {
-  const rate = MODEL_RATES[managedModelSel.value];
+  const model = managedModelSel.value;
+  const balanceRow = document.getElementById('balanceRow');
+  if (model === 'free-translation') {
+    if (balanceRow) balanceRow.style.display = 'none';
+    return;
+  }
+  if (balanceRow) balanceRow.style.display = '';
+  const rate = MODEL_RATES[model];
   if (credits <= 0) {
-    balanceText.textContent = ' 余额：已用尽';
+    balanceText.textContent = '余额：已用尽';
     balanceText.style.color = '#ef4444';
     return;
   }
-  if (!rate) {
-    // 免费模式下只显示积分
-    balanceText.textContent = ` 余额：${credits.toLocaleString()} 积分`;
-    balanceText.style.color = '#10b981';
-    return;
-  }
-  // 积分 ÷ 费率 * 1000 tokens * ~1.2字/token ÷ 10000 = 万字
   const wanChars = Math.round(credits * 1.2 / (rate * 10));
-  balanceText.textContent = ` 余额：约 ${wanChars || 1} 万字`;
+  balanceText.textContent = `余额：约 ${wanChars || 1} 万字`;
   balanceText.style.color = '#10b981';
 }
 
 function loadBalance() {
-  balanceText.textContent = ' 余额：刷新中';
+  const balanceRow = document.getElementById('balanceRow');
+  if (managedModelSel.value === 'free-translation') {
+    if (balanceRow) balanceRow.style.display = 'none';
+    return;
+  }
+  if (balanceRow) balanceRow.style.display = '';
+  balanceText.textContent = '余额：刷新中';
   balanceText.style.color = '#9ca3af';
   chrome.runtime.sendMessage({ action: 'getBalance' }, (res) => {
     if (res && res.ok) {
       updateBalanceUI(res.credits);
     } else if (res && res.loggedOut) {
-      balanceText.textContent = ' 余额：未登录';
+      balanceText.textContent = '余额：未登录';
       balanceText.style.color = '#9ca3af';
     } else {
-      balanceText.textContent = ' 余额：获取失败';
+      balanceText.textContent = '余额：获取失败';
       balanceText.style.color = '#9ca3af';
     }
   });
@@ -149,15 +155,17 @@ function loadBalance() {
 // ===== 核心模型切换 =====
 managedModelSel.addEventListener('change', () => {
   const val = managedModelSel.value;
+  const balanceRow = document.getElementById('balanceRow');
   if (val === 'free-translation') {
     chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
+    if (balanceRow) balanceRow.style.display = 'none';
   } else {
     chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
+    if (balanceRow) balanceRow.style.display = '';
+    chrome.storage.local.get(['cachedCredits'], (local) => {
+      if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
+    });
   }
-  // 切换模型后刷新余额估算
-  chrome.storage.local.get(['cachedCredits'], (local) => {
-    if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
-  });
 });
 
 // ===== 语言选择 =====
@@ -168,14 +176,12 @@ targetLangSel.addEventListener('change', () => {
   chrome.storage.sync.set({ targetLang: targetLangSel.value }, () => retranslateIfAuto());
 });
 
-// ===== 自动翻译按钮 =====
-autoTranslateBtn.addEventListener('click', () => {
-  chrome.storage.sync.get(['autoTranslateEnabled'], (result) => {
-    const newState = !(result.autoTranslateEnabled || false);
-    chrome.storage.sync.set({ autoTranslateEnabled: newState }, () => {
-      updateAutoTranslateUI(newState);
-      if (newState) sendToCurrentTab({ action: 'translate' });
-    });
+// ===== 自动翻译开关 =====
+autoToggle.addEventListener('change', () => {
+  const newState = autoToggle.checked;
+  chrome.storage.sync.set({ autoTranslateEnabled: newState }, () => {
+    updateAutoTranslateUI(newState);
+    if (newState) sendToCurrentTab({ action: 'translate' });
   });
 });
 
@@ -210,17 +216,7 @@ function setSelectValue(sel, value) {
 }
 
 function updateAutoTranslateUI(enabled) {
-  if (enabled) {
-    autoTranslateBtn.textContent = '禁用自动翻译';
-    autoTranslateBtn.classList.add('active');
-    autoDot.classList.add('active');
-    autoStatus.textContent = '已启用自动翻译';
-  } else {
-    autoTranslateBtn.textContent = '启用自动翻译';
-    autoTranslateBtn.classList.remove('active');
-    autoDot.classList.remove('active');
-    autoStatus.textContent = '已禁用自动翻译';
-  }
+  if (autoToggle) autoToggle.checked = enabled;
 }
 
 function updateDisplayModeUI(mode) {
