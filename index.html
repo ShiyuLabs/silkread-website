@@ -169,47 +169,45 @@
     </footer>
 
     <!-- ========== 登录弹窗 (Email + Code) ========== -->
-    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
-        <div class="absolute inset-0 bg-black bg-opacity-60" id="login-overlay"></div>
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm mx-auto relative z-10 transform scale-95 transition-transform duration-300" id="login-box">
-            <button id="close-login" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
+    <div id="login-modal" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);">
+        <div id="login-box" style="background:#fff;border-radius:16px;padding:32px 28px 24px;width:360px;max-width:90vw;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+            <button id="close-login" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:20px;line-height:1;">✕</button>
 
             <!-- Step 1: 输入邮箱 -->
             <div id="login-step1">
-                <div class="text-center mb-6">
-                    <div class="text-3xl mb-2">✉️</div>
-                    <h3 class="text-xl font-bold text-gray-900">登录 / 注册</h3>
-                    <p class="text-sm text-gray-500 mt-1">输入邮箱，我们将发送验证码</p>
+                <div style="text-align:center;margin-bottom:24px;">
+                    <div style="font-size:36px;margin-bottom:8px;">✉️</div>
+                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">登录 / 注册</h3>
+                    <p style="margin:0;font-size:13px;color:#6b7280;">输入邮箱，我们将发送 6 位验证码</p>
                 </div>
                 <input id="login-email" type="email" placeholder="your@email.com"
-                    class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm mb-3">
+                    style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:12px;font-family:inherit;">
                 <button id="btn-send-code"
-                    class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow-sm">
+                    style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
                     发送验证码
                 </button>
             </div>
 
             <!-- Step 2: 输入验证码 -->
-            <div id="login-step2" class="hidden">
-                <div class="text-center mb-6">
-                    <div class="text-3xl mb-2">🔑</div>
-                    <h3 class="text-xl font-bold text-gray-900">输入验证码</h3>
-                    <p class="text-sm text-gray-500 mt-1">已发送至 <span id="login-email-display" class="font-semibold text-blue-600"></span></p>
+            <div id="login-step2" style="display:none;">
+                <div style="text-align:center;margin-bottom:24px;">
+                    <div style="font-size:36px;margin-bottom:8px;">🔑</div>
+                    <h3 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#111;">输入验证码</h3>
+                    <p style="margin:0;font-size:13px;color:#6b7280;">已发送至 <span id="login-email-display" style="color:#2563eb;font-weight:600;"></span></p>
                 </div>
                 <input id="login-code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码"
-                    class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm text-center tracking-[0.4em] text-lg font-mono mb-3">
+                    style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:22px;font-family:monospace;letter-spacing:0.4em;text-align:center;outline:none;margin-bottom:12px;">
                 <button id="btn-verify-code"
-                    class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition shadow-sm mb-2">
+                    style="width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
                     确认登录
                 </button>
-                <button id="btn-resend-code" class="w-full text-sm text-gray-500 hover:text-blue-600 transition py-1">
+                <button id="btn-resend-code"
+                    style="width:100%;padding:8px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;">
                     ← 重新填写邮箱
                 </button>
             </div>
 
-            <p id="login-msg" class="text-center text-sm font-medium mt-4 min-h-[20px]"></p>
+            <p id="login-msg" style="text-align:center;font-size:13px;font-weight:600;margin:14px 0 0;min-height:20px;"></p>
         </div>
 
     <!-- ========== 支付二维码弹窗 (Payment Modal) ========== -->
@@ -319,27 +317,20 @@
             // ===== 模态框辅助 =====
             function openModal(modalEl) {
                 if (!modalEl) return;
-                modalEl.classList.remove('hidden');
-                void modalEl.offsetWidth;
-                modalEl.classList.remove('opacity-0');
-                const box = modalEl.querySelector('[id$="-box"]');
-                if (box) box.classList.remove('scale-95');
+                modalEl.style.display = 'flex';
             }
             function closeModal(modalEl) {
                 if (!modalEl) return;
-                modalEl.classList.add('opacity-0');
-                const box = modalEl.querySelector('[id$="-box"]');
-                if (box) box.classList.add('scale-95');
-                setTimeout(() => modalEl.classList.add('hidden'), 300);
+                modalEl.style.display = 'none';
             }
 
             // ===== 登录模态框 =====
             function openLoginModal() {
-                if (loginStep1) loginStep1.classList.remove('hidden');
-                if (loginStep2) loginStep2.classList.add('hidden');
+                if (loginStep1) loginStep1.style.display = '';
+                if (loginStep2) loginStep2.style.display = 'none';
                 if (loginEmailInput) loginEmailInput.value = '';
                 if (loginCodeInput) loginCodeInput.value = '';
-                if (loginMsg) { loginMsg.textContent = ''; loginMsg.className = 'text-center text-sm font-medium mt-4 min-h-[20px]'; }
+                if (loginMsg) { loginMsg.textContent = ''; loginMsg.style.color = ''; }
                 openModal(loginModal);
                 setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
             }
@@ -347,12 +338,12 @@
             function setLoginMsg(text, ok) {
                 if (!loginMsg) return;
                 loginMsg.textContent = text;
-                loginMsg.className = 'text-center text-sm font-medium mt-4 min-h-[20px] ' + (ok ? 'text-green-600' : 'text-red-500');
+                loginMsg.style.color = ok ? '#16a34a' : '#dc2626';
             }
 
             if (btnLoginShow) btnLoginShow.addEventListener('click', openLoginModal);
             if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal));
-            if (loginOverlay) loginOverlay.addEventListener('click', () => closeModal(loginModal));
+            if (loginOverlay) loginOverlay.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
 
             // Step 1: 发送验证码
             if (btnSendCode) btnSendCode.addEventListener('click', async () => {
@@ -369,9 +360,9 @@
                     });
                     const data = await resp.json();
                     if (data.ok) {
-                        loginEmailDisplay.textContent = email;
-                        loginStep1.classList.add('hidden');
-                        loginStep2.classList.remove('hidden');
+                        if (loginEmailDisplay) loginEmailDisplay.textContent = email;
+                        loginStep1.style.display = 'none';
+                        loginStep2.style.display = '';
                         setLoginMsg('验证码已发送，请查收邮件 📧', true);
                         setTimeout(() => loginCodeInput && loginCodeInput.focus(), 100);
                     } else {
@@ -414,8 +405,8 @@
 
             // 重新发送
             if (btnResendCode) btnResendCode.addEventListener('click', () => {
-                loginStep2.classList.add('hidden');
-                loginStep1.classList.remove('hidden');
+                loginStep2.style.display = 'none';
+                loginStep1.style.display = '';
                 setLoginMsg('', true);
                 setTimeout(() => loginEmailInput && loginEmailInput.focus(), 100);
             });
