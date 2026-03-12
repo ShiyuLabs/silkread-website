@@ -254,7 +254,10 @@ async function translateNodes(textNodes) {
       .catch(err => {
         if (err.message === 'CREDITS_EXHAUSTED') {
           creditsExhausted = true;
-          showNotification('💳 翻译余额不足，请打开扩展弹窗充值', 'error');
+          showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
+        } else if (err.message === 'LOGGED_OUT') {
+          creditsExhausted = true; // 停止继续翻译
+          showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
         } else {
           console.error(`❌ Chunk ${i + 1} failed:`, err.message);
           showNotification('❌ 翻译失败：' + err.message, 'error');
