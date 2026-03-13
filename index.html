@@ -304,7 +304,7 @@
                     </svg>
                     <span class="text-blue-500 text-sm font-medium">二维码加载中...</span>
                 </div>
-                <img id="qrcode-img" src="" alt="微信支付二维码" class="hidden w-full h-full object-contain rounded-xl" />
+                <img id="qrcode-img" src="/image.png" alt="微信支付二维码" class="hidden w-full h-full object-contain rounded-xl" />
                 <div id="qrcode-error" class="hidden text-center px-3">
                     <span class="text-red-500 text-sm">加载失败，请重试</span>
                 </div>
@@ -577,9 +577,11 @@
                     if (!isLoggedIn) { openLoginModal(); return; }
                     const price = this.getAttribute('data-price');
                     if (paymentAmountText) paymentAmountText.innerText = '￥' + price + '.00';
+                    const fallbackQrcode = '/image.png';
                     const qrImg     = document.getElementById('qrcode-img');
                     const qrLoading = document.getElementById('qrcode-loading');
                     const qrError   = document.getElementById('qrcode-error');
+                    qrImg.src = fallbackQrcode;
                     qrImg.classList.add('hidden');
                     qrError.classList.add('hidden');
                     qrLoading.classList.remove('hidden');
@@ -622,12 +624,16 @@
                         } else if (data.url) {
                             window.open(data.url, '_blank'); closeModal(paymentModal);
                         } else {
-                            qrError.querySelector('span').textContent = data.error || '获取二维码失败';
+                            qrImg.src = fallbackQrcode;
+                            qrImg.classList.remove('hidden');
+                            qrError.querySelector('span').textContent = (data.error || '获取二维码失败') + '，已展示备用二维码';
                             qrError.classList.remove('hidden');
                         }
                     } catch {
                         qrLoading.classList.add('hidden');
-                        qrError.querySelector('span').textContent = '网络错误，请稍后再试';
+                        qrImg.src = fallbackQrcode;
+                        qrImg.classList.remove('hidden');
+                        qrError.querySelector('span').textContent = '网络错误，请稍后再试，已展示备用二维码';
                         qrError.classList.remove('hidden');
                     }
                     // Stop polling when modal is closed
