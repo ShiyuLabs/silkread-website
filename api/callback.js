@@ -45,7 +45,11 @@ module.exports = async function handler(req, res) {
   // status or trade_status = 'OD' means paid
   const tradeStatus = data.trade_status || data.status;
   if (tradeStatus === 'OD') {
-    const points = Math.floor(parseFloat(data.total_fee) * 1000);
+    const baseFee = parseFloat(data.total_fee);
+    const basePoints = Math.floor(baseFee * 1000);
+    // 充值赠积分梯度：满100赠20000，满50赠5000，其余不赠
+    const bonusPoints = baseFee >= 100 ? 20000 : baseFee >= 50 ? 5000 : 0;
+    const points = basePoints + bonusPoints;
     const orderId = data.trade_order_id;
 
     if (orderId && kvUrl && kvToken) {

@@ -7,23 +7,23 @@
 const MODEL_CONFIG = {
   'deepseek-chat': {
     format: 'openai',
-    rate:   10,
+    rate:   8,
   },
   'qwen3-235b-a22b': {
     format: 'openai',
-    rate:   20,
+    rate:   18,
   },
   'gemini-2.5-flash': {
     format: 'openai',
-    rate:   30,
+    rate:   25,
   },
   'gpt-5-mini': {
     format: 'openai',
-    rate:   50,
+    rate:   60,
   },
   'claude-sonnet-4-6': {
     format: 'openai',
-    rate:   200,
+    rate:   149,
   },
 };
 

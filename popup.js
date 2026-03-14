@@ -17,11 +17,11 @@ const WEBSITE = 'https://shiyuai.top/';
 // 每个模型的计费比率（积分 / 1K Token）
 const MODEL_RATES = {
   'free-translation':  0,
-  'deepseek-chat':    10,
-  'qwen3-235b-a22b':  20,
-  'gemini-2.5-flash': 30,
-  'gpt-5-mini':       50,
-  'claude-sonnet-4-6': 200,
+  'deepseek-chat':     8,
+  'qwen3-235b-a22b':  18,
+  'gemini-2.5-flash': 25,
+  'gpt-5-mini':       60,
+  'claude-sonnet-4-6': 149,
 };
 
 // 浏览器语言 -> 目标语言 映射
