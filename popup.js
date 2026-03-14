@@ -165,7 +165,7 @@ function updateBalanceUI(credits) {
     return;
   }
   const wanChars = Math.round(credits * 1.2 / (rate * 10));
-  balanceText.textContent = `余额：约 ${wanChars || 1} 万字`;
+  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${wanChars || 1} 万字`;
   balanceText.style.color = '#10b981';
 }
 
