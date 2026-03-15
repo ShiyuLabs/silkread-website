@@ -132,22 +132,6 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Auth lookup failed' });
   }
 
-  // ── Step 1b: Per-user rate limit (30 req/min) ──────────────────────────────
-  try {
-    const bucket    = Math.floor(Date.now() / 60000); // 1-minute window
-    const rlKey     = encodeURIComponent('rl:' + email + ':' + bucket);
-    const incrResp  = await fetch(kvUrl + '/incr/' + rlKey, { headers: kvHeaders });
-    const incrData  = await incrResp.json();
-    const reqCount  = typeof incrData.result === 'number' ? incrData.result : 0;
-    if (reqCount === 1) {
-      // Set TTL on first request in this window
-      await fetch(kvUrl + '/expire/' + rlKey + '/120', { headers: kvHeaders });
-    }
-    if (reqCount > 30) {
-      return res.status(429).json({ error: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' });
-    }
-  } catch (_) { /* non-fatal: skip rate check on KV error */ }
-
   // ── Step 2: Read current balance ───────────────────────────────────────────
   let currentCredits = 0;
   try {
