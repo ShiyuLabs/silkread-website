@@ -232,12 +232,21 @@ function _cacheKey() {
 }
 
 function saveTranslationCache() {
+  if (Object.keys(translationMap).length === 0) return;
   const key = _cacheKey();
-  const payload = { ts: Date.now(), map: translationMap };
-  // Layer 1: 同步写 sessionStorage，刷新立即可用，不存在异步丢失问题
-  try { sessionStorage.setItem(key, JSON.stringify(payload)); } catch(_) {}
-  // Layer 2: 异步写 chrome.storage.local，跨 session 持久化
-  try { chrome.storage.local.set({ [key]: payload }); } catch(_) {}
+  const payload = JSON.stringify({ ts: Date.now(), map: translationMap });
+  // Layer 1: sessionStorage 同步写入，刷新立即生效
+  try {
+    sessionStorage.setItem(key, payload);
+    console.log('💾 Cache saved to sessionStorage, key:', key, 'entries:', Object.keys(translationMap).length);
+  } catch(e) { console.warn('sessionStorage save failed:', e); }
+  // Layer 2: chrome.storage.local 持久化
+  try {
+    const obj = { ts: Date.now(), map: translationMap };
+    chrome.storage.local.set({ [key]: obj }, () => {
+      if (chrome.runtime.lastError) console.warn('storage.local save failed:', chrome.runtime.lastError);
+    });
+  } catch(e) { console.warn('storage.local save failed:', e); }
 }
 
 function loadTranslationCache() {
@@ -529,7 +538,6 @@ function applyTranslationResults(nodes, resultText) {
     translatedElements.push({ node, originalText, translatedText });
     translationMap[originalText.trim()] = translatedText;
 
-    // 直接修改 nodeValue，不插入任何新 DOM 节点
     applyNodeTranslation(node, originalText, translatedText);
 
     if (isIncrementalTranslation) {
@@ -537,6 +545,12 @@ function applyTranslationResults(nodes, resultText) {
       observerTranslateCount.set(key, (observerTranslateCount.get(key) || 0) + 1);
     }
   });
+
+  // 每个 chunk 翻译完立即同步写 sessionStorage，确保刷新不丢失
+  try {
+    const key = _cacheKey();
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), map: translationMap }));
+  } catch(_) {}
 }
 
 function applyNodeTranslation(node, originalText, translatedText) {
