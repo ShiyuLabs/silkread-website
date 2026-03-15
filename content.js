@@ -7,6 +7,8 @@ let translatedElements = [];
 let currentDisplayMode = "bilingual";
 let isAutoTranslateEnabled = false;
 let currentTargetLang = 'zh-CN'; // 目标语言，用于跳过已是目标语言的文本
+let currentEngine = 'free';
+let currentManagedModel = '';
 
 // 动态页面监听相关
 let domObserver = null;
@@ -18,10 +20,12 @@ let extensionReloadNotified = false;
 // ============ 初始化 ============
 console.log("✅ Content script loaded");
 
-chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang'], (result) => {
+chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang', 'translationEngine', 'managedModel'], (result) => {
   isAutoTranslateEnabled = result.autoTranslateEnabled === true;
   currentDisplayMode = result.displayMode || 'bilingual';
   currentTargetLang = result.targetLang || 'zh-CN';
+  currentEngine = result.translationEngine || 'free';
+  currentManagedModel = result.managedModel || '';
   console.log("📍 Settings loaded:", { autoTranslateEnabled: isAutoTranslateEnabled, displayMode: currentDisplayMode, targetLang: currentTargetLang });
 
   if (isAutoTranslateEnabled) {
@@ -180,8 +184,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       applyDisplayMode();
     }
     // 语言或引擎变化时，若已启用自动翻译则重新翻译当前页
-    if (changes.sourceLang || changes.targetLang || changes.translationEngine) {
+    if (changes.sourceLang || changes.targetLang || changes.translationEngine || changes.managedModel) {
       if (changes.targetLang) currentTargetLang = changes.targetLang.newValue || 'zh-CN';
+      if (changes.translationEngine) currentEngine = changes.translationEngine.newValue || 'free';
+      if (changes.managedModel) currentManagedModel = changes.managedModel.newValue || '';
       if (isAutoTranslateEnabled) {
         console.log("🔄 语言/引擎设置已变更，重新翻译...");
         translatePageNow();
@@ -216,6 +222,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // ============ 翻译函数 ============
+
+// ============ 翻译缓存（按 URL+模型+语言 持久化，7天有效）============
+function _cacheKey() {
+  const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
+  return `tc:${engine}:${currentTargetLang}:${location.hostname}${location.pathname}`;
+}
+function loadTranslationCache() {
+  return new Promise(resolve => {
+    const key = _cacheKey();
+    chrome.storage.local.get([key], result => {
+      const entry = result[key];
+      if (!entry || Date.now() - entry.ts > 7 * 86400 * 1000) {
+        if (entry) chrome.storage.local.remove([key]);
+        return resolve(null);
+      }
+      resolve(entry.map);
+    });
+  });
+}
+let _cacheSaveTimer = null;
+function scheduleTranslationCacheSave() {
+  clearTimeout(_cacheSaveTimer);
+  _cacheSaveTimer = setTimeout(() => {
+    const key = _cacheKey();
+    chrome.storage.local.set({ [key]: { ts: Date.now(), map: { ...translationMap } } });
+  }, 800);
+}
 async function translatePageNow() {
   console.log("▶️ Starting translation...");
   clearTranslations();
@@ -225,8 +258,29 @@ async function translatePageNow() {
     console.log("⚠️ No text nodes to translate");
     return;
   }
-  isIncrementalTranslation = false;
-  await translateNodes(textNodes);
+
+  // 加载缓存，立即将命中项渲染到页面（无需等待 API）
+  const cached = await loadTranslationCache();
+  if (cached) Object.assign(translationMap, cached);
+
+  const uncached = [];
+  pauseObserver();
+  for (const node of textNodes) {
+    const text = node.textContent.trim();
+    if (translationMap[text]) {
+      translatedElements.push({ node, originalText: node.nodeValue, translatedText: translationMap[text] });
+      applyNodeTranslation(node, node.nodeValue, translationMap[text]);
+    } else {
+      uncached.push(node);
+    }
+  }
+  resumeObserver();
+  applyDisplayMode(); // 缓存命中部分立即呈现
+
+  if (uncached.length > 0) {
+    isIncrementalTranslation = false;
+    await translateNodes(uncached);
+  }
   console.log("🎉 Translation complete!");
   applyDisplayMode();
 }
@@ -243,7 +297,7 @@ async function translateNodes(textNodes) {
   console.log("📦 Created chunks:", chunks.length);
   
   // chunk 并行发送（每个 chunk 内部只有一个 Google 请求，并发数 5 就够）
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 10;
   const chunkTasks = chunks.map((chunk, i) => () => {
     const texts = chunk.map(n => n.textContent.trim());
     const combined = texts.map((t, idx) => `[${idx}] ${t}`).join('\n');
@@ -289,6 +343,7 @@ async function translateNodes(textNodes) {
   };
 
   await runWithConcurrency(chunkTasks, CONCURRENCY);
+  scheduleTranslationCacheSave(); // 翻译完成后异步保存缓存
   applyDisplayMode();
   } finally {
     isTranslating = false;
@@ -357,11 +412,6 @@ function extractTextNodes(root) {
           // inline style 隐藏
           const s = parent.style;
           if (s && (s.display === 'none' || s.visibility === 'hidden')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          // computedStyle 隐藏（捕获通过 CSS class 隐藏的元素，如折叠评论）
-          const cs = window.getComputedStyle(parent);
-          if (cs.display === 'none' || cs.visibility === 'hidden') {
             return NodeFilter.FILTER_REJECT;
           }
           parent = parent.parentElement;
