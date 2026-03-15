@@ -4,6 +4,17 @@
 // 本地开发: 'http://localhost:8000'  上线后改为你的服务器地址
 const PROXY_URL = 'https://shiyuai.top';
 
+// 缓存翻译设置（避免在 message handler 里嵌套 storage.sync.get，防止 MV3 服务工作者被意外终止）
+let _cachedSettings = {
+  translationEngine: 'free', sourceLang: 'auto', targetLang: 'zh-CN',
+  aiMode: 'managed', managedModel: '', byokProvider: '', byokModel: '', byokApiKey: ''
+};
+chrome.storage.sync.get(Object.keys(_cachedSettings), (s) => { Object.assign(_cachedSettings, s); });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'sync') return;
+  for (const k in changes) if (k in _cachedSettings) _cachedSettings[k] = changes[k].newValue;
+});
+
 // 获取已登录用户的 session token（返回 null 表示未登录）
 async function getAuthToken() {
   const stored = await chrome.storage.local.get(['authToken', 'authEmail']);
@@ -102,21 +113,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "fetchTranslation") {
-    // 读取引擎和语言设置
-    chrome.storage.sync.get(['translationEngine', 'sourceLang', 'targetLang',
-      'aiMode', 'managedModel', 'byokProvider', 'byokModel', 'byokApiKey'], (settings) => {
-      const engine     = settings.translationEngine || 'free';
-      const sourceLang = settings.sourceLang || 'auto';
-      const targetLang = settings.targetLang || 'zh-CN';
+    // 直接用缓存设置，不再嵌套 storage.sync.get，防止 MV3 服务工作者在回调间隙被终止
+    const settings  = _cachedSettings;
+    const engine     = settings.translationEngine || 'free';
+    const sourceLang = settings.sourceLang || 'auto';
+    const targetLang = settings.targetLang || 'zh-CN';
 
-      const task = engine === 'ai'
-        ? handleAITranslation(request.text, sourceLang, targetLang, settings)
-        : handleFreeTranslation(request.text, sourceLang, targetLang);
+    const task = engine === 'ai'
+      ? handleAITranslation(request.text, sourceLang, targetLang, settings)
+      : handleFreeTranslation(request.text, sourceLang, targetLang);
 
-      task
-        .then(result => sendResponse({ success: true, data: result }))
-        .catch(error => sendResponse({ success: false, error: error.message }));
-    });
+    task
+      .then(result => sendResponse({ success: true, data: result }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // 保持异步通道
   }
 });

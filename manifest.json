@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "诗语翻译 - AI 智能翻译助手",
-  "version": "1.1",
+  "version": "1.2",
   "description": "诗语翻译：支持全球顶级大模型的沉浸式双语对照翻译",
   "permissions": [
     "storage",
