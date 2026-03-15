@@ -6,6 +6,7 @@ let translationMap = {};
 let translatedElements = [];
 let currentDisplayMode = "bilingual";
 let isAutoTranslateEnabled = false;
+let currentTargetLang = 'zh-CN'; // 目标语言，用于跳过已是目标语言的文本
 
 // 动态页面监听相关
 let domObserver = null;
@@ -17,10 +18,11 @@ let extensionReloadNotified = false;
 // ============ 初始化 ============
 console.log("✅ Content script loaded");
 
-chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode'], (result) => {
+chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang'], (result) => {
   isAutoTranslateEnabled = result.autoTranslateEnabled === true;
   currentDisplayMode = result.displayMode || 'bilingual';
-  console.log("📍 Settings loaded:", { autoTranslateEnabled: isAutoTranslateEnabled, displayMode: currentDisplayMode });
+  currentTargetLang = result.targetLang || 'zh-CN';
+  console.log("📍 Settings loaded:", { autoTranslateEnabled: isAutoTranslateEnabled, displayMode: currentDisplayMode, targetLang: currentTargetLang });
 
   if (isAutoTranslateEnabled) {
     startAutoTranslate();
@@ -179,6 +181,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
     // 语言或引擎变化时，若已启用自动翻译则重新翻译当前页
     if (changes.sourceLang || changes.targetLang || changes.translationEngine) {
+      if (changes.targetLang) currentTargetLang = changes.targetLang.newValue || 'zh-CN';
       if (isAutoTranslateEnabled) {
         console.log("🔄 语言/引擎设置已变更，重新翻译...");
         translatePageNow();
@@ -322,6 +325,14 @@ function extractTextNodes(root) {
         // 过滤掉太短或纯符号的文本
         if (text.length <= 2 || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
           return NodeFilter.FILTER_REJECT;
+        }
+
+        // 如果目标语言是中文，跳过本身已经是中文的文本节点（节省积分）
+        if (currentTargetLang && currentTargetLang.startsWith('zh')) {
+          const cjkCount = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+          if (cjkCount / text.length > 0.6) {
+            return NodeFilter.FILTER_REJECT;
+          }
         }
 
         // 检查所有祖先节点
