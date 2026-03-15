@@ -20,8 +20,8 @@ const MODEL_RATES = {
   'deepseek-chat':     8,
   'qwen3-235b-a22b':  18,
   'gemini-2.5-flash': 25,
-  'gpt-5-mini':       60,
-  'claude-sonnet-4-6': 149,
+  'gpt-5-mini':       80,
+  'claude-sonnet-4-6': 179,
 };
 
 // 浏览器语言 -> 目标语言 映射

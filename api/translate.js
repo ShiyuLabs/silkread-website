@@ -19,11 +19,11 @@ const MODEL_CONFIG = {
   },
   'gpt-5-mini': {
     format: 'openai',
-    rate:   60,
+    rate:   80,
   },
   'claude-sonnet-4-6': {
     format: 'openai',
-    rate:   149,
+    rate:   179,
   },
 };
 
