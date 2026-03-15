@@ -23,6 +23,66 @@ let observerCharCount = 0;       // Observer 累计增量翻译量
 // 增量翻译上限：初始量的 30%（防止无限滚动页面持续消耗）
 const OBSERVER_BUDGET_RATIO = 0.3;
 
+// ── IntersectionObserver 懒翻译：首屏以下内容滚入视口时才翻译 ──────────────────────
+let lazyObserver = null;
+const lazyObservedElements = new Set(); // 防止重复 observe
+
+function resetLazyObserver() {
+  if (lazyObserver) {
+    lazyObserver.disconnect();
+    lazyObserver = null;
+  }
+  lazyObservedElements.clear();
+}
+
+function getLazyObserver() {
+  if (lazyObserver) return lazyObserver;
+  lazyObserver = new IntersectionObserver((entries) => {
+    const toTranslate = [];
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      lazyObserver.unobserve(entry.target);
+      lazyObservedElements.delete(entry.target);
+      // 用和主流程相同的过滤器重新提取该元素内的文本节点
+      const nodes = extractTextNodes(entry.target);
+      const translatedNodeSet = new Set(translatedElements.map(e => e.node));
+      for (const n of nodes) {
+        if (translatedNodeSet.has(n)) continue;
+        const text = n.nodeValue?.trim();
+        if (!text) continue;
+        if (translationMap[text]) {
+          translatedElements.push({ node: n, originalText: n.nodeValue, translatedText: translationMap[text] });
+          applyNodeTranslation(n, n.nodeValue, translationMap[text]);
+        } else {
+          toTranslate.push(n);
+        }
+      }
+    }
+    if (toTranslate.length > 0) {
+      console.log(`👁️ 滚入视口，翻译 ${toTranslate.length} 个节点...`);
+      isIncrementalTranslation = true;
+      translateNodes(toTranslate).then(() => {
+        isIncrementalTranslation = false;
+        applyDisplayMode();
+        saveTranslationCache();
+      });
+    } else {
+      applyDisplayMode();
+    }
+  }, { rootMargin: '400px 0px', threshold: 0 });
+  return lazyObserver;
+}
+
+function observeForLazyTranslation(elements) {
+  const obs = getLazyObserver();
+  for (const el of elements) {
+    if (!lazyObservedElements.has(el)) {
+      lazyObservedElements.add(el);
+      obs.observe(el);
+    }
+  }
+}
+
 // Extension context 有效性检查（扩展被重载后旧 content.js 应立即停止一切操作）
 function isContextValid() {
   try { return !!chrome.runtime?.id; } catch (_) { return false; }
@@ -304,6 +364,7 @@ function loadTranslationCache() {
 async function translatePageNow() {
   if (!isContextValid()) return;
   console.log("▶️ Starting translation...");
+  resetLazyObserver(); // 重新翻译时重置，避免旧 observer 干扰
 
   // AI 模式下，翻译前记录余额，完成后对比显示实际消耗（透明计费）
   let creditsBefore = null;
@@ -326,37 +387,49 @@ async function translatePageNow() {
   const cached = await loadTranslationCache();
   if (cached) Object.assign(translationMap, cached);
 
-  const uncached = [];
-  // 初始翻译最多提取 30,000 字符，防止动态加载型网站（无限滚动等）一次性燃烧大量积分
-  // 超出部分由 MutationObserver 在内容滚入视口后按需翻译
-  const MAX_INITIAL_CHARS = 30000;
-  let apiCharCount = 0;
+  // 按视口位置分流：首屏内/附近 → 立即翻译；视口以下 → IntersectionObserver 懒翻译
+  const inViewNodes = [];
+  const belowFoldParents = new Set();
+  const viewportH = window.innerHeight;
+
   pauseObserver();
   for (const node of textNodes) {
-    const text = node.textContent.trim();
+    const text = node.nodeValue?.trim();
+    if (!text) continue;
     if (translationMap[text]) {
+      // 缓存命中，立即应用，无论在不在视口
       translatedElements.push({ node, originalText: node.nodeValue, translatedText: translationMap[text] });
       applyNodeTranslation(node, node.nodeValue, translationMap[text]);
-    } else if (apiCharCount < MAX_INITIAL_CHARS) {
-      uncached.push(node);
-      apiCharCount += text.length;
+      continue;
     }
-    // 超出上限的节点跳过：MutationObserver 会在它们滚入视口后补翻译
+    const el = node.parentElement;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      if (rect.top <= viewportH * 2) {
+        inViewNodes.push(node);   // 在视口内或近处，立即翻译
+      } else {
+        belowFoldParents.add(el); // 视口以下，滚到时再翻译
+      }
+    }
   }
   resumeObserver();
   applyDisplayMode(); // 缓存命中部分立即呈现
 
-  // 统计实际发送给 API 的字符数（可见文本，不含缓存命中部分）
-  // apiCharCount 已在上面循环中累加
+  // 对折叠以下的父元素注册懒翻译（用户滚到时自动触发）
+  if (belowFoldParents.size > 0) {
+    observeForLazyTranslation(belowFoldParents);
+    console.log(`👁️ 折叠以下 ${belowFoldParents.size} 个元素注册懒翻译`);
+  }
 
+  const apiCharCount = inViewNodes.reduce((s, n) => s + (n.nodeValue?.trim().length || 0), 0);
   // 初始翻译完成后记录字符量，作为 Observer 预算基准
   initialPageCharCount = apiCharCount + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
   observerCharCount = 0;
-  console.log(`📊 可见字符: ${initialPageCharCount}，其中需调用 API: ${apiCharCount}`);
+  console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldParents.size} 个元素（懒加载）`);
 
-  if (uncached.length > 0) {
+  if (inViewNodes.length > 0) {
     isIncrementalTranslation = false;
-    await translateNodes(uncached);
+    await translateNodes(inViewNodes);
   }
   console.log("🎉 Translation complete!");
   applyDisplayMode();
@@ -369,8 +442,9 @@ async function translatePageNow() {
       if (creditsBefore !== null && creditsAfter !== null) {
         const consumed = Math.max(0, creditsBefore - creditsAfter);
         if (consumed > 0) {
+          const lazyNote = belowFoldParents.size > 0 ? `，折叠以下滚动时自动翻译` : '';
           showNotification(
-            `✅ 翻译完成｜提取 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分`,
+            `✅ 翻译完成｜首屏 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分${lazyNote}`,
             'info', 8000
           );
         } else if (apiCharCount === 0) {
@@ -707,6 +781,7 @@ function applyDisplayMode() {
 
 // ============ 清空翻译 ============
 function clearTranslations() {
+  resetLazyObserver(); // 清空懒翻译 observer，避免旧 observer 在重新翻译后仍触发
   pauseObserver();
   translatedElements.forEach(({ node, originalText }) => {
     if (node && node.parentNode) {
