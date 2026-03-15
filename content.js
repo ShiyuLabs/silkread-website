@@ -463,16 +463,6 @@ function extractTextNodes(root) {
           parent = parent.parentElement;
         }
 
-        // checkVisibility() — Chrome 105+ 原生可见性检测，捕获 CSS class 控制的隐藏
-        // 比 getComputedStyle 快，浏览器内部优化过
-        try {
-          if (typeof node.parentElement?.checkVisibility === 'function') {
-            if (!node.parentElement.checkVisibility({ checkVisibilityCSS: true })) {
-              return NodeFilter.FILTER_REJECT;
-            }
-          }
-        } catch (_) {}
-
         return NodeFilter.FILTER_ACCEPT;
       }
     },
