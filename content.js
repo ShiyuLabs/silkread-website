@@ -372,8 +372,6 @@ function extractTextNodes(root) {
     'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'OBJECT',
     'SVG', 'CANVAS', 'CODE', 'PRE', 'TEXTAREA', 'INPUT',
     'SELECT', 'OPTION',
-    // 导航/页眉/页脚/侧边栏——UI 框架，不是正文内容
-    'NAV', 'HEADER', 'FOOTER', 'ASIDE',
   ]);
   
   // 跳过这些 role（UI 交互组件 + 页面结构区域）
@@ -389,8 +387,8 @@ function extractTextNodes(root) {
     {
       acceptNode: function(node) {
         const text = node.textContent.trim();
-        // 过滤太短的文本（≤10 字符的基本都是按钮标签、数字、单词）
-        if (text.length <= 10 || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
+        // 过滤纯符号/纯数字（没有任何字母或CJK字符的跳过）
+        if (!text || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
           return NodeFilter.FILTER_REJECT;
         }
 
