@@ -109,6 +109,7 @@
       color: #6b7280; font-weight: 500;
       text-overflow: ellipsis; overflow: hidden; max-width: 175px; white-space: nowrap;
     }
+    .model-rate-hint { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 3px; margin-bottom: 2px; letter-spacing: 0.2px; }
     .btn-sm-link {
       font-size: 11px; background: none; border: none; cursor: pointer; padding: 0;
       width: auto; color: #7c3aed; text-decoration: underline; font-weight: 600;
@@ -197,14 +198,15 @@
       <div class="lang-row">
         <label>模型</label>
         <select id="managedModel">
-          <option value="free-translation">🆓 免费翻译（谷歌通道）</option>
-          <option value="deepseek-chat">⚡ DeepSeek V3（8积分/1K词）</option>
-          <option value="qwen3-235b-a22b">🌟 Qwen3-235B（18积分/1K词）</option>
-          <option value="gemini-2.5-flash">🎯 Gemini 2.5 Flash（25积分/1K词）</option>
-          <option value="gpt-5-mini">🚀 GPT-5 mini（80积分/1K词）</option>
-          <option value="claude-sonnet-4-6">👑 Claude Sonnet 4.6（179积分/1K词）</option>
+          <option value="free-translation">🆓 免费翻译（谷歌）</option>
+          <option value="deepseek-chat">⚡ DeepSeek V3</option>
+          <option value="qwen3-235b-a22b">🌟 Qwen3-235B</option>
+          <option value="gemini-2.5-flash">🎯 Gemini 2.5 Flash</option>
+          <option value="gpt-5-mini">🚀 GPT-5 mini</option>
+          <option value="claude-sonnet-4-6">👑 Claude Sonnet 4.6</option>
         </select>
       </div>
+      <div class="model-rate-hint" id="modelRateHint">谷歌通道 · 完全免费</div>
       <div class="balance-row" id="balanceRow">
         <span class="balance-text" id="balanceText">余额：加载中</span>
         <button class="btn-topup" id="topupBtn">充值</button>

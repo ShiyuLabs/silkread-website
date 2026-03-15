@@ -8,6 +8,7 @@ const modeTranslation  = document.getElementById('modeTranslation');
 const sourceLangSel    = document.getElementById('sourceLang');
 const targetLangSel    = document.getElementById('targetLang');
 const managedModelSel  = document.getElementById('managedModel');
+const modelRateHint    = document.getElementById('modelRateHint');
 const balanceText      = document.getElementById('balanceText');
 const topupBtn         = document.getElementById('topupBtn');
 const accountEmail     = document.getElementById('accountEmail');
@@ -24,6 +25,19 @@ const MODEL_RATES = {
   'gpt-5-mini':       80,
   'claude-sonnet-4-6': 179,
 };
+
+const MODEL_RATE_HINTS = {
+  'free-translation':  '谷歌通道 · 完全免费',
+  'deepseek-chat':     '8 积分 / 1K Token',
+  'qwen3-235b-a22b':  '18 积分 / 1K Token',
+  'gemini-2.5-flash': '25 积分 / 1K Token',
+  'gpt-5-mini':       '80 积分 / 1K Token',
+  'claude-sonnet-4-6': '179 积分 / 1K Token',
+};
+
+function updateModelRateHint(model) {
+  if (modelRateHint) modelRateHint.textContent = MODEL_RATE_HINTS[model] || '';
+}
 
 // 浏览器语言 -> 目标语言 映射
 function detectBrowserLang() {
@@ -51,9 +65,11 @@ chrome.storage.sync.get(
 
     if (syncResult.translationEngine === 'free') {
       setSelectValue(managedModelSel, 'free-translation');
+      updateModelRateHint('free-translation');
     } else {
       const targetModel = syncResult.managedModel || 'deepseek-chat';
       setSelectValue(managedModelSel, targetModel);
+      updateModelRateHint(managedModelSel.value);
       // 如果存储的模型在新选项列表里找不到（旧版本遗留），自动回退到免费档并修正存储
       if (managedModelSel.value !== targetModel) {
         managedModelSel.value = 'free-translation';
@@ -150,6 +166,7 @@ topupBtn.addEventListener('click', () => {
 
 // ===== 余额显示 =====
 function setFreeMode() {
+  updateModelRateHint('free-translation');
   balanceText.textContent = '免费通道·无需登录';
   balanceText.style.color = '#10b981';
   topupBtn.textContent = '充値升级';
@@ -192,11 +209,12 @@ function loadBalance() {
 managedModelSel.addEventListener('change', () => {
   const val = managedModelSel.value;
   if (val === 'free-translation') {
-    chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
-    setFreeMode();
-  } else {
-    chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
-    topupBtn.textContent = '充値';
+      chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
+      setFreeMode();
+    } else {
+      chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
+      updateModelRateHint(val);
+      topupBtn.textContent = '充値';
     chrome.storage.local.get(['cachedCredits'], (local) => {
       if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
       else loadBalance();
