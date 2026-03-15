@@ -348,14 +348,16 @@ async function translateNodes(textNodes) {
           } else if (err.message === 'LOGGED_OUT') {
             creditsExhausted = true;
             showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
-          } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED') {
+          } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED' ||
+                     err.message?.toLowerCase().includes('extension context') ||
+                     err.message?.toLowerCase().includes('context invalidated')) {
             creditsExhausted = true;
             if (!extensionReloadNotified) {
               extensionReloadNotified = true;
               showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
             }
           } else {
-            console.error(`❌ Chunk ${i + 1} failed:`, err.message);
+            console.warn(`⚠️ Chunk ${i + 1} failed:`, err.message);
             showNotification('❌ 翻译失败：' + err.message, 'error');
           }
         });
