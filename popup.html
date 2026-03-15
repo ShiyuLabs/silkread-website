@@ -37,6 +37,9 @@
       color: #3730a3; border-color: #a5b4fc;
     }
     .btn-secondary.active { background: linear-gradient(135deg, #dbeafe, #ede9fe); color: #1e40af; border-color: #818cf8; }
+    .mode-group { display: flex; gap: 6px; }
+    .mode-group button { flex: 1; padding: 8px 4px; font-size: 12px; border-radius: 8px; background: #f5f3ff; color: #6d28d9; border: 1.5px solid #c4b5fd; font-weight: 600; }
+    .mode-group button.active { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; border-color: #4f46e5; box-shadow: 0 2px 6px rgba(79,70,229,0.25); }
     .status-item { display: flex; align-items: center; font-size: 12px; color: #666; margin-top: 8px; justify-content: center; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; margin-right: 6px; transition: background 0.3s; }
     .status-dot.active { background: #10b981; box-shadow: 0 0 4px #10b981; }
@@ -262,9 +265,11 @@
 
   <!-- 显示模式 -->
   <div class="section">
-    <button id="displayModeBtn" class="btn-secondary">切换为译文只显</button>
-    <div class="status-item">
-      <span id="modeText" style="font-weight: 500;">当前: 双语对照显示</span>
+    <div class="section-label">显示模式</div>
+    <div class="mode-group">
+      <button id="modeOriginal">📝 原文</button>
+      <button id="modeBilingual" class="active">🔀 双语</button>
+      <button id="modeTranslation">✨ 译文</button>
     </div>
   </div>
 

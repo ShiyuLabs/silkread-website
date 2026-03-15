@@ -132,6 +132,18 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Auth lookup failed' });
   }
 
+  // ── Step 1b: Check shared translation cache (saves credits for repeated requests) ──
+  const crypto = require('crypto');
+  const textHash = crypto.createHash('md5').update(model + ':' + targetLang + ':' + text).digest('hex').slice(0, 16);
+  const transCacheKey = encodeURIComponent('trcache:' + textHash);
+  try {
+    const cr = await fetch(kvUrl + '/get/' + transCacheKey, { headers: kvHeaders });
+    const cd = await cr.json();
+    if (cd.result) {
+      return res.status(200).json({ translated_text: cd.result, cost: 0, remaining: null, cached: true });
+    }
+  } catch (_) {}
+
   // ── Step 2: Read current balance ───────────────────────────────────────────
   let currentCredits = 0;
   try {
@@ -176,6 +188,14 @@ module.exports = async function handler(req, res) {
   } catch (_) {
     remainingCredits = Math.max(0, remainingCredits);
   }
+
+  // ── Step 6: Save result to shared translation cache (TTL 30 days) ──────────
+  try {
+    await fetch(
+      kvUrl + '/set/' + transCacheKey + '?ex=2592000',
+      { method: 'POST', headers: { ...kvHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(result.text) }
+    );
+  } catch (_) {}
 
   return res.status(200).json({
     translated_text: result.text,

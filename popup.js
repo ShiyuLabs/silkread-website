@@ -1,8 +1,9 @@
 ﻿// popup.js
 
 const autoToggle       = document.getElementById('autoToggle');
-const displayModeBtn   = document.getElementById('displayModeBtn');
-const modeText         = document.getElementById('modeText');
+const modeOriginal     = document.getElementById('modeOriginal');
+const modeBilingual    = document.getElementById('modeBilingual');
+const modeTranslation  = document.getElementById('modeTranslation');
 
 const sourceLangSel    = document.getElementById('sourceLang');
 const targetLangSel    = document.getElementById('targetLang');
@@ -221,15 +222,15 @@ autoToggle.addEventListener('change', () => {
 });
 
 // ===== 显示模式按钮 =====
-displayModeBtn.addEventListener('click', () => {
-  chrome.storage.sync.get(['displayMode'], (result) => {
-    const newMode = (result.displayMode || 'bilingual') === 'bilingual' ? 'translationOnly' : 'bilingual';
-    chrome.storage.sync.set({ displayMode: newMode }, () => {
-      updateDisplayModeUI(newMode);
-      sendToCurrentTab({ action: 'changeDisplayMode', mode: newMode });
-    });
+function setDisplayMode(mode) {
+  chrome.storage.sync.set({ displayMode: mode }, () => {
+    updateDisplayModeUI(mode);
+    sendToCurrentTab({ action: 'changeDisplayMode', mode });
   });
-});
+}
+modeOriginal.addEventListener('click',    () => setDisplayMode('original'));
+modeBilingual.addEventListener('click',   () => setDisplayMode('bilingual'));
+modeTranslation.addEventListener('click', () => setDisplayMode('translationOnly'));
 
 // ===== 辅助 =====
 function retranslateIfAuto() {
@@ -255,13 +256,8 @@ function updateAutoTranslateUI(enabled) {
 }
 
 function updateDisplayModeUI(mode) {
-  if (mode === 'translationOnly') {
-    displayModeBtn.textContent = '切换为双语对照';
-    displayModeBtn.classList.add('active');
-    modeText.textContent = '当前: 译文只显';
-  } else {
-    displayModeBtn.textContent = '切换为译文只显';
-    displayModeBtn.classList.remove('active');
-    modeText.textContent = '当前: 双语对照';
-  }
+  [modeOriginal, modeBilingual, modeTranslation].forEach(b => b.classList.remove('active'));
+  if (mode === 'original')         modeOriginal.classList.add('active');
+  else if (mode === 'translationOnly') modeTranslation.classList.add('active');
+  else                             modeBilingual.classList.add('active');
 }

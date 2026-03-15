@@ -554,7 +554,9 @@ function applyTranslationResults(nodes, resultText) {
 }
 
 function applyNodeTranslation(node, originalText, translatedText) {
-  if (currentDisplayMode === 'translationOnly') {
+  if (currentDisplayMode === 'original') {
+    node.nodeValue = originalText;
+  } else if (currentDisplayMode === 'translationOnly') {
     node.nodeValue = translatedText;
   } else {
     // 双语模式：译文 + 原文
