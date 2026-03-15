@@ -565,21 +565,24 @@ function extractTextNodes(root) {
           }
         }
 
-        // 检查所有祖先节点
+        // 检查所有祖先节点，同时记录是否在 nav 内
         let parent = node.parentElement;
+        let insideNav = false;
         while (parent && parent !== root) {
           // 跳过特定标签
           if (skipTags.has(parent.tagName)) {
             return NodeFilter.FILTER_REJECT;
           }
-          // 跳过特定 role
           const role = parent.getAttribute('role');
+          // 跳过特定 role
           if (role && skipRoles.has(role)) {
             return NodeFilter.FILTER_REJECT;
           }
-          // 跳过 aria-hidden 元素（仅跳过明确用于纯装饰/重复的元素，不跳过法律声明等可见内容）
-          // 注意：aria-hidden 是无障碍属性，不代表视觉上隐藏，不做整体过滤
-          // inline style 隐藏
+          // 标记是否在导航区域（nav 标签或 role="navigation"）
+          if (parent.tagName === 'NAV' || role === 'navigation') {
+            insideNav = true;
+          }
+          // inline style 明确隐藏（无论是否在 nav 内都跳过）
           const s = parent.style;
           if (s && (s.display === 'none' || s.visibility === 'hidden')) {
             return NodeFilter.FILTER_REJECT;
@@ -591,27 +594,28 @@ function extractTextNodes(root) {
           parent = parent.parentElement;
         }
 
-        // CSS class 控制的 display:none 检测（hidden tabs, 分页内容, 折叠面板等）
-        // offsetParent === null 说明此元素或某祖先有 display:none
-        // position:fixed/sticky 的元素 offsetParent 也是 null 但实际可见，需排除
         const el = node.parentElement;
-        if (el && el.offsetParent === null) {
-          try {
-            const pos = getComputedStyle(el).position;
-            if (pos !== 'fixed' && pos !== 'sticky') {
-              return NodeFilter.FILTER_REJECT;
-            }
-          } catch(_) {}
-        }
 
-        // visibility:hidden 检测 — visibility 在 CSS 中是继承属性
-        // 检查直接父元素的计算值即可捕获所有祖先设置的 visibility:hidden
-        if (el) {
-          try {
-            if (getComputedStyle(el).visibility === 'hidden') {
-              return NodeFilter.FILTER_REJECT;
-            }
-          } catch(_) {}
+        // nav 下拉菜单字数极少，跳过 CSS 可见性检查，确保下拉项被翻译
+        // 非 nav 区域：用 offsetParent/visibility 过滤真正隐藏的内容（防止过度消耗）
+        if (!insideNav) {
+          // CSS class 控制的 display:none 检测（hidden tabs, 分页内容, 折叠面板等）
+          if (el && el.offsetParent === null) {
+            try {
+              const pos = getComputedStyle(el).position;
+              if (pos !== 'fixed' && pos !== 'sticky') {
+                return NodeFilter.FILTER_REJECT;
+              }
+            } catch(_) {}
+          }
+          // visibility:hidden 检测（CSS 继承属性）
+          if (el) {
+            try {
+              if (getComputedStyle(el).visibility === 'hidden') {
+                return NodeFilter.FILTER_REJECT;
+              }
+            } catch(_) {}
+          }
         }
 
         return NodeFilter.FILTER_ACCEPT;
