@@ -223,31 +223,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // ============ 翻译函数 ============
 
-// ============ 翻译缓存（按 URL+模型+语言 持久化，7天有效）============
+// ============ 翻译缓存 ============
+// Layer 1: sessionStorage — 同步读写，同 tab 刷新立即生效，tab 关闭清除
+// Layer 2: chrome.storage.local — 跨 session 持久化，7天有效
 function _cacheKey() {
   const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
   return `tc:${engine}:${currentTargetLang}:${location.hostname}${location.pathname}`;
 }
+
+function saveTranslationCache() {
+  const key = _cacheKey();
+  const payload = { ts: Date.now(), map: translationMap };
+  // Layer 1: 同步写 sessionStorage，刷新立即可用，不存在异步丢失问题
+  try { sessionStorage.setItem(key, JSON.stringify(payload)); } catch(_) {}
+  // Layer 2: 异步写 chrome.storage.local，跨 session 持久化
+  try { chrome.storage.local.set({ [key]: payload }); } catch(_) {}
+}
+
 function loadTranslationCache() {
+  const key = _cacheKey();
+  // Layer 1: 先同步读 sessionStorage（刷新场景，命中率 100%）
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (raw) {
+      const entry = JSON.parse(raw);
+      if (entry && entry.map && Object.keys(entry.map).length > 0) {
+        console.log('📦 Cache hit (sessionStorage)');
+        return Promise.resolve(entry.map);
+      }
+    }
+  } catch(_) {}
+  // Layer 2: 异步读 chrome.storage.local（新 tab / 新 session）
   return new Promise(resolve => {
-    const key = _cacheKey();
     chrome.storage.local.get([key], result => {
       const entry = result[key];
       if (!entry || Date.now() - entry.ts > 7 * 86400 * 1000) {
         if (entry) chrome.storage.local.remove([key]);
         return resolve(null);
       }
+      console.log('📦 Cache hit (storage.local)');
       resolve(entry.map);
     });
   });
-}
-let _cacheSaveTimer = null;
-function scheduleTranslationCacheSave() {
-  clearTimeout(_cacheSaveTimer);
-  _cacheSaveTimer = setTimeout(() => {
-    const key = _cacheKey();
-    chrome.storage.local.set({ [key]: { ts: Date.now(), map: { ...translationMap } } });
-  }, 800);
 }
 async function translatePageNow() {
   console.log("▶️ Starting translation...");
@@ -327,7 +344,7 @@ async function translateNodes(textNodes) {
         });
     }));
 
-    scheduleTranslationCacheSave();
+    saveTranslationCache();
     applyDisplayMode();
   } finally {
     isTranslating = false;
