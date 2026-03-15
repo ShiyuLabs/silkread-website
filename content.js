@@ -292,62 +292,45 @@ let isIncrementalTranslation = false;
 async function translateNodes(textNodes) {
   isTranslating = true;
   try {
-  // 分组翻译
-  const chunks = groupTextNodes(textNodes);
-  console.log("📦 Created chunks:", chunks.length);
-  
-  // chunk 并行发送（每个 chunk 内部只有一个 Google 请求，并发数 5 就够）
-  const CONCURRENCY = 10;
-  const chunkTasks = chunks.map((chunk, i) => () => {
-    const texts = chunk.map(n => n.textContent.trim());
-    const combined = texts.map((t, idx) => `[${idx}] ${t}`).join('\n');
-    console.log(`⏳ Sending chunk ${i + 1}/${chunks.length}...`);
-    return requestTranslation(combined)
-      .then(translated => {
-        pauseObserver();           // 暂停 Observer，防止插入 span 触发死循环
-        applyTranslationResults(chunk, translated);
-        resumeObserver();          // 恢复 Observer
-        console.log(`✅ Chunk ${i + 1} done`);
-      })
-      .catch(err => {
-        if (err.message === 'CREDITS_EXHAUSTED') {
-          creditsExhausted = true;
-          showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
-        } else if (err.message === 'LOGGED_OUT') {
-          creditsExhausted = true; // 停止继续翻译
-          showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
-        } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED') {
-          // Extension was reloaded/updated; old page context must refresh.
-          creditsExhausted = true;
-          if (!extensionReloadNotified) {
-            extensionReloadNotified = true;
-            showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
+    const chunks = groupTextNodes(textNodes);
+    console.log("📦 Created chunks:", chunks.length);
+
+    // 所有 chunk 全部并行发送，追求最快翻译速度
+    await Promise.all(chunks.map((chunk, i) => {
+      const texts = chunk.map(n => n.textContent.trim());
+      const combined = texts.map((t, idx) => `[${idx}] ${t}`).join('\n');
+      console.log(`⏳ Sending chunk ${i + 1}/${chunks.length}...`);
+      return requestTranslation(combined)
+        .then(translated => {
+          pauseObserver();
+          applyTranslationResults(chunk, translated);
+          resumeObserver();
+          console.log(`✅ Chunk ${i + 1} done`);
+        })
+        .catch(err => {
+          if (err.message === 'CREDITS_EXHAUSTED') {
+            creditsExhausted = true;
+            showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
+          } else if (err.message === 'LOGGED_OUT') {
+            creditsExhausted = true;
+            showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
+          } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED') {
+            creditsExhausted = true;
+            if (!extensionReloadNotified) {
+              extensionReloadNotified = true;
+              showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
+            }
+          } else {
+            console.error(`❌ Chunk ${i + 1} failed:`, err.message);
+            showNotification('❌ 翻译失败：' + err.message, 'error');
           }
-        } else {
-          console.error(`❌ Chunk ${i + 1} failed:`, err.message);
-          showNotification('❌ 翻译失败：' + err.message, 'error');
-        }
-      });
-  });
+        });
+    }));
 
-  // 控制并发数的执行器
-  const runWithConcurrency = async (tasks, limit) => {
-    const queue = [...tasks];
-    const workers = Array(Math.min(limit, queue.length)).fill(null).map(async () => {
-      while (queue.length > 0) {
-        const task = queue.shift();
-        if (task) await task();
-      }
-    });
-    await Promise.all(workers);
-  };
-
-  await runWithConcurrency(chunkTasks, CONCURRENCY);
-  scheduleTranslationCacheSave(); // 翻译完成后异步保存缓存
-  applyDisplayMode();
+    scheduleTranslationCacheSave();
+    applyDisplayMode();
   } finally {
     isTranslating = false;
-    // 翻译进行中有新节点进来，立即补跑一次
     if (pendingNewNodes) {
       pendingNewNodes = false;
       setTimeout(() => translateNewNodes(), 100);
