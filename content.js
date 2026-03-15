@@ -384,11 +384,10 @@ function extractTextNodes(root) {
     'SELECT', 'OPTION',
   ]);
   
-  // 跳过这些 role（UI 交互组件 + 页面结构区域）
+  // 跳过这些 role（仅跳过纯交互控件）
   const skipRoles = new Set([
     'menu', 'menuitem', 'menubar', 'menuitemcheckbox', 'menuitemradio',
     'listbox', 'option',
-    'navigation', 'banner', 'complementary', 'search', 'toolbar',
   ]);
 
   const walker = document.createTreeWalker(
