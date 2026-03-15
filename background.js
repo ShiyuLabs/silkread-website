@@ -15,6 +15,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   for (const k in changes) if (k in _cachedSettings) _cachedSettings[k] = changes[k].newValue;
 });
 
+// 预热 Vercel 函数（平均冷启动要 1-2s，提前唤醒）
+fetch(`${PROXY_URL}/api/index`).catch(() => {});
+
 // 获取已登录用户的 session token（返回 null 表示未登录）
 async function getAuthToken() {
   const stored = await chrome.storage.local.get(['authToken', 'authEmail']);
@@ -123,12 +126,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? handleAITranslation(request.text, sourceLang, targetLang, settings)
       : handleFreeTranslation(request.text, sourceLang, targetLang);
 
+    const task = engine === 'ai'
+      ? handleAITranslation(request.text, sourceLang, targetLang, settings)
+      : handleFreeTranslation(request.text, sourceLang, targetLang);
+
     task
       .then(result => sendResponse({ success: true, data: result }))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // 保持异步通道
   }
 });
+
+// 定期重新预热（Vercel 函数闲置超过 5 分钟会再次冷却）
+setInterval(() => { fetch(`${PROXY_URL}/api/index`).catch(() => {}); }, 4 * 60 * 1000);
 
 // ===== 免费翻译（Google Translate 非官方 API） =====
 function toGoogleLangCode(lang) {

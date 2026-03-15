@@ -350,46 +350,42 @@ let isIncrementalTranslation = false;
 // 核心翻译逻辑
 async function translateNodes(textNodes) {
   isTranslating = true;
+  const isFree = (currentEngine !== 'ai');
   try {
     const chunks = groupTextNodes(textNodes);
     console.log("📦 Created chunks:", chunks.length);
 
-    // 所有 chunk 全部并行发送，全部完成后一次性渲染（避免一点点出现的割裂感）
-    const settled = await Promise.allSettled(chunks.map((chunk, i) => {
-      const texts = chunk.map(n => n.textContent.trim());
-      const combined = texts.map((t, idx) => `[${idx}] ${t}`).join('\n');
-      console.log(`⏳ Sending chunk ${i + 1}/${chunks.length}...`);
-      return requestTranslation(combined).then(translated => ({ chunk, translated }));
-    }));
-
-    // 统一渲染所有成功的 chunk
-    pauseObserver();
-    for (const result of settled) {
-      if (result.status === 'fulfilled') {
-        applyTranslationResults(result.value.chunk, result.value.translated);
-      } else {
-        const err = result.reason;
-        if (err.message === 'CREDITS_EXHAUSTED') {
-          creditsExhausted = true;
-          showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
-        } else if (err.message === 'LOGGED_OUT') {
-          creditsExhausted = true;
-          showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
-        } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED' ||
-                   err.message?.toLowerCase().includes('extension context') ||
-                   err.message?.toLowerCase().includes('context invalidated')) {
-          creditsExhausted = true;
-          if (!extensionReloadNotified) {
-            extensionReloadNotified = true;
-            showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
-          }
+    if (isFree) {
+      // 免费翻译：并行全部发送，全部完成后一次性渲染
+      const settled = await Promise.allSettled(chunks.map((chunk, i) => {
+        const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
+        return requestTranslation(combined).then(translated => ({ chunk, translated }));
+      }));
+      pauseObserver();
+      for (const result of settled) {
+        if (result.status === 'fulfilled') {
+          applyTranslationResults(result.value.chunk, result.value.translated);
         } else {
-          console.warn('⚠️ Chunk failed:', err.message);
-          showNotification('❌ 翻译失败：' + err.message, 'error');
+          handleTranslationError(result.reason);
         }
       }
+      resumeObserver();
+    } else {
+      // AI 翻译：并行发送，每个 chunk 完成就立即渲染（用户看到翻译逐步出现，感觉更快）
+      await Promise.allSettled(chunks.map((chunk, i) => {
+        const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
+        console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
+        return requestTranslation(combined)
+          .then(translated => {
+            pauseObserver();
+            applyTranslationResults(chunk, translated);
+            resumeObserver();
+            applyDisplayMode();
+            console.log(`✅ AI chunk ${i + 1} done`);
+          })
+          .catch(err => handleTranslationError(err));
+      }));
     }
-    resumeObserver();
 
     saveTranslationCache();
     applyDisplayMode();
@@ -399,6 +395,27 @@ async function translateNodes(textNodes) {
       pendingNewNodes = false;
       setTimeout(() => translateNewNodes(), 100);
     }
+  }
+}
+
+function handleTranslationError(err) {
+  if (err.message === 'CREDITS_EXHAUSTED') {
+    creditsExhausted = true;
+    showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
+  } else if (err.message === 'LOGGED_OUT') {
+    creditsExhausted = true;
+    showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
+  } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED' ||
+             err.message?.toLowerCase().includes('extension context') ||
+             err.message?.toLowerCase().includes('context invalidated')) {
+    creditsExhausted = true;
+    if (!extensionReloadNotified) {
+      extensionReloadNotified = true;
+      showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
+    }
+  } else {
+    console.warn('⚠️ Chunk failed:', err.message);
+    showNotification('❌ 翻译失败：' + err.message, 'error');
   }
 }
 
