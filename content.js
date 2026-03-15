@@ -562,27 +562,33 @@ function showNotification(msg, type = 'info') {
 function requestTranslation(text) {
   return new Promise((resolve, reject) => {
     try {
-      chrome.runtime.sendMessage(
-        { action: 'fetchTranslation', text: text },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            const msg = chrome.runtime.lastError.message || 'Translation failed';
-            if (msg.includes('Extension context invalidated') || msg.includes('context invalidated')) {
-              reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
-            } else {
-              reject(new Error(msg));
-            }
-            return;
-          }
-          if (response && response.success) {
-            resolve(response.data);
-          } else {
-            reject(new Error(response?.error || 'Translation failed'));
-          }
+      // 使用长连接 port 代替 sendMessage：
+      // MV3 Service Worker 在 port 存活期间不会被 Chrome 挂起，彻底解决 "message channel closed" 问题
+      const port = chrome.runtime.connect({ name: 'translation' });
+      const timer = setTimeout(() => {
+        port.disconnect();
+        reject(new Error('Translation timeout'));
+      }, 90000); // 90秒超时
+
+      port.onMessage.addListener((msg) => {
+        clearTimeout(timer);
+        port.disconnect();
+        if (msg.success) resolve(msg.data);
+        else reject(new Error(msg.error || 'Translation failed'));
+      });
+
+      port.onDisconnect.addListener(() => {
+        clearTimeout(timer);
+        const err = chrome.runtime.lastError;
+        if (err && (err.message?.includes('Extension context') || err.message?.includes('context invalidated'))) {
+          reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+        } else {
+          reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
         }
-      );
+      });
+
+      port.postMessage({ action: 'fetchTranslation', text });
     } catch (e) {
-      // chrome.runtime.sendMessage 在 extension context 失效时会同步 throw
       reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
     }
   });

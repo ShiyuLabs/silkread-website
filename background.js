@@ -133,6 +133,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// 长连接 port 处理翻译请求（MV3 port 存活期间 Service Worker 不被挂起）
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'translation') return;
+  port.onMessage.addListener((request) => {
+    if (request.action !== 'fetchTranslation') return;
+    const settings  = _cachedSettings;
+    const engine     = settings.translationEngine || 'free';
+    const sourceLang = settings.sourceLang || 'auto';
+    const targetLang = settings.targetLang || 'zh-CN';
+    const task = engine === 'ai'
+      ? handleAITranslation(request.text, sourceLang, targetLang, settings)
+      : handleFreeTranslation(request.text, sourceLang, targetLang);
+    task
+      .then(result  => { try { port.postMessage({ success: true,  data:  result        }); } catch(_){} })
+      .catch(error  => { try { port.postMessage({ success: false, error: error.message }); } catch(_){} });
+  });
+});
+
 // 定期重新预热（Vercel 函数闲置超过 5 分钟会再次冷却）
 setInterval(() => { fetch(`${PROXY_URL}/api/index`).catch(() => {}); }, 4 * 60 * 1000);
 
