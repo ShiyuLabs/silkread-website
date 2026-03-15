@@ -177,7 +177,6 @@ async function translateNewNodes() {
   if (needsApi.length === 0) return;
 
   // 检查剩余预算
-  const budget = initialPageCharCount * OBSERVER_BUDGET_RATIO;
   const newChars = needsApi.reduce((s, n) => s + n.nodeValue.trim().length, 0);
   if (budget > 0 && observerCharCount + newChars > budget) {
     console.log(`🛑 Observer 增量预算已满（${Math.round(observerCharCount)}/${Math.round(budget)} chars），停止增量翻译`);
