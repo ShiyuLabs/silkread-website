@@ -182,8 +182,8 @@ function updateBalanceUI(credits) {
     balanceText.style.color = '#ef4444';
     return;
   }
-  const wanChars = Math.round(credits * 1.2 / (rate * 10));
-  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${wanChars || 1} 万字`;
+  const chars = Math.round(credits * 10000 * 1.2 / (rate * 10));
+  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${chars.toLocaleString()} 字`;
   balanceText.style.color = '#10b981';
 }
 
