@@ -495,29 +495,30 @@ function showNotification(msg, type = 'info') {
 
 function requestTranslation(text) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
-      {
-        action: 'fetchTranslation',
-        text: text
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          const msg = chrome.runtime.lastError.message || 'Translation failed';
-          if (msg.includes('Extension context invalidated')) {
-            reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
-          } else {
-            reject(new Error(msg));
+    try {
+      chrome.runtime.sendMessage(
+        { action: 'fetchTranslation', text: text },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            const msg = chrome.runtime.lastError.message || 'Translation failed';
+            if (msg.includes('Extension context invalidated') || msg.includes('context invalidated')) {
+              reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+            } else {
+              reject(new Error(msg));
+            }
+            return;
           }
-          return;
+          if (response && response.success) {
+            resolve(response.data);
+          } else {
+            reject(new Error(response?.error || 'Translation failed'));
+          }
         }
-        
-        if (response && response.success) {
-          resolve(response.data);
-        } else {
-          reject(new Error(response?.error || 'Translation failed'));
-        }
-      }
-    );
+      );
+    } catch (e) {
+      // chrome.runtime.sendMessage 在 extension context 失效时会同步 throw
+      reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+    }
   });
 }
 
