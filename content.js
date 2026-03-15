@@ -327,21 +327,27 @@ async function translatePageNow() {
   if (cached) Object.assign(translationMap, cached);
 
   const uncached = [];
+  // 初始翻译最多提取 30,000 字符，防止动态加载型网站（无限滚动等）一次性燃烧大量积分
+  // 超出部分由 MutationObserver 在内容滚入视口后按需翻译
+  const MAX_INITIAL_CHARS = 30000;
+  let apiCharCount = 0;
   pauseObserver();
   for (const node of textNodes) {
     const text = node.textContent.trim();
     if (translationMap[text]) {
       translatedElements.push({ node, originalText: node.nodeValue, translatedText: translationMap[text] });
       applyNodeTranslation(node, node.nodeValue, translationMap[text]);
-    } else {
+    } else if (apiCharCount < MAX_INITIAL_CHARS) {
       uncached.push(node);
+      apiCharCount += text.length;
     }
+    // 超出上限的节点跳过：MutationObserver 会在它们滚入视口后补翻译
   }
   resumeObserver();
   applyDisplayMode(); // 缓存命中部分立即呈现
 
   // 统计实际发送给 API 的字符数（可见文本，不含缓存命中部分）
-  const apiCharCount = uncached.reduce((s, n) => s + n.nodeValue.trim().length, 0);
+  // apiCharCount 已在上面循环中累加
 
   // 初始翻译完成后记录字符量，作为 Observer 预算基准
   initialPageCharCount = apiCharCount + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
@@ -519,6 +525,16 @@ function extractTextNodes(root) {
           try {
             const pos = getComputedStyle(el).position;
             if (pos !== 'fixed' && pos !== 'sticky') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch(_) {}
+        }
+
+        // visibility:hidden 检测 — visibility 在 CSS 中是继承属性
+        // 检查直接父元素的计算值即可捕获所有祖先设置的 visibility:hidden
+        if (el) {
+          try {
+            if (getComputedStyle(el).visibility === 'hidden') {
               return NodeFilter.FILTER_REJECT;
             }
           } catch(_) {}
