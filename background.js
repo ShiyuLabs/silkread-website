@@ -350,6 +350,6 @@ async function callGemini(apiKey, model, text, sourceLang, targetLang) {
 function buildPrompt(sourceLang, targetLang) {
   const targetName = LANG_NAMES[targetLang] || targetLang;
   const sourceName = sourceLang === 'auto' ? '原文' : (LANG_NAMES[sourceLang] || sourceLang);
-  return `请将下面的${sourceName}文本翻译成地道的${targetName}。\n文本按编号分隔，每段用 [数字] 标记。\n请严格按照同样的格式返回翻译结果，每行一个，格式为 [数字] 翻译内容。\n不要添加任何其他解释。`;
-}
+  return `请将下面每一条${sourceName}文本翻译成地道的${targetName}。\n重要规则：\n1. 必须翻译【全部】编号条目，一条都不能漏，包括单个词语、专有名词、导航菜单项；\n2. 专有名词（如公司名、产品名）无通用译名时保留原文；\n3. 严格按格式返回：每行 [数字] 翻译内容，行数必须与输入完全一致；\n4. 不要添加任何解释、注释或多余内容。`;
+}`
 

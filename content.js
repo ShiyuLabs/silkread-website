@@ -466,10 +466,8 @@ function extractTextNodes(root) {
           if (role && skipRoles.has(role)) {
             return NodeFilter.FILTER_REJECT;
           }
-          // 跳过 aria-hidden 元素
-          if (parent.getAttribute('aria-hidden') === 'true') {
-            return NodeFilter.FILTER_REJECT;
-          }
+          // 跳过 aria-hidden 元素（仅跳过明确用于纯装饰/重复的元素，不跳过法律声明等可见内容）
+          // 注意：aria-hidden 是无障碍属性，不代表视觉上隐藏，不做整体过滤
           // inline style 隐藏
           const s = parent.style;
           if (s && (s.display === 'none' || s.visibility === 'hidden')) {
