@@ -126,10 +126,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ? handleAITranslation(request.text, sourceLang, targetLang, settings)
       : handleFreeTranslation(request.text, sourceLang, targetLang);
 
-    const task = engine === 'ai'
-      ? handleAITranslation(request.text, sourceLang, targetLang, settings)
-      : handleFreeTranslation(request.text, sourceLang, targetLang);
-
     task
       .then(result => sendResponse({ success: true, data: result }))
       .catch(error => sendResponse({ success: false, error: error.message }));
