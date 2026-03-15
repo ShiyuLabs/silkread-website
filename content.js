@@ -480,6 +480,19 @@ function extractTextNodes(root) {
           parent = parent.parentElement;
         }
 
+        // CSS class 控制的 display:none 检测（hidden tabs, 分页内容, 折叠面板等）
+        // offsetParent === null 说明此元素或某祖先有 display:none
+        // position:fixed/sticky 的元素 offsetParent 也是 null 但实际可见，需排除
+        const el = node.parentElement;
+        if (el && el.offsetParent === null) {
+          try {
+            const pos = getComputedStyle(el).position;
+            if (pos !== 'fixed' && pos !== 'sticky') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch(_) {}
+        }
+
         return NodeFilter.FILTER_ACCEPT;
       }
     },
