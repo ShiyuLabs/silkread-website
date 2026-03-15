@@ -105,6 +105,11 @@ module.exports = async function handler(req, res) {
   const { token, text, model, target_lang: targetLang = '简体中文' } = req.body || {};
   if (!token || !text || !model) return res.status(400).json({ error: 'Missing parameters' });
 
+  // ── Hard limit: single request max 8000 chars ──────────────────────────────
+  if (text.length > 8000) {
+    return res.status(400).json({ error: 'TEXT_TOO_LONG', message: '单次请求最多 8000 字符' });
+  }
+
   const cfg = MODEL_CONFIG[model];
   if (!cfg) return res.status(400).json({ error: `Unknown model: ${model}` });
 
@@ -113,7 +118,7 @@ module.exports = async function handler(req, res) {
   const kvHeaders = { Authorization: 'Bearer ' + kvToken };
 
   // ── Step 1: Resolve session token → email ──────────────────────────────────
-  let creditsKey;
+  let creditsKey, email;
   try {
     const tokenResp = await fetch(
       kvUrl + '/get/' + encodeURIComponent('token:' + token),
@@ -121,11 +126,27 @@ module.exports = async function handler(req, res) {
     );
     const tokenData = await tokenResp.json();
     if (!tokenData.result) return res.status(401).json({ error: 'LOGGED_OUT' });
-    const email = decodeURIComponent(tokenData.result);
+    email = decodeURIComponent(tokenData.result);
     creditsKey = 'user:' + email + ':credits';
   } catch (e) {
     return res.status(500).json({ error: 'Auth lookup failed' });
   }
+
+  // ── Step 1b: Per-user rate limit (30 req/min) ──────────────────────────────
+  try {
+    const bucket    = Math.floor(Date.now() / 60000); // 1-minute window
+    const rlKey     = encodeURIComponent('rl:' + email + ':' + bucket);
+    const incrResp  = await fetch(kvUrl + '/incr/' + rlKey, { headers: kvHeaders });
+    const incrData  = await incrResp.json();
+    const reqCount  = typeof incrData.result === 'number' ? incrData.result : 0;
+    if (reqCount === 1) {
+      // Set TTL on first request in this window
+      await fetch(kvUrl + '/expire/' + rlKey + '/120', { headers: kvHeaders });
+    }
+    if (reqCount > 30) {
+      return res.status(429).json({ error: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' });
+    }
+  } catch (_) { /* non-fatal: skip rate check on KV error */ }
 
   // ── Step 2: Read current balance ───────────────────────────────────────────
   let currentCredits = 0;
