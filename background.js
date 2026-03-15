@@ -141,25 +141,27 @@ function toGoogleLangCode(lang) {
 }
 
 async function googleTranslate(text, sl, tl) {
-  // 优先走自有服务器代理（稳定），失败后回退直连 Google
+  // 优先直连 Google（最快，无额外网络跳转），失败后走自有代理兜底
   try {
-    const resp = await fetch(`${PROXY_URL}/api/freeTranslate`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ text, sl: sl || 'auto', tl }),
-    });
+    const params = new URLSearchParams({ client: 'gtx', sl: sl || 'auto', tl, dt: 't', q: text });
+    const resp = await fetch('https://translate.googleapis.com/translate_a/single?' + params);
     if (resp.ok) {
       const data = await resp.json();
-      if (data.translated) return data.translated;
+      const result = data[0].map(seg => seg[0]).join('');
+      if (result) return result;
     }
-  } catch (_) { /* proxy failed, fall through to direct */ }
+  } catch (_) { /* direct failed, fall through to proxy */ }
 
-  // 直连 Google 兜底
-  const params = new URLSearchParams({ client: 'gtx', sl: sl || 'auto', tl, dt: 't', q: text });
-  const resp2 = await fetch('https://translate.googleapis.com/translate_a/single?' + params);
+  // 代理兜底（Google 直连被限速时使用）
+  const resp2 = await fetch(`${PROXY_URL}/api/freeTranslate`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ text, sl: sl || 'auto', tl }),
+  });
   if (!resp2.ok) throw new Error(`免费翻译失败: HTTP ${resp2.status}`);
   const data2 = await resp2.json();
-  return data2[0].map(seg => seg[0]).join('');
+  if (data2.translated) return data2.translated;
+  throw new Error('免费翻译失败：代理无响应');
 }
 
 async function handleFreeTranslation(text, sourceLang, targetLang) {
