@@ -304,6 +304,16 @@ function loadTranslationCache() {
 async function translatePageNow() {
   if (!isContextValid()) return;
   console.log("▶️ Starting translation...");
+
+  // AI 模式下，翻译前记录余额，完成后对比显示实际消耗（透明计费）
+  let creditsBefore = null;
+  if (currentEngine === 'ai') {
+    try {
+      const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
+      if (s.cachedCredits !== undefined) creditsBefore = s.cachedCredits;
+    } catch(_) {}
+  }
+
   clearTranslations();
   const textNodes = extractTextNodes(document.body);
   console.log("📝 Found text nodes:", textNodes.length);
@@ -330,11 +340,13 @@ async function translatePageNow() {
   resumeObserver();
   applyDisplayMode(); // 缓存命中部分立即呈现
 
+  // 统计实际发送给 API 的字符数（可见文本，不含缓存命中部分）
+  const apiCharCount = uncached.reduce((s, n) => s + n.nodeValue.trim().length, 0);
+
   // 初始翻译完成后记录字符量，作为 Observer 预算基准
-  initialPageCharCount = uncached.reduce((s, n) => s + n.nodeValue.trim().length, 0)
-    + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
+  initialPageCharCount = apiCharCount + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
   observerCharCount = 0;
-  console.log(`📊 页面初始字符量: ${initialPageCharCount}，Observer 预算: ${Math.round(initialPageCharCount * OBSERVER_BUDGET_RATIO)}`);
+  console.log(`📊 可见字符: ${initialPageCharCount}，其中需调用 API: ${apiCharCount}`);
 
   if (uncached.length > 0) {
     isIncrementalTranslation = false;
@@ -342,6 +354,25 @@ async function translatePageNow() {
   }
   console.log("🎉 Translation complete!");
   applyDisplayMode();
+
+  // 翻译完成后显示消耗明细（AI 模式）
+  if (currentEngine === 'ai') {
+    try {
+      const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
+      const creditsAfter = s.cachedCredits !== undefined ? s.cachedCredits : null;
+      if (creditsBefore !== null && creditsAfter !== null) {
+        const consumed = Math.max(0, creditsBefore - creditsAfter);
+        if (consumed > 0) {
+          showNotification(
+            `✅ 翻译完成｜提取 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分`,
+            'info', 8000
+          );
+        } else if (apiCharCount === 0) {
+          showNotification(`✅ 全部命中缓存，0 积分消耗`, 'info', 4000);
+        }
+      }
+    } catch(_) {}
+  }
 }
 
 // isIncrementalTranslation: 区分初始全页翻译 vs Observer 增量翻译
@@ -546,7 +577,7 @@ function groupTextNodes(nodes) {
 
 // 页面内通知条（CREDITS_EXHAUSTED 等错误提示）
 let _notifTimer = null;
-function showNotification(msg, type = 'info') {
+function showNotification(msg, type = 'info', duration = 5000) {
   let el = document.getElementById('__translator_notif__');
   if (!el) {
     el = document.createElement('div');
@@ -567,9 +598,8 @@ function showNotification(msg, type = 'info') {
   clearTimeout(_notifTimer);
   _notifTimer = setTimeout(() => {
     el.style.opacity = '0';
-    // 淡出后从文档流中移除，彻底不遮挡任何元素
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
-  }, 5000);
+  }, duration);
 }
 
 function requestTranslation(text) {
