@@ -17,6 +17,11 @@ let isTranslating = false;
 let pendingNewNodes = false; // 翻译进行中时有新节点进来，翻译完后补跑
 let extensionReloadNotified = false;
 
+// Extension context 有效性检查（扩展被重载后旧 content.js 应立即停止一切操作）
+function isContextValid() {
+  try { return !!chrome.runtime?.id; } catch (_) { return false; }
+}
+
 // ============ 初始化 ============
 console.log("✅ Content script loaded");
 
@@ -65,6 +70,7 @@ function startLiveObserver() {
   if (domObserver) return;
   domObserver = new MutationObserver((mutations) => {
     if (!isAutoTranslateEnabled) return;
+    if (!isContextValid()) { stopLiveObserver(); return; }
 
     // 快速路径：同步立即把缓存中已有翻译的新节点翻译掉
     // MutationObserver 回调在浏览器绘制前执行，用户看不到英文闪现
@@ -116,6 +122,7 @@ const MAX_OBSERVER_RETRIES = 3;
 let creditsExhausted = false; // 余额不足时停止所有翻译请求
 
 async function translateNewNodes() {
+  if (!isContextValid()) { stopLiveObserver(); return; }
   if (isTranslating) {
     pendingNewNodes = true;
     return;
@@ -276,6 +283,7 @@ function loadTranslationCache() {
   });
 }
 async function translatePageNow() {
+  if (!isContextValid()) return;
   console.log("▶️ Starting translation...");
   clearTranslations();
   const textNodes = extractTextNodes(document.body);
