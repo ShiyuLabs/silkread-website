@@ -303,17 +303,20 @@ async function translateNodes(textNodes) {
 function extractTextNodes(root) {
   const nodes = [];
   
-  // 跳过这些标签（只跳过无实际文字内容或不应翻译的标签）
+  // 跳过这些标签
   const skipTags = new Set([
     'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'OBJECT',
     'SVG', 'CANVAS', 'CODE', 'PRE', 'TEXTAREA', 'INPUT',
-    'SELECT', 'OPTION'
+    'SELECT', 'OPTION',
+    // 导航/页眉/页脚/侧边栏——UI 框架，不是正文内容
+    'NAV', 'HEADER', 'FOOTER', 'ASIDE',
   ]);
   
-  // 只跳过真正会因插入 span 而弹出菜单的 role
+  // 跳过这些 role（UI 交互组件 + 页面结构区域）
   const skipRoles = new Set([
     'menu', 'menuitem', 'menubar', 'menuitemcheckbox', 'menuitemradio',
-    'listbox', 'option'
+    'listbox', 'option',
+    'navigation', 'banner', 'complementary', 'search', 'toolbar',
   ]);
 
   const walker = document.createTreeWalker(
@@ -322,8 +325,8 @@ function extractTextNodes(root) {
     {
       acceptNode: function(node) {
         const text = node.textContent.trim();
-        // 过滤掉太短或纯符号的文本
-        if (text.length <= 2 || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
+        // 过滤太短的文本（≤10 字符的基本都是按钮标签、数字、单词）
+        if (text.length <= 10 || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
           return NodeFilter.FILTER_REJECT;
         }
 
@@ -347,13 +350,18 @@ function extractTextNodes(root) {
           if (role && skipRoles.has(role)) {
             return NodeFilter.FILTER_REJECT;
           }
-          // 跳过 aria-hidden 元素（这个可靠，表示对用户不可见）
+          // 跳过 aria-hidden 元素
           if (parent.getAttribute('aria-hidden') === 'true') {
             return NodeFilter.FILTER_REJECT;
           }
-          // 只通过 style 属性判断 display:none（不用 computedStyle，避免误判动画/过渡中的元素）
-          const inlineDisplay = parent.style && parent.style.display;
-          if (inlineDisplay === 'none') {
+          // inline style 隐藏
+          const s = parent.style;
+          if (s && (s.display === 'none' || s.visibility === 'hidden')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          // computedStyle 隐藏（捕获通过 CSS class 隐藏的元素，如折叠评论）
+          const cs = window.getComputedStyle(parent);
+          if (cs.display === 'none' || cs.visibility === 'hidden') {
             return NodeFilter.FILTER_REJECT;
           }
           parent = parent.parentElement;
