@@ -17,6 +17,12 @@ let isTranslating = false;
 let pendingNewNodes = false; // 翻译进行中时有新节点进来，翻译完后补跑
 let extensionReloadNotified = false;
 
+// Observer 增量翻译流量保护
+let initialPageCharCount = 0;   // 初始全页翻译的字符量
+let observerCharCount = 0;       // Observer 累计增量翻译量
+// 增量翻译上限：初始量的 30%（防止无限滚动页面持续消耗）
+const OBSERVER_BUDGET_RATIO = 0.3;
+
 // Extension context 有效性检查（扩展被重载后旧 content.js 应立即停止一切操作）
 function isContextValid() {
   try { return !!chrome.runtime?.id; } catch (_) { return false; }
@@ -127,7 +133,11 @@ async function translateNewNodes() {
     pendingNewNodes = true;
     return;
   }
-  if (creditsExhausted) return; // 余额耗尽时不再重试
+  if (creditsExhausted) return;
+
+  // 增量流量保护：超出预算就停止
+  const budget = initialPageCharCount * OBSERVER_BUDGET_RATIO;
+  if (budget > 0 && observerCharCount >= budget) return; // 余额耗尽时不再重试
 
   const allNodes = extractTextNodes(document.body);
   // 建立 node → entry 快速查表
@@ -165,6 +175,16 @@ async function translateNewNodes() {
   resumeObserver();
 
   if (needsApi.length === 0) return;
+
+  // 检查剩余预算
+  const budget = initialPageCharCount * OBSERVER_BUDGET_RATIO;
+  const newChars = needsApi.reduce((s, n) => s + n.nodeValue.trim().length, 0);
+  if (budget > 0 && observerCharCount + newChars > budget) {
+    console.log(`🛑 Observer 增量预算已满（${Math.round(observerCharCount)}/${Math.round(budget)} chars），停止增量翻译`);
+    return;
+  }
+  observerCharCount += newChars;
+
   console.log(`🆕 发现 ${needsApi.length} 个新节点，增量翻译...`);
   isIncrementalTranslation = true;
   await translateNodes(needsApi);
@@ -311,6 +331,12 @@ async function translatePageNow() {
   resumeObserver();
   applyDisplayMode(); // 缓存命中部分立即呈现
 
+  // 初始翻译完成后记录字符量，作为 Observer 预算基准
+  initialPageCharCount = uncached.reduce((s, n) => s + n.nodeValue.trim().length, 0)
+    + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
+  observerCharCount = 0;
+  console.log(`📊 页面初始字符量: ${initialPageCharCount}，Observer 预算: ${Math.round(initialPageCharCount * OBSERVER_BUDGET_RATIO)}`);
+
   if (uncached.length > 0) {
     isIncrementalTranslation = false;
     await translateNodes(uncached);
@@ -443,6 +469,18 @@ function extractTextNodes(root) {
   while (node = walker.nextNode()) {
     nodes.push(node);
   }
+
+  // Shadow DOM 穿透：遍历所有有 shadowRoot 的元素，递归采集
+  try {
+    const allElements = root.querySelectorAll('*');
+    for (const el of allElements) {
+      if (el.shadowRoot) {
+        const shadowNodes = extractTextNodes(el.shadowRoot);
+        nodes.push(...shadowNodes);
+      }
+    }
+  } catch(_) {}
+
   return nodes;
 }
 
