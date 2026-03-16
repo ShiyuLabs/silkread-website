@@ -314,7 +314,10 @@ function _setBallState(state) {
 }
 
 function _onBallClick() {
-  if (!isContextValid()) return;
+  if (!isContextValid()) {
+    showNotification('🔄 插件已更新，请刷新页面后再使用', 'error');
+    return;
+  }
   if (isTranslating) return;
   if (_ballTranslated) {
     // 已翻译 → 恢复原文
@@ -833,12 +836,9 @@ function handleTranslationError(err) {
   } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED' ||
              err.message?.toLowerCase().includes('extension context') ||
              err.message?.toLowerCase().includes('context invalidated')) {
-    creditsExhausted = true;
-    // 增量翻译（滚动加载）失败时不覆盖已有成功通知，只在首次全页翻译失败时提示
-    if (!extensionReloadNotified && !isIncrementalTranslation) {
-      extensionReloadNotified = true;
-      showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
-    }
+    // 单个 chunk 的 port 断开不代表整体失败（其他 chunk 可能成功）
+    // 真正失效时用户点悬浮球会触发 isContextValid() 检查并提示
+    console.warn('⚠️ Port disconnect on chunk (extension context check):', err.message);
   } else {
     console.warn('⚠️ Chunk failed:', err.message);
     // 增量/滚动翻译失败不弹通知，避免覆盖"翻译完成"提示
