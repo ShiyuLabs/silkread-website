@@ -424,7 +424,9 @@
                     const r = await fetch(API + '/api/balance?token=' + authToken);
                     const d = await r.json();
                     if (d.credits !== undefined) {
-                        navBalance.textContent = d.credits.toLocaleString() + ' 点数';
+                        // 以最低费率(DeepSeek 8积分/1K Token)换算展示余额
+                        const navTokens = Math.round(d.credits / 8 * 1000);
+                        navBalance.textContent = navTokens.toLocaleString() + ' Token';
                     }
                 } catch {}
             }
@@ -590,7 +592,7 @@
                         store.set('authToken', authToken);
                         store.set('authEmail', authEmail);
                         window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
-                        setLoginMsg('注册成功，赠送1000点数！', true);
+                        setLoginMsg('注册成功，赠送 125,000 Token！', true);
                         setTimeout(() => { closeModal(loginModal); updateNav(); }, 800);
                     } else {
                         setLoginMsg(data.error || '注册失败，请重试', false);
