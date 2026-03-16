@@ -18,21 +18,26 @@ const WEBSITE = 'https://shiyuai.top/';
 
 // 每个模型的计费比率（积分 / 1K Token）
 const MODEL_RATES = {
-  'free-translation':  0,
-  'deepseek-chat':     8,
-  'qwen3-235b-a22b':  18,
-  'gemini-2.5-flash': 25,
-  'gpt-5-mini':       80,
-  'claude-sonnet-4-6': 179,
+  'free-translation':            0,
+  'deepseek-v3.2':               8,
+  'qwen3-235b-a22b':             18,
+  'gemini-2.5-flash-nothinking': 25,
+  'claude-sonnet-4-6':           250,
 };
 
 const MODEL_RATE_HINTS = {
-  'free-translation':  '谷歌通道 · 完全免费',
-  'deepseek-chat':     '¥0.008 / 1K Token',
-  'qwen3-235b-a22b':  '¥0.018 / 1K Token',
-  'gemini-2.5-flash': '¥0.025 / 1K Token',
-  'gpt-5-mini':       '¥0.08 / 1K Token',
-  'claude-sonnet-4-6': '¥0.179 / 1K Token',
+  'free-translation':            '谷歌通道 · 完全免费',
+  'deepseek-v3.2':               '¥0.008 / 1K Token',
+  'qwen3-235b-a22b':             '¥0.018 / 1K Token',
+  'gemini-2.5-flash-nothinking': '¥0.025 / 1K Token',
+  'claude-sonnet-4-6':           '¥0.25 / 1K Token',
+};
+
+// 旧版本模型 key 迁移映射（老用户 storage 里可能存有旧 key）
+const MODEL_MIGRATION = {
+  'deepseek-chat':    'deepseek-v3.2',
+  'gemini-2.5-flash': 'gemini-2.5-flash-nothinking',
+  'gpt-5-mini':       'deepseek-v3.2',
 };
 
 function updateModelRateHint(model) {
@@ -67,13 +72,18 @@ chrome.storage.sync.get(
       setSelectValue(managedModelSel, 'free-translation');
       updateModelRateHint('free-translation');
     } else {
-      const targetModel = syncResult.managedModel || 'deepseek-chat';
+      let targetModel = syncResult.managedModel || 'deepseek-v3.2';
+      // 旧 key 迁移：自动映射到新模型并持久化
+      if (MODEL_MIGRATION[targetModel]) {
+        targetModel = MODEL_MIGRATION[targetModel];
+        chrome.storage.sync.set({ managedModel: targetModel });
+      }
       setSelectValue(managedModelSel, targetModel);
       updateModelRateHint(managedModelSel.value);
-      // 如果存储的模型在新选项列表里找不到（旧版本遗留），自动回退到免费档并修正存储
-      if (managedModelSel.value !== targetModel) {
-        managedModelSel.value = 'free-translation';
-        chrome.storage.sync.set({ translationEngine: 'free' });
+      // 如果模型在新选项列表里仍找不到，回退到最便宜的付费档
+      if (!managedModelSel.value || managedModelSel.value !== targetModel) {
+        managedModelSel.value = 'deepseek-v3.2';
+        chrome.storage.sync.set({ managedModel: 'deepseek-v3.2' });
       }
     }
 

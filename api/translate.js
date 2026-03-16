@@ -7,16 +7,14 @@
 // costRateOut = credits cost YOU per 1 000 OUTPUT tokens  (ChatAnywhere invoice)
 // 1 credit = ¥0.001
 const MODEL_CONFIG = {
-  // ChatAnywhere: deepseek-chat  输入 ¥0.0012  输出 ¥0.0018 per 1K
-  'deepseek-chat':     { format: 'openai', rate: 8,   costRateIn: 1.2,  costRateOut: 1.8  },
+  // ChatAnywhere: deepseek-v3.2  输入 ¥0.0012  输出 ¥0.0018 per 1K
+  'deepseek-v3.2':               { format: 'openai', rate: 8,   costRateIn: 1.2,  costRateOut: 1.8  },
   // ChatAnywhere: qwen3-235b-a22b 输入 ¥0.0014  输出 ¥0.0056 per 1K
-  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRateIn: 1.4,  costRateOut: 5.6  },
-  // ChatAnywhere: gemini-2.5-flash 输入 ¥0.0012  输出 ¥0.0100 per 1K
-  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRateIn: 1.2,  costRateOut: 10.0 },
-  // ChatAnywhere: gpt-5-mini  输入 ¥0.00175 输出 ¥0.0140 per 1K
-  'gpt-5-mini':       { format: 'openai', rate: 80,  costRateIn: 1.75, costRateOut: 14.0 },
+  'qwen3-235b-a22b':             { format: 'openai', rate: 18,  costRateIn: 1.4,  costRateOut: 5.6  },
+  // ChatAnywhere: gemini-2.5-flash-nothinking 输入 ¥0.0012  输出 ¥0.0100 per 1K（无 thinking token，翻译更省）
+  'gemini-2.5-flash-nothinking': { format: 'openai', rate: 25,  costRateIn: 1.2,  costRateOut: 10.0 },
   // ChatAnywhere: claude-sonnet-4-6 输入 ¥0.0150  输出 ¥0.0750 per 1K
-  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRateIn: 15.0, costRateOut: 75.0 },
+  'claude-sonnet-4-6':           { format: 'openai', rate: 250, costRateIn: 15.0, costRateOut: 75.0 },
 };
 
 // Conservative token estimate: ~1.5 tokens per character for pre-flight balance check
