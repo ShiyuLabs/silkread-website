@@ -182,12 +182,12 @@ function updateBalanceUI(credits) {
     balanceText.style.color = '#ef4444';
     return;
   }
-  // 积分 / rate = K Token，例：9927积分 / 8 = 1240.9K Token ≈ 124万Token
+  // 直接以 Token 为单位显示余额：credits / rate = K Token
   const kTokens = Math.round(credits / rate);
   const display = kTokens >= 1000
     ? (kTokens / 1000).toFixed(1) + ' M Token'
     : kTokens.toLocaleString() + ' K Token';
-  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${display}`;
+  balanceText.textContent = `余额：${display}`;
   balanceText.style.color = '#10b981';
 }
 

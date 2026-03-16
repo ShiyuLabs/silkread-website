@@ -2,6 +2,21 @@
 
 const CHUNK_SIZE = 4000;
 
+// 模型费率（积分/1K Token），用于将积分差值换算成 Token 显示
+const MODEL_CREDIT_RATES = {
+  'deepseek-chat': 8, 'qwen3-235b-a22b': 18, 'gemini-2.5-flash': 25,
+  'gpt-5-mini': 80, 'claude-sonnet-4-6': 179,
+};
+function _creditsToTokenStr(credits) {
+  const rate = MODEL_CREDIT_RATES[currentManagedModel] || 8;
+  const tokens = Math.round(credits * 1000 / rate);
+  return tokens >= 1000000
+    ? (tokens / 1000000).toFixed(1) + ' M Token'
+    : tokens >= 1000
+      ? (tokens / 1000).toFixed(1) + ' K Token'
+      : tokens + ' Token';
+}
+
 // 双语模式 DOM 注入：原文保留，译文作为独立块元素插在后面（仿沉浸式翻译）
 const _injectedTrMap = new WeakMap();
 
@@ -503,11 +518,11 @@ async function translatePageNow() {
         if (consumed > 0) {
           const lazyNote = belowFoldNodes.length > 0 ? `，滚动加载更多` : '';
           showNotification(
-            `✅ 翻译完成｜首屏 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分${lazyNote}`,
+            `✅ 翻译完成｜消耗 ${_creditsToTokenStr(consumed)}，剩余 ${_creditsToTokenStr(creditsAfter)}${lazyNote}`,
             'info', 6000
           );
         } else if (apiCharCount === 0) {
-          showNotification(`✅ 全部命中缓存，0 积分消耗`, 'info', 3000);
+          showNotification(`✅ 全部命中缓存，0 Token 消耗`, 'info', 3000);
         }
       }
     } catch(_) {}
