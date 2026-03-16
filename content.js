@@ -731,12 +731,13 @@ async function translatePageNow() {
 }
 
 function _downloadTranslationReport(consumed, creditsAfter) {
-  const sellRate   = _pageStats.sellRate || MODEL_CREDIT_RATES[currentManagedModel] || 8;
-  const costRate   = _pageStats.costRate || Math.round(sellRate * 0.4); // fallback estimate
-  const sellYuan   = ((_pageStats.cost || consumed) * 0.001).toFixed(4);
-  const costYuan   = (_pageStats.costCredits * 0.001).toFixed(4);
-  const profitYuan = ((_pageStats.cost - _pageStats.costCredits) * 0.001).toFixed(4);
-  const marginPct  = _pageStats.costCredits > 0
+  const sellRate    = _pageStats.sellRate || MODEL_CREDIT_RATES[currentManagedModel] || 8;
+  const costRate    = _pageStats.costRate || 1;
+  // 全部换算成 ¥，不显示「积分」
+  const sellYuan    = ((_pageStats.cost || consumed) * 0.001).toFixed(4);
+  const costYuan    = (_pageStats.costCredits * 0.001).toFixed(4);
+  const profitYuan  = ((_pageStats.cost - _pageStats.costCredits) * 0.001).toFixed(4);
+  const marginPct   = _pageStats.costCredits > 0
     ? (((_pageStats.cost - _pageStats.costCredits) / _pageStats.cost) * 100).toFixed(1)
     : '—';
   const balanceYuan = (creditsAfter * 0.001).toFixed(4);
@@ -754,17 +755,18 @@ function _downloadTranslationReport(consumed, creditsAfter) {
     `合计 Token：${_pageStats.totalTokens.toLocaleString()}`,
     '',
     '━━━ 费用明细 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `进价费率：¥${(costRate * 0.001).toFixed(4)}/1K Token（costRate=${costRate}）`,
-    `售价费率：¥${(sellRate * 0.001).toFixed(4)}/1K Token（sellRate=${sellRate}）`,
-    `─────────────────────────────────────────`,
-    `本页进价成本：¥${costYuan}（${_pageStats.costCredits} 积分）`,
-    `向用户收取：  ¥${sellYuan}（${_pageStats.cost || consumed} 积分）`,
+    `ChatAnywhere 进价：¥${(costRate * 0.001).toFixed(4)}/1K Token`,
+    `向用户售价：       ¥${(sellRate * 0.001).toFixed(4)}/1K Token`,
+    `──────────────────────────────────────────`,
+    `本页进价成本：¥${costYuan}`,
+    `向用户收取：  ¥${sellYuan}`,
     `毛利润：      ¥${profitYuan}（毛利率 ${marginPct}%）`,
     '',
     '━━━ 账户余额 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `当前余额：¥${balanceYuan}（${creditsAfter} 积分）`,
+    `当前余额：¥${balanceYuan}`,
     '',
-    '* costRate 可在 api/translate.js MODEL_CONFIG 中按实际账单调整',
+    '* 进价在 api/translate.js MODEL_CONFIG → costRate 中按 ChatAnywhere 实际账单调整',
+    '* 1 credit = ¥0.001，costRate:1 = ¥0.001/1K Token',
   ];
   const content = lines.join('\n');
   const filename = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;

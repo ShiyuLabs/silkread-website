@@ -2,17 +2,16 @@
 // ALL API keys are loaded from server-side environment variables only.
 
 // ─── Model registry ────────────────────────────────────────────────────────────
-// All models route through ONE API proxy (BASE_URL + OPENAI_API_KEY).
-// rate:     credits charged to user per 1 000 actual tokens  (selling price)
-// costRate: credits that cost YOU per 1 000 actual tokens    (your cost price)
-//           → Adjust costRate to match your ONE API / upstream invoice price
-//             1 credit = ¥0.001, so costRate:4 means ¥0.004 / 1K tokens cost
+// rate     = credits charged to user per 1 000 tokens  (selling price)
+// costRate = credits that cost YOU  per 1 000 tokens   (your ChatAnywhere price)
+// 1 credit = ¥0.001
+// costRate 按你 ChatAnywhere 实际充值单价填写，例如 ¥0.001/1K token → costRate:1
 const MODEL_CONFIG = {
-  'deepseek-chat':     { format: 'openai', rate: 8,   costRate: 3   },  // sell ¥0.008 / cost ¥0.003
-  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRate: 10  },  // sell ¥0.018 / cost ¥0.010
-  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRate: 10  },  // sell ¥0.025 / cost ¥0.010
-  'gpt-5-mini':       { format: 'openai', rate: 80,  costRate: 15  },  // sell ¥0.080 / cost ¥0.015
-  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRate: 100 },  // sell ¥0.179 / cost ¥0.100
+  'deepseek-chat':     { format: 'openai', rate: 8,   costRate: 1   },  // 售¥0.008 成本¥0.001/1K
+  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRate: 4   },  // 售¥0.018 成本¥0.004/1K
+  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRate: 4   },  // 售¥0.025 成本¥0.004/1K
+  'gpt-5-mini':       { format: 'openai', rate: 80,  costRate: 15  },  // 售¥0.080 成本¥0.015/1K
+  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRate: 60  },  // 售¥0.179 成本¥0.060/1K
 };
 
 // Conservative token estimate: ~1.5 tokens per character for pre-flight balance check
