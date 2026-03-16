@@ -771,22 +771,32 @@ async function translateNodes(textNodes) {
     console.log("📦 Created chunks:", chunks.length);
 
     if (isFree) {
-      // 免费翻译：并行全部发送，先显示转圈，全部完成后渲染
-      textNodes.forEach(n => _showChunkLoading([n]));
-      const settled = await Promise.allSettled(chunks.map((chunk, i) => {
-        const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
-        return requestTranslation(combined).then(translated => ({ chunk, translated }));
-      }));
-      textNodes.forEach(n => _hideChunkLoading([n]));
-      pauseObserver();
-      for (const result of settled) {
-        if (result.status === 'fulfilled') {
-          applyTranslationResults(result.value.chunk, result.value.translated);
-        } else {
-          handleTranslationError(result.reason);
+      // 免费翻译：最多 3 个并发，避免同时发几十个请求被 Google 限速
+      const MAX_CONCURRENT_FREE = 3;
+      let fqi = 0;
+      const freeResults = [];
+      async function freeWorker() {
+        while (fqi < chunks.length) {
+          const i = fqi++;
+          const chunk = chunks[i];
+          const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
+          chunk.forEach(n => _showChunkLoading([n]));
+          try {
+            const translated = await requestTranslation(combined);
+            chunk.forEach(n => _hideChunkLoading([n]));
+            pauseObserver();
+            applyTranslationResults(chunk, translated);
+            resumeObserver();
+            applyDisplayMode();
+          } catch(err) {
+            chunk.forEach(n => _hideChunkLoading([n]));
+            handleTranslationError(err);
+          }
         }
       }
-      resumeObserver();
+      await Promise.all(
+        Array.from({ length: Math.min(MAX_CONCURRENT_FREE, chunks.length) }, freeWorker)
+      );
     } else {
       // AI 翻译：最多 3 个并发（仿沉浸式翻译），避免同时发几十个请求被限速
       // 每个 chunk 完成立即渲染，用户看到翻译逐块出现
@@ -852,10 +862,7 @@ function handleTranslationError(err) {
     console.warn('⚠️ Port disconnect on chunk (extension context check):', err.message);
   } else {
     console.warn('⚠️ Chunk failed:', err.message);
-    // 增量/滚动翻译失败不弹通知，避免覆盖"翻译完成"提示
-    if (!isIncrementalTranslation) {
-      showNotification('❌ 翻译失败：' + err.message, 'error');
-    }
+    // 单个 chunk 失败不弹通知，translatePageNow 末尾的聚合检查统一处理
   }
 }
 
