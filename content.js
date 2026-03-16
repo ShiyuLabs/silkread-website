@@ -20,6 +20,9 @@ function _creditsToTokenStr(credits) {
 // 双语模式 DOM 注入：原文保留，译文作为独立块元素插在后面（仿沉浸式翻译）
 const _injectedTrMap = new WeakMap();
 
+// 本页翻译统计（AI 模式）
+let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+
 // 注入全局样式（document_end 时 head 已存在）
 ;(function() {
   if (document.getElementById('__shiyu_style__')) return;
@@ -439,7 +442,10 @@ async function translatePageNow() {
   console.log("▶️ Starting translation...");
   resetLazyObserver(); // 重新翻译时重置，避免旧 observer 干扰
 
-  // AI 模式下，翻译前记录余额，完成后对比显示实际消耗（透明计费）
+  // AI 模式下，翻译前重置本页统计，翻译前记录余额（双重校验）
+  if (currentEngine === 'ai') {
+    _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+  }
   let creditsBefore = null;
   if (currentEngine === 'ai') {
     try {
@@ -517,18 +523,56 @@ async function translatePageNow() {
         const consumed = Math.max(0, creditsBefore - creditsAfter);
         if (consumed > 0) {
           const lazyNote = belowFoldNodes.length > 0 ? `，滚动加载更多` : '';
+          const yuan = (consumed * 0.001).toFixed(4);
           showNotification(
-            `✅ 翻译完成｜消耗 ${_creditsToTokenStr(consumed)}，剩余 ${_creditsToTokenStr(creditsAfter)}${lazyNote}`,
-            'info', 6000
+            `✅ 翻译完成｜消耗 ¥${yuan}${lazyNote}`,
+            'info', 8000,
+            { label: '📊 账单', fn: () => _showTranslationReport(consumed, creditsAfter) }
           );
         } else if (apiCharCount === 0) {
-          showNotification(`✅ 全部命中缓存，0 Token 消耗`, 'info', 3000);
+          showNotification(`✅ 全部命中缓存，0 消耗`, 'info', 3000);
         }
       }
     } catch(_) {}
   } else {
     showNotification('✅ 翻译完成', 'info', 2500);
   }
+}
+
+function _showTranslationReport(consumed, creditsAfter) {
+  const rate = MODEL_CREDIT_RATES[currentManagedModel] || 8;
+  const yuan = (consumed * 0.001).toFixed(4);
+  const balanceYuan = (creditsAfter * 0.001).toFixed(4);
+  const lines = [
+    '诗语翻译 · 本页翻译账单',
+    '═══════════════════════════',
+    `时间：${new Date().toLocaleString('zh-CN')}`,
+    `页面：${location.href}`,
+    `模型：${currentManagedModel}（¥${(rate * 0.001).toFixed(3)}/1K Token）`,
+    '',
+    'Token 明细',
+    '───────────────────────────',
+    `输入 Token：${_pageStats.inputTokens.toLocaleString()}`,
+    `输出 Token：${_pageStats.outputTokens.toLocaleString()}`,
+    `合计 Token：${_pageStats.totalTokens.toLocaleString()}`,
+    '',
+    '费用',
+    '───────────────────────────',
+    `本页消耗：¥${yuan}`,
+    `账户余额：¥${balanceYuan}`,
+    '',
+    '* 以上为向您收取的费用，实际API成本请查阅上游服务商账单',
+  ];
+  const content = lines.join('\n');
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
 
 // isIncrementalTranslation: 区分初始全页翻译 vs Observer 增量翻译
@@ -569,9 +613,17 @@ async function translateNodes(textNodes) {
           const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
           console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
           try {
-            const translated = await requestTranslation(combined);
+            const result = await requestTranslation(combined);
+            // result 可能是字符串（旧路径）或带统计的对象
+            const translatedText = (result && result.__shiyuStats) ? result.text : result;
+            if (result && result.__shiyuStats) {
+              _pageStats.inputTokens  += result.inputTokens  || 0;
+              _pageStats.outputTokens += result.outputTokens || 0;
+              _pageStats.totalTokens  += result.totalTokens  || 0;
+              _pageStats.cost         += result.cost         || 0;
+            }
             pauseObserver();
-            applyTranslationResults(chunk, translated);
+            applyTranslationResults(chunk, translatedText);
             resumeObserver();
             applyDisplayMode();
             console.log(`✅ AI chunk ${i + 1} done`);
@@ -758,7 +810,7 @@ function groupTextNodes(nodes) {
 
 // 页面内通知条（CREDITS_EXHAUSTED 等错误提示）
 let _notifTimer = null;
-function showNotification(msg, type = 'info', duration = 5000) {
+function showNotification(msg, type = 'info', duration = 5000, action = null) {
   let el = document.getElementById('__translator_notif__');
   if (!el) {
     el = document.createElement('div');
@@ -768,11 +820,31 @@ function showNotification(msg, type = 'info', duration = 5000) {
       padding: '10px 16px', borderRadius: '8px', fontSize: '13px',
       fontFamily: 'sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
       transition: 'opacity 0.3s', maxWidth: '320px', lineHeight: '1.5',
-      pointerEvents: 'none', // 永远不拦截鼠标点击
+      pointerEvents: 'none',
     });
     document.body.appendChild(el);
   }
-  el.textContent = msg;
+  // 清空旧内容
+  el.innerHTML = '';
+  const msgSpan = document.createElement('span');
+  msgSpan.textContent = msg;
+  el.appendChild(msgSpan);
+
+  if (action) {
+    el.style.pointerEvents = 'auto';
+    const btn = document.createElement('button');
+    btn.textContent = action.label;
+    Object.assign(btn.style, {
+      marginLeft: '10px', padding: '2px 8px', fontSize: '12px', cursor: 'pointer',
+      borderRadius: '4px', border: '1px solid currentColor', background: 'transparent',
+      color: 'inherit', fontFamily: 'inherit',
+    });
+    btn.addEventListener('click', () => { action.fn(); });
+    el.appendChild(btn);
+  } else {
+    el.style.pointerEvents = 'none';
+  }
+
   el.style.background = type === 'error' ? '#fee2e2' : '#dbeafe';
   el.style.color       = type === 'error' ? '#991b1b' : '#1e3a8a';
   el.style.opacity = '1';

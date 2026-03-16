@@ -57,8 +57,10 @@ async function callOpenAI(cfg, model, text, targetLang) {
   }
   const data = await resp.json();
   return {
-    text:        data.choices[0].message.content,
-    totalTokens: data.usage?.total_tokens ?? estimateTokens(text),
+    text:         data.choices[0].message.content,
+    inputTokens:  data.usage?.prompt_tokens     ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+    totalTokens:  data.usage?.total_tokens      ?? estimateTokens(text),
   };
 }
 
@@ -201,6 +203,9 @@ module.exports = async function handler(req, res) {
     translated_text: result.text,
     cost:            actualCost,
     remaining:       Math.max(0, remainingCredits),
+    inputTokens:     result.inputTokens  || 0,
+    outputTokens:    result.outputTokens || 0,
+    totalTokens:     result.totalTokens  || 0,
   });
 };
 

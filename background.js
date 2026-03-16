@@ -262,7 +262,15 @@ async function handleManagedTranslation(text, sourceLang, targetLang, settings) 
   if (data.remaining !== undefined) {
     chrome.storage.local.set({ cachedCredits: data.remaining });
   }
-  return data.translated_text || data.translated;
+  // 返回带统计信息的对象（content.js 会读取 .text 和 .stats）
+  return {
+    __shiyuStats: true,
+    text:         data.translated_text || data.translated || '',
+    cost:         data.cost         || 0,
+    inputTokens:  data.inputTokens  || 0,
+    outputTokens: data.outputTokens || 0,
+    totalTokens:  data.totalTokens  || 0,
+  };
 }
 
 // ===== 自带 API 翻译（用用户自己的 Key）=====
