@@ -28,11 +28,11 @@ const MODEL_RATES = {
 
 const MODEL_RATE_HINTS = {
   'free-translation':  '谷歌通道 · 完全免费',
-  'deepseek-chat':     '8 积分 / 1K Token',
-  'qwen3-235b-a22b':  '18 积分 / 1K Token',
-  'gemini-2.5-flash': '25 积分 / 1K Token',
-  'gpt-5-mini':       '80 积分 / 1K Token',
-  'claude-sonnet-4-6': '179 积分 / 1K Token',
+  'deepseek-chat':     '¥0.008 / 1K Token',
+  'qwen3-235b-a22b':  '¥0.018 / 1K Token',
+  'gemini-2.5-flash': '¥0.025 / 1K Token',
+  'gpt-5-mini':       '¥0.08 / 1K Token',
+  'claude-sonnet-4-6': '¥0.179 / 1K Token',
 };
 
 function updateModelRateHint(model) {
