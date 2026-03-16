@@ -48,11 +48,16 @@ function _hideChunkLoading(chunk) {
 
 // 注入全局样式（document_end 时 head 已存在）
 ;(function() {
-  if (document.getElementById('__shiyu_style__')) return;
-  const s = document.createElement('style');
-  s.id = '__shiyu_style__';
-  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}html.shiyu-mode-original .shiyu-tr{display:none!important;}html.shiyu-mode-translation .shiyu-tr{display:none!important;}';
-  (document.head || document.documentElement).appendChild(s);
+  const css = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}html.shiyu-mode-original .shiyu-tr{display:none!important;}html.shiyu-mode-translation .shiyu-tr{display:none!important;}';
+  // Always update textContent — after extension reload the old <style> element (without
+  // the mode CSS rules) would remain, so we must overwrite it every time.
+  let s = document.getElementById('__shiyu_style__');
+  if (!s) {
+    s = document.createElement('style');
+    s.id = '__shiyu_style__';
+    (document.head || document.documentElement).appendChild(s);
+  }
+  s.textContent = css;
 })();
 
 let translationMap = {};
@@ -373,21 +378,37 @@ function startLiveObserver() {
 
     // 快速路径：同步立即把缓存中已有翻译的新节点翻译掉
     // MutationObserver 回调在浏览器绘制前执行，用户看不到英文闪现
+    // Pause during DOM insertions to prevent cascading observer callbacks that
+    // would cause quadratic work (n nodes × m callbacks) and freeze the page.
     const translatedNodeSet = new Set(translatedElements.map(e => e.node));
+    const needsInsert = [];
     for (const mutation of mutations) {
       for (const added of mutation.addedNodes) {
         if (added.nodeType === Node.TEXT_NODE) {
           if (translatedNodeSet.has(added)) continue;
+          // Skip shiyu-tr text nodes — those contain translated text, not source text
+          if (added.parentNode && added.parentNode.classList && added.parentNode.classList.contains('shiyu-tr')) continue;
           const text = added.nodeValue?.trim();
           if (text && translationMap[text]) {
-            translatedElements.push({ node: added, originalText: added.nodeValue, translatedText: translationMap[text] });
-            translatedNodeSet.add(added);
-            applyNodeTranslation(added, added.nodeValue, translationMap[text]);
+            needsInsert.push({ node: added, orig: added.nodeValue, trans: translationMap[text] });
           }
         } else if (added.nodeType === Node.ELEMENT_NODE) {
-          applyCacheToSubtree(added);
+          // Skip our own injected elements
+          if (!added.classList.contains('shiyu-tr')) needsInsert.push({ element: added });
         }
       }
+    }
+    if (needsInsert.length > 0) {
+      pauseObserver(); // prevent cascading callbacks for all insertions below
+      for (const item of needsInsert) {
+        if (item.element) {
+          applyCacheToSubtree(item.element);
+        } else {
+          translatedElements.push({ node: item.node, originalText: item.orig, translatedText: item.trans });
+          applyNodeTranslation(item.node, item.orig, item.trans);
+        }
+      }
+      resumeObserver();
     }
 
     // 慢速路径（API 调用）：仅在自动翻译模式下触发，悬浮球模式只用缓存
@@ -1220,17 +1241,22 @@ function applyNodeTranslation(node, originalText, translatedText) {
 
 // ============ 显示模式切换 ============
 function applyDisplayMode() {
-  // CSS class toggle — handles ALL .shiyu-tr elements (including untracked ones
-  // left by a previous content script run after extension reload)
-  document.documentElement.classList.toggle('shiyu-mode-original', currentDisplayMode === 'original');
+  // CSS class toggle — instant, zero DOM mutations, covers ALL .shiyu-tr including
+  // untracked elements left by a previous content script run after extension reload.
+  document.documentElement.classList.toggle('shiyu-mode-original',    currentDisplayMode === 'original');
   document.documentElement.classList.toggle('shiyu-mode-translation', currentDisplayMode === 'translationOnly');
 
-  // Per-node DOM pass — handles translationOnly text-swap + re-creates missing shiyu-tr
+  // Text-node swap: only the node's text content needs changing.
+  // bilingual / original: show original text (shiyu-tr visibility managed by CSS above)
+  // translationOnly:      show translated text in the text node itself (CSS hides shiyu-tr)
+  // Pause the observer so these nodeValue changes don't cascade into observer callbacks.
+  pauseObserver();
   translatedElements.forEach(({ node, originalText, translatedText }) => {
-    if (node && node.parentNode) {
-      applyNodeTranslation(node, originalText, translatedText);
-    }
+    if (!node || !node.parentNode) return;
+    const want = (currentDisplayMode === 'translationOnly') ? translatedText : originalText;
+    if (node.nodeValue !== want) node.nodeValue = want;
   });
+  resumeObserver();
 }
 
 // ============ 清空翻译 ============
