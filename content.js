@@ -192,72 +192,80 @@ function _injectFloatingBall() {
   ball.id = '__shiyu_ball__';
   _ball = ball;
 
-  // 用 setProperty + important，防止页面自身 CSS 覆盖悬浮球样式
   const si = (k, v) => ball.style.setProperty(k, v, 'important');
+
+  // 初始定位用 right/bottom，拖拽后切换为 left/top
   si('position', 'fixed');
-  si('bottom', '80px');
   si('right', '18px');
-  si('width', '44px');
-  si('height', '44px');
+  si('bottom', '80px');
+  si('left', 'auto');
+  si('top', 'auto');
+  si('width', '48px');
+  si('height', '48px');
   si('border-radius', '50%');
-  si('background', 'linear-gradient(135deg,#6366f1,#8b5cf6)');
-  si('box-shadow', '0 4px 14px rgba(99,102,241,0.5)');
+  si('background', '#fff');
+  si('border', '2.5px solid #6366f1');
+  si('box-shadow', '0 3px 14px rgba(99,102,241,0.28),0 1px 4px rgba(0,0,0,0.10)');
   si('cursor', 'pointer');
   si('z-index', '2147483646');
   si('display', 'flex');
   si('align-items', 'center');
   si('justify-content', 'center');
-  si('font-family', 'sans-serif');
-  si('font-size', '14px');
-  si('font-weight', 'bold');
-  si('color', '#fff');
+  si('font-family', 'system-ui,"PingFang SC","Microsoft YaHei",sans-serif');
+  si('font-size', '16px');
+  si('font-weight', '700');
+  si('color', '#6366f1');
   si('user-select', 'none');
-  si('transition', 'transform .15s,box-shadow .15s');
+  si('transition', 'box-shadow .2s');
   si('touch-action', 'none');
   si('box-sizing', 'border-box');
   si('padding', '0');
   si('margin', '0');
-  si('border', 'none');
-  si('line-height', '44px');
+  si('line-height', '1');
   si('text-align', 'center');
-  si('overflow', 'visible');
   si('pointer-events', 'auto');
 
   ball.title = '诗语翻译 - 点击翻译本页';
   ball.textContent = '译';
 
-  console.log('[诗语] 悬浮球注入中…');
+  // hover: 只加深阴影，不 scale（scale 会导致视觉中心偏移、难以点击）
+  const _shadowNormal = '0 3px 14px rgba(99,102,241,0.28),0  1px 4px rgba(0,0,0,0.10)';
+  const _shadowHover  = '0 6px 24px rgba(99,102,241,0.50),0 2px 8px rgba(0,0,0,0.13)';
+  ball.addEventListener('mouseenter', () => { if (!_ballDragging) ball.style.setProperty('box-shadow', _shadowHover, 'important'); });
+  ball.addEventListener('mouseleave', () => { ball.style.setProperty('box-shadow', _shadowNormal, 'important'); });
 
-  // 拖拽支持
+  // 拖拽：pointerdown 时立刻切换到 left/top 定位，避免方向混乱
   let _ballDragging = false;
-  let _dragStartX, _dragStartY, _ballStartRight, _ballStartBottom;
-
-  ball.addEventListener('mouseenter', () => {
-    if (!_ballDragging) ball.style.setProperty('transform', 'scale(1.12)', 'important');
-  });
-  ball.addEventListener('mouseleave', () => {
-    if (!_ballDragging) ball.style.setProperty('transform', 'scale(1)', 'important');
-  });
+  let _dragStartX, _dragStartY, _ballInitLeft, _ballInitTop;
 
   ball.addEventListener('pointerdown', (e) => {
     _ballDragging = false;
     _dragStartX = e.clientX;
     _dragStartY = e.clientY;
     const rect = ball.getBoundingClientRect();
-    _ballStartRight = window.innerWidth - rect.right;
-    _ballStartBottom = window.innerHeight - rect.bottom;
+    _ballInitLeft = rect.left;
+    _ballInitTop  = rect.top;
+    // 切换到 left/top，数学直接：新位置 = 初始位置 + 鼠标偏移
+    ball.style.setProperty('right',  'auto', 'important');
+    ball.style.setProperty('bottom', 'auto', 'important');
+    ball.style.setProperty('left', _ballInitLeft + 'px', 'important');
+    ball.style.setProperty('top',  _ballInitTop  + 'px', 'important');
     ball.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
+
   ball.addEventListener('pointermove', (e) => {
     const dx = e.clientX - _dragStartX;
     const dy = e.clientY - _dragStartY;
-    if (!_ballDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) _ballDragging = true;
+    if (!_ballDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) _ballDragging = true;
     if (_ballDragging) {
-      ball.style.setProperty('right', Math.max(0, _ballStartRight - dx) + 'px', 'important');
-      ball.style.setProperty('bottom', Math.max(0, _ballStartBottom + dy) + 'px', 'important');
+      const newLeft = Math.max(0, Math.min(window.innerWidth  - 48, _ballInitLeft + dx));
+      const newTop  = Math.max(0, Math.min(window.innerHeight - 48, _ballInitTop  + dy));
+      ball.style.setProperty('left', newLeft + 'px', 'important');
+      ball.style.setProperty('top',  newTop  + 'px', 'important');
     }
   });
+
   ball.addEventListener('pointerup', () => {
     if (!_ballDragging) _onBallClick();
     _ballDragging = false;
@@ -272,19 +280,25 @@ function _setBallState(state) {
   const si = (k, v) => _ball.style.setProperty(k, v, 'important');
   if (state === 'loading') {
     _ball.textContent = '';
-    si('background', 'linear-gradient(135deg,#6366f1,#8b5cf6)');
+    si('background', '#fff');
+    si('border', '2.5px solid #6366f1');
+    si('color', '#6366f1');
     const sp = document.createElement('div');
-    sp.style.cssText = 'width:22px;height:22px;border:3px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:shiyu-spin .7s linear infinite;flex-shrink:0;';
+    sp.style.cssText = 'width:22px;height:22px;border:3px solid rgba(99,102,241,0.25);border-top-color:#6366f1;border-radius:50%;animation:shiyu-spin .7s linear infinite;flex-shrink:0;';
     _ball.appendChild(sp);
     _ball.title = '翻译中...';
   } else if (state === 'done') {
     _ball.textContent = '✓';
-    si('background', 'linear-gradient(135deg,#10b981,#059669)');
+    si('background', '#fff');
+    si('border', '2.5px solid #10b981');
+    si('color', '#10b981');
     _ball.title = '已翻译 - 再次点击恢复原文';
     _ballTranslated = true;
   } else if (state === 'idle') {
     _ball.textContent = '译';
-    si('background', 'linear-gradient(135deg,#6366f1,#8b5cf6)');
+    si('background', '#fff');
+    si('border', '2.5px solid #6366f1');
+    si('color', '#6366f1');
     _ball.title = '诗语翻译 - 点击翻译本页';
     _ballTranslated = false;
   }
