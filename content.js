@@ -173,10 +173,132 @@ chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang', 't
   currentManagedModel = result.managedModel || '';
   console.log("📍 Settings loaded:", { autoTranslateEnabled: isAutoTranslateEnabled, displayMode: currentDisplayMode, targetLang: currentTargetLang });
 
+  _injectFloatingBall();
+
   if (isAutoTranslateEnabled) {
     startAutoTranslate();
   }
 });
+
+// ============ 悬浮球 ============
+let _ball = null;
+let _ballTranslated = false;
+
+function _injectFloatingBall() {
+  if (document.getElementById('__shiyu_ball__')) return;
+
+  const ball = document.createElement('div');
+  ball.id = '__shiyu_ball__';
+  _ball = ball;
+
+  Object.assign(ball.style, {
+    position: 'fixed',
+    bottom: '80px',
+    right: '18px',
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    boxShadow: '0 4px 14px rgba(99,102,241,0.5)',
+    cursor: 'pointer',
+    zIndex: '2147483646',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '20px',
+    userSelect: 'none',
+    transition: 'transform .15s,box-shadow .15s',
+    touchAction: 'none',
+  });
+  ball.title = '诗语翻译 - 点击翻译本页';
+  ball.textContent = '译';
+  ball.style.fontFamily = 'sans-serif';
+  ball.style.color = '#fff';
+  ball.style.fontWeight = 'bold';
+  ball.style.fontSize = '14px';
+  ball.style.letterSpacing = '0';
+
+  // 悬浮放大
+  ball.addEventListener('mouseenter', () => {
+    if (!_ballDragging) ball.style.transform = 'scale(1.12)';
+  });
+  ball.addEventListener('mouseleave', () => {
+    if (!_ballDragging) ball.style.transform = 'scale(1)';
+  });
+
+  // 拖拽支持
+  let _ballDragging = false;
+  let _dragStartX, _dragStartY, _ballStartRight, _ballStartBottom;
+  ball.addEventListener('pointerdown', (e) => {
+    _ballDragging = false;
+    _dragStartX = e.clientX;
+    _dragStartY = e.clientY;
+    const rect = ball.getBoundingClientRect();
+    _ballStartRight = window.innerWidth - rect.right;
+    _ballStartBottom = window.innerHeight - rect.bottom;
+    ball.setPointerCapture(e.pointerId);
+  });
+  ball.addEventListener('pointermove', (e) => {
+    const dx = e.clientX - _dragStartX;
+    const dy = e.clientY - _dragStartY;
+    if (!_ballDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) _ballDragging = true;
+    if (_ballDragging) {
+      ball.style.right = Math.max(0, _ballStartRight - dx) + 'px';
+      ball.style.bottom = Math.max(0, _ballStartBottom + dy) + 'px';
+    }
+  });
+  ball.addEventListener('pointerup', (e) => {
+    if (!_ballDragging) _onBallClick();
+    _ballDragging = false;
+  });
+
+  document.body.appendChild(ball);
+}
+
+function _setBallState(state) {
+  if (!_ball) return;
+  if (state === 'loading') {
+    _ball.textContent = '';
+    _ball.style.background = 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+    // 注入旋转动画圆圈
+    const sp = document.createElement('div');
+    sp.style.cssText = 'width:22px;height:22px;border:3px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:shiyu-spin .7s linear infinite;';
+    _ball.appendChild(sp);
+    _ball.title = '翻译中...';
+  } else if (state === 'done') {
+    _ball.textContent = '✓';
+    _ball.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    _ball.title = '已翻译 - 再次点击恢复原文';
+    _ballTranslated = true;
+  } else if (state === 'idle') {
+    _ball.textContent = '译';
+    _ball.style.background = 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+    _ball.title = '诗语翻译 - 点击翻译本页';
+    _ballTranslated = false;
+  }
+}
+
+function _onBallClick() {
+  if (!isContextValid()) return;
+  if (isTranslating) return;
+  if (_ballTranslated) {
+    // 已翻译 → 恢复原文
+    clearTranslations();
+    _setBallState('idle');
+    return;
+  }
+  // 开始翻译
+  _setBallState('loading');
+  creditsExhausted = false;
+  translatePageNow()
+    .then(() => {
+      _setBallState('done');
+      startLiveObserver();
+    })
+    .catch(err => {
+      _setBallState('idle');
+    });
+}
 
 function startAutoTranslate() {
   console.log("🚀 AUTO TRANSLATING NOW");
