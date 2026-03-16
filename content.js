@@ -51,7 +51,7 @@ function _hideChunkLoading(chunk) {
   if (document.getElementById('__shiyu_style__')) return;
   const s = document.createElement('style');
   s.id = '__shiyu_style__';
-  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}';
+  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}html.shiyu-mode-original .shiyu-tr{display:none!important;}html.shiyu-mode-translation .shiyu-tr{display:none!important;}';
   (document.head || document.documentElement).appendChild(s);
 })();
 
@@ -1220,6 +1220,12 @@ function applyNodeTranslation(node, originalText, translatedText) {
 
 // ============ 显示模式切换 ============
 function applyDisplayMode() {
+  // CSS class toggle — handles ALL .shiyu-tr elements (including untracked ones
+  // left by a previous content script run after extension reload)
+  document.documentElement.classList.toggle('shiyu-mode-original', currentDisplayMode === 'original');
+  document.documentElement.classList.toggle('shiyu-mode-translation', currentDisplayMode === 'translationOnly');
+
+  // Per-node DOM pass — handles translationOnly text-swap + re-creates missing shiyu-tr
   translatedElements.forEach(({ node, originalText, translatedText }) => {
     if (node && node.parentNode) {
       applyNodeTranslation(node, originalText, translatedText);
@@ -1231,6 +1237,8 @@ function applyDisplayMode() {
 function clearTranslations() {
   resetLazyObserver();
   pauseObserver();
+  // 清除 CSS 模式类，避免切回原文后残留状态
+  document.documentElement.classList.remove('shiyu-mode-original', 'shiyu-mode-translation');
   translatedElements.forEach(({ node, originalText }) => {
     if (node && node.parentNode) node.nodeValue = originalText;
     // 移除注入的译文元素
