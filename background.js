@@ -286,7 +286,8 @@ async function handleManagedTranslation(text, sourceLang, targetLang, settings) 
     inputChars:   data.inputChars   || 0,
     outputChars:  data.outputChars  || 0,
     sellRate:     data.sellRate     || 0,
-    costRate:     data.costRate     || 0,
+    costRateIn:   data.costRateIn   || 0,
+    costRateOut:  data.costRateOut  || 0,
   };
 }
 

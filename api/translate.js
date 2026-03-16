@@ -2,16 +2,21 @@
 // ALL API keys are loaded from server-side environment variables only.
 
 // ─── Model registry ────────────────────────────────────────────────────────────
-// rate     = credits charged to user per 1 000 tokens  (selling price)
-// costRate = credits that cost YOU  per 1 000 tokens   (your ChatAnywhere price)
+// rate        = credits charged to user per 1 000 tokens  (selling price, unified)
+// costRateIn  = credits cost YOU per 1 000 INPUT  tokens  (ChatAnywhere invoice)
+// costRateOut = credits cost YOU per 1 000 OUTPUT tokens  (ChatAnywhere invoice)
 // 1 credit = ¥0.001
-// costRate 按你 ChatAnywhere 实际充值单价填写，例如 ¥0.001/1K token → costRate:1
 const MODEL_CONFIG = {
-  'deepseek-chat':     { format: 'openai', rate: 8,   costRate: 1   },  // 售¥0.008 成本¥0.001/1K
-  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRate: 4   },  // 售¥0.018 成本¥0.004/1K
-  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRate: 4   },  // 售¥0.025 成本¥0.004/1K
-  'gpt-5-mini':       { format: 'openai', rate: 80,  costRate: 15  },  // 售¥0.080 成本¥0.015/1K
-  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRate: 60  },  // 售¥0.179 成本¥0.060/1K
+  // ChatAnywhere: deepseek-chat  输入 ¥0.0012  输出 ¥0.0018 per 1K
+  'deepseek-chat':     { format: 'openai', rate: 8,   costRateIn: 1.2,  costRateOut: 1.8  },
+  // ChatAnywhere: qwen3-235b-a22b 输入 ¥0.0014  输出 ¥0.0056 per 1K
+  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRateIn: 1.4,  costRateOut: 5.6  },
+  // ChatAnywhere: gemini-2.5-flash 输入 ¥0.0012  输出 ¥0.0100 per 1K
+  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRateIn: 1.2,  costRateOut: 10.0 },
+  // ChatAnywhere: gpt-5-mini  输入 ¥0.00175 输出 ¥0.0140 per 1K
+  'gpt-5-mini':       { format: 'openai', rate: 80,  costRateIn: 1.75, costRateOut: 14.0 },
+  // ChatAnywhere: claude-sonnet-4-6 输入 ¥0.0150  输出 ¥0.0750 per 1K
+  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRateIn: 15.0, costRateOut: 75.0 },
 };
 
 // Conservative token estimate: ~1.5 tokens per character for pre-flight balance check
@@ -161,8 +166,11 @@ module.exports = async function handler(req, res) {
   }
 
   // ── Step 5: Precise deduction based on actual usage.total_tokens ──────────
-  const actualCost     = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.rate));
-  const actualCostPrice = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.costRate));
+  const actualCost      = Math.max(1, Math.ceil(result.totalTokens  / 1000 * cfg.rate));
+  const actualCostPrice = Math.ceil(
+    result.inputTokens  / 1000 * cfg.costRateIn +
+    result.outputTokens / 1000 * cfg.costRateOut
+  ) || 1;
   let remainingCredits = currentCredits - actualCost;
   try {
     const dr = await fetch(
@@ -198,7 +206,8 @@ module.exports = async function handler(req, res) {
     inputChars:      text.length,
     outputChars:     (result.text || '').length,
     sellRate:        cfg.rate,
-    costRate:        cfg.costRate,
+    costRateIn:      cfg.costRateIn,
+    costRateOut:     cfg.costRateOut,
   });
 };
 

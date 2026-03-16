@@ -23,7 +23,7 @@ const _injectedTrMap = new WeakMap();
 const _loadingMap = new WeakMap();
 
 // 本页翻译统计（AI 模式）
-let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, costCredits: 0, inputChars: 0, outputChars: 0, sellRate: 0, costRate: 0 };
+let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, costCredits: 0, inputChars: 0, outputChars: 0, sellRate: 0, costRateIn: 0, costRateOut: 0 };
 
 function _showChunkLoading(chunk) {
   if (currentDisplayMode === 'original') return;
@@ -628,7 +628,7 @@ async function translatePageNow() {
 
   // AI 模式下，翻译前重置本页统计，翻译前记录余额（双重校验）
   if (currentEngine === 'ai') {
-    _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+    _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, costCredits: 0, inputChars: 0, outputChars: 0, sellRate: 0, costRateIn: 0, costRateOut: 0 };
   }
   let creditsBefore = null;
   if (currentEngine === 'ai') {
@@ -731,9 +731,9 @@ async function translatePageNow() {
 }
 
 function _downloadTranslationReport(consumed, creditsAfter) {
-  const sellRate    = _pageStats.sellRate || MODEL_CREDIT_RATES[currentManagedModel] || 8;
-  const costRate    = _pageStats.costRate || 1;
-  // 全部换算成 ¥，不显示「积分」
+  const sellRate    = _pageStats.sellRate   || MODEL_CREDIT_RATES[currentManagedModel] || 8;
+  const costRateIn  = _pageStats.costRateIn  || 0;
+  const costRateOut = _pageStats.costRateOut || 0;
   const sellYuan    = ((_pageStats.cost || consumed) * 0.001).toFixed(4);
   const costYuan    = (_pageStats.costCredits * 0.001).toFixed(4);
   const profitYuan  = ((_pageStats.cost - _pageStats.costCredits) * 0.001).toFixed(4);
@@ -741,32 +741,37 @@ function _downloadTranslationReport(consumed, creditsAfter) {
     ? (((_pageStats.cost - _pageStats.costCredits) / _pageStats.cost) * 100).toFixed(1)
     : '—';
   const balanceYuan = (creditsAfter * 0.001).toFixed(4);
+  // 分别计算输入/输出成本
+  const inputCostYuan  = (_pageStats.inputTokens  / 1000 * costRateIn  * 0.001).toFixed(4);
+  const outputCostYuan = (_pageStats.outputTokens / 1000 * costRateOut * 0.001).toFixed(4);
 
   const lines = [
     '诗语翻译 · 本页翻译账单（运营视角）',
-    '═══════════════════════════════════════',
+    '══════════════════════════════════════════',
     `时间：${new Date().toLocaleString('zh-CN')}`,
     `页面：${location.href}`,
     `模型：${currentManagedModel}`,
     '',
-    '━━━ Token & 字符统计 ━━━━━━━━━━━━━━━━━━━━━',
-    `输入 Token：${_pageStats.inputTokens.toLocaleString()}   输入字符：${_pageStats.inputChars.toLocaleString()}`,
-    `输出 Token：${_pageStats.outputTokens.toLocaleString()}   输出字符：${_pageStats.outputChars.toLocaleString()}`,
-    `合计 Token：${_pageStats.totalTokens.toLocaleString()}`,
+    '━━━ Token & 字符统计 ━━━━━━━━━━━━━━━━━━━━━━━',
+    `输入 Token：${_pageStats.inputTokens.toLocaleString().padStart(8)}   输入字符：${_pageStats.inputChars.toLocaleString()}`,
+    `输出 Token：${_pageStats.outputTokens.toLocaleString().padStart(8)}   输出字符：${_pageStats.outputChars.toLocaleString()}`,
+    `合计 Token：${_pageStats.totalTokens.toLocaleString().padStart(8)}`,
     '',
-    '━━━ 费用明细 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `ChatAnywhere 进价：¥${(costRate * 0.001).toFixed(4)}/1K Token`,
-    `向用户售价：       ¥${(sellRate * 0.001).toFixed(4)}/1K Token`,
-    `──────────────────────────────────────────`,
-    `本页进价成本：¥${costYuan}`,
-    `向用户收取：  ¥${sellYuan}`,
-    `毛利润：      ¥${profitYuan}（毛利率 ${marginPct}%）`,
+    '━━━ 成本明细（ChatAnywhere 进价）━━━━━━━━━━━━━━',
+    `输入单价：¥${(costRateIn  * 0.001).toFixed(5)}/1K Token  小计：¥${inputCostYuan}`,
+    `输出单价：¥${(costRateOut * 0.001).toFixed(5)}/1K Token  小计：¥${outputCostYuan}`,
+    `进价小计：¥${costYuan}`,
     '',
-    '━━━ 账户余额 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '━━━ 收入明细（向用户收取）━━━━━━━━━━━━━━━━━━',
+    `售价单价：¥${(sellRate * 0.001).toFixed(4)}/1K Token（不分输入输出）`,
+    `本页收入：¥${sellYuan}`,
+    '',
+    '━━━ 利润 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `毛利润：  ¥${profitYuan}`,
+    `毛利率：  ${marginPct}%`,
+    '',
+    '━━━ 账户余额 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     `当前余额：¥${balanceYuan}`,
-    '',
-    '* 进价在 api/translate.js MODEL_CONFIG → costRate 中按 ChatAnywhere 实际账单调整',
-    '* 1 credit = ¥0.001，costRate:1 = ¥0.001/1K Token',
   ];
   const content = lines.join('\n');
   const filename = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;
@@ -835,8 +840,9 @@ async function translateNodes(textNodes) {
               _pageStats.costCredits  += result.costCredits  || 0;
               _pageStats.inputChars   += result.inputChars   || 0;
               _pageStats.outputChars  += result.outputChars  || 0;
-              if (result.sellRate) _pageStats.sellRate = result.sellRate;
-              if (result.costRate) _pageStats.costRate = result.costRate;
+              if (result.sellRate)   _pageStats.sellRate   = result.sellRate;
+              if (result.costRateIn)  _pageStats.costRateIn  = result.costRateIn;
+              if (result.costRateOut) _pageStats.costRateOut = result.costRateOut;
             }
             _hideChunkLoading(chunk);
             pauseObserver();
