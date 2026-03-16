@@ -317,13 +317,8 @@ function _onBallClick() {
   _setBallState('loading');
   creditsExhausted = false;
   translatePageNow()
-    .then(() => {
-      _setBallState('done');
-      startLiveObserver();
-    })
-    .catch(err => {
-      _setBallState('idle');
-    });
+    .then(() => { _setBallState('done'); })
+    .catch(()  => { _setBallState('idle'); });
 }
 
 function startAutoTranslate() {
@@ -830,13 +825,17 @@ function handleTranslationError(err) {
              err.message?.toLowerCase().includes('extension context') ||
              err.message?.toLowerCase().includes('context invalidated')) {
     creditsExhausted = true;
-    if (!extensionReloadNotified) {
+    // 增量翻译（滚动加载）失败时不覆盖已有成功通知，只在首次全页翻译失败时提示
+    if (!extensionReloadNotified && !isIncrementalTranslation) {
       extensionReloadNotified = true;
       showNotification('🔄 插件已更新，请刷新当前页面后再翻译', 'error');
     }
   } else {
     console.warn('⚠️ Chunk failed:', err.message);
-    showNotification('❌ 翻译失败：' + err.message, 'error');
+    // 增量/滚动翻译失败不弹通知，避免覆盖"翻译完成"提示
+    if (!isIncrementalTranslation) {
+      showNotification('❌ 翻译失败：' + err.message, 'error');
+    }
   }
 }
 
@@ -1056,17 +1055,21 @@ function showNotification(msg, type = 'info', duration = 5000, action = null) {
 
 function requestTranslation(text) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     try {
       // 使用长连接 port 代替 sendMessage：
       // MV3 Service Worker 在 port 存活期间不会被 Chrome 挂起，彻底解决 "message channel closed" 问题
       const port = chrome.runtime.connect({ name: 'translation' });
       const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         port.disconnect();
         reject(new Error('Translation timeout'));
       }, 90000); // 90秒超时
 
       port.onMessage.addListener((msg) => {
         clearTimeout(timer);
+        settled = true;  // 先标记已处理，防止 onDisconnect 误 reject
         port.disconnect();
         if (msg.success) resolve(msg.data);
         else reject(new Error(msg.error || 'Translation failed'));
@@ -1074,17 +1077,15 @@ function requestTranslation(text) {
 
       port.onDisconnect.addListener(() => {
         clearTimeout(timer);
-        const err = chrome.runtime.lastError;
-        if (err && (err.message?.includes('Extension context') || err.message?.includes('context invalidated'))) {
-          reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
-        } else {
-          reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
-        }
+        void chrome.runtime.lastError; // 必须读一次，否则 Chrome 报 unchecked error
+        if (settled) return;           // onMessage 已处理，忽略 disconnect 事件
+        settled = true;
+        reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
       });
 
       port.postMessage({ action: 'fetchTranslation', text });
     } catch (e) {
-      reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+      if (!settled) { settled = true; reject(new Error('EXTENSION_CONTEXT_INVALIDATED')); }
     }
   });
 }
