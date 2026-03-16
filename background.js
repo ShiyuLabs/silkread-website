@@ -279,9 +279,14 @@ async function handleManagedTranslation(text, sourceLang, targetLang, settings) 
     __shiyuStats: true,
     text:         data.translated_text || data.translated || '',
     cost:         data.cost         || 0,
+    costCredits:  data.costCredits  || 0,
     inputTokens:  data.inputTokens  || 0,
     outputTokens: data.outputTokens || 0,
     totalTokens:  data.totalTokens  || 0,
+    inputChars:   data.inputChars   || 0,
+    outputChars:  data.outputChars  || 0,
+    sellRate:     data.sellRate     || 0,
+    costRate:     data.costRate     || 0,
   };
 }
 

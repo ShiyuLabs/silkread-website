@@ -3,28 +3,16 @@
 
 // ─── Model registry ────────────────────────────────────────────────────────────
 // All models route through ONE API proxy (BASE_URL + OPENAI_API_KEY).
-// rate: credits charged per 1 000 actual tokens consumed
+// rate:     credits charged to user per 1 000 actual tokens  (selling price)
+// costRate: credits that cost YOU per 1 000 actual tokens    (your cost price)
+//           → Adjust costRate to match your ONE API / upstream invoice price
+//             1 credit = ¥0.001, so costRate:4 means ¥0.004 / 1K tokens cost
 const MODEL_CONFIG = {
-  'deepseek-chat': {
-    format: 'openai',
-    rate:   8,
-  },
-  'qwen3-235b-a22b': {
-    format: 'openai',
-    rate:   18,
-  },
-  'gemini-2.5-flash': {
-    format: 'openai',
-    rate:   25,
-  },
-  'gpt-5-mini': {
-    format: 'openai',
-    rate:   80,
-  },
-  'claude-sonnet-4-6': {
-    format: 'openai',
-    rate:   179,
-  },
+  'deepseek-chat':     { format: 'openai', rate: 8,   costRate: 3   },  // sell ¥0.008 / cost ¥0.003
+  'qwen3-235b-a22b':  { format: 'openai', rate: 18,  costRate: 10  },  // sell ¥0.018 / cost ¥0.010
+  'gemini-2.5-flash': { format: 'openai', rate: 25,  costRate: 10  },  // sell ¥0.025 / cost ¥0.010
+  'gpt-5-mini':       { format: 'openai', rate: 80,  costRate: 15  },  // sell ¥0.080 / cost ¥0.015
+  'claude-sonnet-4-6':{ format: 'openai', rate: 179, costRate: 100 },  // sell ¥0.179 / cost ¥0.100
 };
 
 // Conservative token estimate: ~1.5 tokens per character for pre-flight balance check
@@ -174,7 +162,8 @@ module.exports = async function handler(req, res) {
   }
 
   // ── Step 5: Precise deduction based on actual usage.total_tokens ──────────
-  const actualCost = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.rate));
+  const actualCost     = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.rate));
+  const actualCostPrice = Math.max(1, Math.ceil(result.totalTokens / 1000 * cfg.costRate));
   let remainingCredits = currentCredits - actualCost;
   try {
     const dr = await fetch(
@@ -202,10 +191,15 @@ module.exports = async function handler(req, res) {
   return res.status(200).json({
     translated_text: result.text,
     cost:            actualCost,
+    costCredits:     actualCostPrice,
     remaining:       Math.max(0, remainingCredits),
     inputTokens:     result.inputTokens  || 0,
     outputTokens:    result.outputTokens || 0,
     totalTokens:     result.totalTokens  || 0,
+    inputChars:      text.length,
+    outputChars:     (result.text || '').length,
+    sellRate:        cfg.rate,
+    costRate:        cfg.costRate,
   });
 };
 
