@@ -235,10 +235,12 @@ function _injectFloatingBall() {
   ball.addEventListener('mouseleave', () => { ball.style.setProperty('box-shadow', _shadowNormal, 'important'); });
 
   // 拖拽：pointerdown 时立刻切换到 left/top 定位，避免方向混乱
+  let _pointerDown = false;  // 必须按住才能拖，防止松开后 move 事件误触发
   let _ballDragging = false;
   let _dragStartX, _dragStartY, _ballInitLeft, _ballInitTop;
 
   ball.addEventListener('pointerdown', (e) => {
+    _pointerDown = true;
     _ballDragging = false;
     _dragStartX = e.clientX;
     _dragStartY = e.clientY;
@@ -255,6 +257,7 @@ function _injectFloatingBall() {
   });
 
   ball.addEventListener('pointermove', (e) => {
+    if (!_pointerDown) return;  // 没按下，直接忽略
     const dx = e.clientX - _dragStartX;
     const dy = e.clientY - _dragStartY;
     if (!_ballDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) _ballDragging = true;
@@ -267,7 +270,13 @@ function _injectFloatingBall() {
   });
 
   ball.addEventListener('pointerup', () => {
+    _pointerDown = false;
     if (!_ballDragging) _onBallClick();
+    _ballDragging = false;
+  });
+
+  ball.addEventListener('pointercancel', () => {
+    _pointerDown = false;
     _ballDragging = false;
   });
 
