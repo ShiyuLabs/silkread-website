@@ -182,9 +182,9 @@ function updateBalanceUI(credits) {
     balanceText.style.color = '#ef4444';
     return;
   }
-  // 直接以 Token 为单位显示余额：credits / rate * 1000 = 实际 Token 数
-  const tokens = Math.round(credits / rate * 1000);
-  balanceText.textContent = `余额：${tokens.toLocaleString()} Token`;
+  // 显示人民币余额（1积分 = ¥0.001，与模型无关）
+  const yuan = (credits * 0.001).toFixed(2);
+  balanceText.textContent = `余额：¥${yuan}`;
   balanceText.style.color = '#10b981';
 }
 

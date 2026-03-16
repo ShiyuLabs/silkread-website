@@ -424,9 +424,9 @@
                     const r = await fetch(API + '/api/balance?token=' + authToken);
                     const d = await r.json();
                     if (d.credits !== undefined) {
-                        // 以最低费率(DeepSeek 8积分/1K Token)换算展示余额
-                        const navTokens = Math.round(d.credits / 8 * 1000);
-                        navBalance.textContent = navTokens.toLocaleString() + ' Token';
+                        // 显示人民币余额（1积分 = ¥0.001，与模型无关）
+                        const yuan = (d.credits * 0.001).toFixed(2);
+                        navBalance.textContent = '¥' + yuan;
                     }
                 } catch {}
             }
