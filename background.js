@@ -18,6 +18,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // 预热 Vercel 函数（平均冷启动要 1-2s，提前唤醒）
 fetch(`${PROXY_URL}/api/index`).catch(() => {});
 
+// MV3 Service Worker 保活：每 25 秒触发一次 alarm，防止翻译中途被 Chrome 挂起
+chrome.alarms.create('sw-keepalive', { periodInMinutes: 0.4 });
+chrome.alarms.onAlarm.addListener(() => { /* no-op: waking up is enough */ });
+
 // 获取已登录用户的 session token（返回 null 表示未登录）
 async function getAuthToken() {
   const stored = await chrome.storage.local.get(['authToken', 'authEmail']);

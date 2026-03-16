@@ -329,8 +329,11 @@ function _onBallClick() {
   _setBallState('loading');
   creditsExhausted = false;
   translatePageNow()
-    .then(() => { _setBallState('done'); })
-    .catch(()  => { _setBallState('idle'); });
+    .then(() => { _setBallState('done'); startLiveObserver(); })
+    .catch((err) => {
+      _setBallState('idle');
+      // NO_TRANSLATION 错误已在 translatePageNow 内显示通知，其余静默处理
+    });
 }
 
 function startAutoTranslate() {
@@ -364,7 +367,8 @@ function applyCacheToSubtree(root) {
 function startLiveObserver() {
   if (domObserver) return;
   domObserver = new MutationObserver((mutations) => {
-    if (!isAutoTranslateEnabled) return;
+    // 悬浮球翻译后也需要监听，让 React/SPA 重渲染的新节点能从缓存补回翻译
+    if (!isAutoTranslateEnabled && !_ballTranslated) return;
     if (!isContextValid()) { stopLiveObserver(); return; }
 
     // 快速路径：同步立即把缓存中已有翻译的新节点翻译掉
@@ -386,7 +390,8 @@ function startLiveObserver() {
       }
     }
 
-    // 慢速路径：防抖后处理真正新的（缓存中没有的）文本
+    // 慢速路径（API 调用）：仅在自动翻译模式下触发，悬浮球模式只用缓存
+    if (!isAutoTranslateEnabled) return;
     clearTimeout(observerDebounceTimer);
     observerDebounceTimer = setTimeout(() => {
       translateNewNodes();
@@ -680,10 +685,16 @@ async function translatePageNow() {
   observerCharCount = 0;
   console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldNodes.length} 个节点（滚动时翻译）`);
 
+  const _elemsBefore = translatedElements.length;
   if (inViewNodes.length > 0) {
-    showNotification('⏳ 翻译中...', 'info', 60000);
+    showNotification('⏳ 翻译中...', 'info', 15000);
     isIncrementalTranslation = false;
     await translateNodes(inViewNodes);
+  }
+  // 如果有节点需要翻译但翻译后数量没增加，说明全部 chunk 静默失败
+  if (inViewNodes.length > 0 && translatedElements.length <= _elemsBefore) {
+    showNotification('❌ 翻译失败，请重试', 'error', 5000);
+    throw new Error('NO_TRANSLATION');
   }
   console.log("🎉 Translation complete!");
   applyDisplayMode();
