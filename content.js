@@ -623,7 +623,8 @@ function loadTranslationCache() {
 async function translatePageNow() {
   if (!isContextValid()) return;
   console.log("▶️ Starting translation...");
-  resetLazyObserver(); // 重新翻译时重置，避免旧 observer 干扰
+  resetLazyObserver();
+  _shownChunkErrors.clear(); // 每次翻译重置错误去重
 
   // AI 模式下，翻译前重置本页统计，翻译前记录余额（双重校验）
   if (currentEngine === 'ai') {
@@ -847,6 +848,8 @@ async function translateNodes(textNodes) {
   }
 }
 
+let _shownChunkErrors = new Set(); // 同一类错误只弹一次，避免重复通知
+
 function handleTranslationError(err) {
   if (err.message === 'CREDITS_EXHAUSTED') {
     creditsExhausted = true;
@@ -859,10 +862,15 @@ function handleTranslationError(err) {
              err.message?.toLowerCase().includes('context invalidated')) {
     // 单个 chunk 的 port 断开不代表整体失败（其他 chunk 可能成功）
     // 真正失效时用户点悬浮球会触发 isContextValid() 检查并提示
-    console.warn('⚠️ Port disconnect on chunk (extension context check):', err.message);
+    console.warn('⚠️ Port disconnect on chunk:', err.message);
   } else {
     console.warn('⚠️ Chunk failed:', err.message);
-    // 单个 chunk 失败不弹通知，translatePageNow 末尾的聚合检查统一处理
+    // 相同错误只弹一次，且不覆盖余额/登录通知
+    const key = err.message.slice(0, 60);
+    if (!_shownChunkErrors.has(key)) {
+      _shownChunkErrors.add(key);
+      showNotification('❌ ' + err.message, 'error', 8000);
+    }
   }
 }
 
