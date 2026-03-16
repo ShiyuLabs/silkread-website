@@ -28,7 +28,7 @@ let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
   if (document.getElementById('__shiyu_style__')) return;
   const s = document.createElement('style');
   s.id = '__shiyu_style__';
-  s.textContent = '.shiyu-tr{display:block;color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;margin-top:2px;padding:0;border:none;background:none;}';
+  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}';  
   (document.head || document.documentElement).appendChild(s);
 })();
 
@@ -962,12 +962,24 @@ function applyNodeTranslation(node, originalText, translatedText) {
   } else if (currentDisplayMode === 'translationOnly') {
     node.nodeValue = translatedText;
   } else {
-    // 双语模式：原文保留，译文作为块级元素紧接在后（仿沉浸式翻译）
+    // 双语模式：检测父元素 display，inline 父元素用内联括号样式，block 父元素用换行块级样式
     node.nodeValue = originalText;
     if (node.parentNode) {
       const tr = document.createElement('font');
       tr.className = 'shiyu-tr';
-      tr.textContent = translatedText;
+      // 判断父元素是否是块级：取计算样式 display
+      const parentDisplay = window.getComputedStyle(node.parentNode).display;
+      const isBlock = parentDisplay === 'block' || parentDisplay === 'flex' ||
+                      parentDisplay === 'grid' || parentDisplay === 'list-item' ||
+                      parentDisplay === 'table-cell' || parentDisplay === 'table';
+      if (isBlock) {
+        tr.classList.add('shiyu-tr-block');
+        tr.textContent = translatedText;
+      } else {
+        // inline 父元素：空格 + 括号包裹，不换行，不破坏原布局
+        tr.classList.add('shiyu-tr-inline');
+        tr.textContent = '（' + translatedText + '）';
+      }
       const next = node.nextSibling;
       if (next) node.parentNode.insertBefore(tr, next);
       else node.parentNode.appendChild(tr);
