@@ -182,8 +182,12 @@ function updateBalanceUI(credits) {
     balanceText.style.color = '#ef4444';
     return;
   }
-  const chars = Math.round(credits * 10000 * 1.2 / (rate * 10));
-  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${chars.toLocaleString()} 字`;
+  // 积分 / rate = K Token，例：9927积分 / 8 = 1240.9K Token ≈ 124万Token
+  const kTokens = Math.round(credits / rate);
+  const display = kTokens >= 1000
+    ? (kTokens / 1000).toFixed(1) + ' M Token'
+    : kTokens.toLocaleString() + ' K Token';
+  balanceText.textContent = `${credits.toLocaleString()} 积分  ≈ ${display}`;
   balanceText.style.color = '#10b981';
 }
 
