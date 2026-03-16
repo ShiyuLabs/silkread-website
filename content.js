@@ -565,15 +565,15 @@ function _downloadTranslationReport(consumed, creditsAfter) {
     '* 以上为向您收取的费用，实际API成本请查阅上游服务商账单',
   ];
   const content = lines.join('\n');
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
+  // content script 无法用 createObjectURL 触发下载，改用 data: URI
+  const dataUri = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;
+  a.href = dataUri;
+  a.download = `\u8bd7\u8bed\u8d26\u5355-${new Date().toISOString().slice(0,10)}.txt`;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  setTimeout(() => a.remove(), 500);
 }
 
 // isIncrementalTranslation: 区分初始全页翻译 vs Observer 增量翻译
