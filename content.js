@@ -819,40 +819,68 @@ function showNotification(msg, type = 'info', duration = 5000, action = null) {
       position: 'fixed', top: '16px', right: '16px', zIndex: '2147483647',
       padding: '10px 16px', borderRadius: '8px', fontSize: '13px',
       fontFamily: 'sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-      transition: 'opacity 0.3s', maxWidth: '320px', lineHeight: '1.5',
+      transition: 'opacity 0.3s', maxWidth: '340px', lineHeight: '1.5',
       pointerEvents: 'none',
     });
     document.body.appendChild(el);
   }
   // 清空旧内容
   el.innerHTML = '';
+  el.style.pointerEvents = 'auto';
+
+  // 第一行：消息 + 关闭按钮
+  const row1 = document.createElement('div');
+  Object.assign(row1.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' });
+
   const msgSpan = document.createElement('span');
   msgSpan.textContent = msg;
-  el.appendChild(msgSpan);
+  msgSpan.style.flex = '1';
+  row1.appendChild(msgSpan);
 
+  // 关闭按钮（×）
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '×';
+  Object.assign(closeBtn.style, {
+    marginLeft: '4px', padding: '0 4px', fontSize: '16px', cursor: 'pointer',
+    border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit',
+    lineHeight: '1', flexShrink: '0',
+  });
+  const dismiss = () => {
+    clearTimeout(_notifTimer);
+    el.style.opacity = '0';
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+  };
+  closeBtn.addEventListener('click', dismiss);
+  row1.appendChild(closeBtn);
+  el.appendChild(row1);
+
+  // 第二行：action 按钮（如果有）
   if (action) {
-    el.style.pointerEvents = 'auto';
+    const row2 = document.createElement('div');
+    row2.style.marginTop = '6px';
     const btn = document.createElement('button');
     btn.textContent = action.label;
     Object.assign(btn.style, {
-      marginLeft: '10px', padding: '2px 8px', fontSize: '12px', cursor: 'pointer',
+      padding: '3px 10px', fontSize: '12px', cursor: 'pointer',
       borderRadius: '4px', border: '1px solid currentColor', background: 'transparent',
       color: 'inherit', fontFamily: 'inherit',
     });
-    btn.addEventListener('click', () => { action.fn(); });
-    el.appendChild(btn);
-  } else {
-    el.style.pointerEvents = 'none';
+    btn.addEventListener('click', () => { action.fn(); dismiss(); });
+    row2.appendChild(btn);
+    el.appendChild(row2);
   }
 
   el.style.background = type === 'error' ? '#fee2e2' : '#dbeafe';
   el.style.color       = type === 'error' ? '#991b1b' : '#1e3a8a';
   el.style.opacity = '1';
   clearTimeout(_notifTimer);
-  _notifTimer = setTimeout(() => {
-    el.style.opacity = '0';
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
-  }, duration);
+  // 有 action 按钮时不自动消失，等用户点 × 或 action
+  if (!action) {
+    _notifTimer = setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+    }, duration);
+  }
 }
 
 function requestTranslation(text) {
