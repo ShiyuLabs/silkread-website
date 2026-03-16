@@ -524,10 +524,11 @@ async function translatePageNow() {
         if (consumed > 0) {
           const lazyNote = belowFoldNodes.length > 0 ? `，滚动加载更多` : '';
           const yuan = (consumed * 0.001).toFixed(4);
+          // 自动下载账单
+          _downloadTranslationReport(consumed, creditsAfter);
           showNotification(
-            `✅ 翻译完成｜消耗 ¥${yuan}${lazyNote}`,
-            'info', 8000,
-            { label: '📊 账单', fn: () => _showTranslationReport(consumed, creditsAfter) }
+            `✅ 翻译完成｜消耗 ¥${yuan}，账单已下载${lazyNote}`,
+            'info', 8000
           );
         } else if (apiCharCount === 0) {
           showNotification(`✅ 全部命中缓存，0 消耗`, 'info', 3000);
@@ -539,7 +540,7 @@ async function translatePageNow() {
   }
 }
 
-function _showTranslationReport(consumed, creditsAfter) {
+function _downloadTranslationReport(consumed, creditsAfter) {
   const rate = MODEL_CREDIT_RATES[currentManagedModel] || 8;
   const yuan = (consumed * 0.001).toFixed(4);
   const balanceYuan = (creditsAfter * 0.001).toFixed(4);
