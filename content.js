@@ -23,63 +23,84 @@ let observerCharCount = 0;       // Observer 累计增量翻译量
 // 增量翻译上限：初始量的 30%（防止无限滚动页面持续消耗）
 const OBSERVER_BUDGET_RATIO = 0.3;
 
-// ── IntersectionObserver 懒翻译：首屏以下内容滚入视口时才翻译 ──────────────────────
-let lazyObserver = null;
-const lazyObservedElements = new Set(); // 防止重复 observe
+// ── Scroll-based 懒翻译（替代 IntersectionObserver）────────────────────────────
+// IntersectionObserver 的问题：observe 几百个小元素时，rootMargin 会让它们页面加载时全部同时触发
+// 改用 scroll 监听 + 300ms 防抖，每次滚动只批量翻译刚进入视口的节点
+let _belowFoldNodes = [];       // 待翻译的视口以下文本节点
+let _lazyScrollTimer = null;
+let _lazyScrollAttached = false;
 
 function resetLazyObserver() {
-  if (lazyObserver) {
-    lazyObserver.disconnect();
-    lazyObserver = null;
+  _belowFoldNodes = [];
+  clearTimeout(_lazyScrollTimer);
+  if (_lazyScrollAttached) {
+    window.removeEventListener('scroll', _onLazyScroll);
+    _lazyScrollAttached = false;
   }
-  lazyObservedElements.clear();
 }
 
-function getLazyObserver() {
-  if (lazyObserver) return lazyObserver;
-  lazyObserver = new IntersectionObserver((entries) => {
-    const toTranslate = [];
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      lazyObserver.unobserve(entry.target);
-      lazyObservedElements.delete(entry.target);
-      // 用和主流程相同的过滤器重新提取该元素内的文本节点
-      const nodes = extractTextNodes(entry.target);
-      const translatedNodeSet = new Set(translatedElements.map(e => e.node));
-      for (const n of nodes) {
-        if (translatedNodeSet.has(n)) continue;
-        const text = n.nodeValue?.trim();
-        if (!text) continue;
-        if (translationMap[text]) {
-          translatedElements.push({ node: n, originalText: n.nodeValue, translatedText: translationMap[text] });
-          applyNodeTranslation(n, n.nodeValue, translationMap[text]);
-        } else {
-          toTranslate.push(n);
-        }
-      }
-    }
-    if (toTranslate.length > 0) {
-      console.log(`👁️ 滚入视口，翻译 ${toTranslate.length} 个节点...`);
-      isIncrementalTranslation = true;
-      translateNodes(toTranslate).then(() => {
-        isIncrementalTranslation = false;
-        applyDisplayMode();
-        saveTranslationCache();
-      });
+function _onLazyScroll() {
+  clearTimeout(_lazyScrollTimer);
+  _lazyScrollTimer = setTimeout(_translateNewlyVisible, 300);
+}
+
+function _translateNewlyVisible() {
+  if (!isAutoTranslateEnabled || !isContextValid() || isTranslating) return;
+  if (_belowFoldNodes.length === 0) return;
+
+  const viewportH = window.innerHeight;
+  const nowVisible = [];
+  const stillHidden = [];
+
+  for (const node of _belowFoldNodes) {
+    if (!node.parentNode) continue;
+    const rect = node.parentElement?.getBoundingClientRect();
+    if (rect && rect.top <= viewportH + 400) {
+      nowVisible.push(node);
     } else {
-      applyDisplayMode();
+      stillHidden.push(node);
     }
-  }, { rootMargin: '400px 0px', threshold: 0 });
-  return lazyObserver;
+  }
+  _belowFoldNodes = stillHidden;
+
+  if (_belowFoldNodes.length === 0 && _lazyScrollAttached) {
+    window.removeEventListener('scroll', _onLazyScroll);
+    _lazyScrollAttached = false;
+  }
+  if (nowVisible.length === 0) return;
+
+  // 缓存命中直接套用，未命中的走 API
+  const translatedNodeSet = new Set(translatedElements.map(e => e.node));
+  const toApi = [];
+  for (const n of nowVisible) {
+    if (translatedNodeSet.has(n)) continue;
+    const text = n.nodeValue?.trim();
+    if (!text) continue;
+    if (translationMap[text]) {
+      translatedElements.push({ node: n, originalText: n.nodeValue, translatedText: translationMap[text] });
+      applyNodeTranslation(n, n.nodeValue, translationMap[text]);
+    } else {
+      toApi.push(n);
+    }
+  }
+  applyDisplayMode();
+
+  if (toApi.length > 0) {
+    console.log(`📜 滚动加载 ${toApi.length} 个节点`);
+    isIncrementalTranslation = true;
+    translateNodes(toApi).then(() => {
+      isIncrementalTranslation = false;
+      applyDisplayMode();
+      saveTranslationCache();
+    });
+  }
 }
 
-function observeForLazyTranslation(elements) {
-  const obs = getLazyObserver();
-  for (const el of elements) {
-    if (!lazyObservedElements.has(el)) {
-      lazyObservedElements.add(el);
-      obs.observe(el);
-    }
+function registerBelowFoldNodes(nodes) {
+  _belowFoldNodes = nodes;
+  if (nodes.length > 0 && !_lazyScrollAttached) {
+    window.addEventListener('scroll', _onLazyScroll, { passive: true });
+    _lazyScrollAttached = true;
   }
 }
 
@@ -387,9 +408,9 @@ async function translatePageNow() {
   const cached = await loadTranslationCache();
   if (cached) Object.assign(translationMap, cached);
 
-  // 按视口位置分流：首屏内/附近 → 立即翻译；视口以下 → IntersectionObserver 懒翻译
+  // 按视口位置分流：首屏内/附近 → 立即翻译；视口以下 → scroll 懒翻译
   const inViewNodes = [];
-  const belowFoldParents = new Set();
+  const belowFoldNodes = [];
   const viewportH = window.innerHeight;
 
   pauseObserver();
@@ -402,30 +423,26 @@ async function translatePageNow() {
       applyNodeTranslation(node, node.nodeValue, translationMap[text]);
       continue;
     }
-    const el = node.parentElement;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      if (rect.top <= viewportH * 2) {
-        inViewNodes.push(node);   // 在视口内或近处，立即翻译
-      } else {
-        belowFoldParents.add(el); // 视口以下，滚到时再翻译
-      }
+    const rect = node.parentElement?.getBoundingClientRect();
+    if (rect && rect.top <= viewportH * 2) {
+      inViewNodes.push(node);    // 在视口内或近处，立即翻译
+    } else {
+      belowFoldNodes.push(node); // 视口以下，滚到时再翻译
     }
   }
   resumeObserver();
   applyDisplayMode(); // 缓存命中部分立即呈现
 
-  // 对折叠以下的父元素注册懒翻译（用户滚到时自动触发）
-  if (belowFoldParents.size > 0) {
-    observeForLazyTranslation(belowFoldParents);
-    console.log(`👁️ 折叠以下 ${belowFoldParents.size} 个元素注册懒翻译`);
+  // 注册 scroll 监听，用户滚动时按需翻译
+  if (belowFoldNodes.length > 0) {
+    registerBelowFoldNodes(belowFoldNodes);
+    console.log(`📜 折叠以下 ${belowFoldNodes.length} 个节点注册滚动懒翻译`);
   }
 
   const apiCharCount = inViewNodes.reduce((s, n) => s + (n.nodeValue?.trim().length || 0), 0);
-  // 初始翻译完成后记录字符量，作为 Observer 预算基准
   initialPageCharCount = apiCharCount + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
   observerCharCount = 0;
-  console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldParents.size} 个元素（懒加载）`);
+  console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldNodes.length} 个节点（滚动时翻译）`);
 
   if (inViewNodes.length > 0) {
     isIncrementalTranslation = false;
@@ -442,7 +459,7 @@ async function translatePageNow() {
       if (creditsBefore !== null && creditsAfter !== null) {
         const consumed = Math.max(0, creditsBefore - creditsAfter);
         if (consumed > 0) {
-          const lazyNote = belowFoldParents.size > 0 ? `，折叠以下滚动时自动翻译` : '';
+          const lazyNote = belowFoldNodes.length > 0 ? `，折叠以下滚动时自动翻译` : '';
           showNotification(
             `✅ 翻译完成｜首屏 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分${lazyNote}`,
             'info', 8000
@@ -482,20 +499,31 @@ async function translateNodes(textNodes) {
       }
       resumeObserver();
     } else {
-      // AI 翻译：并行发送，每个 chunk 完成就立即渲染（用户看到翻译逐步出现，感觉更快）
-      await Promise.allSettled(chunks.map((chunk, i) => {
-        const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
-        console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
-        return requestTranslation(combined)
-          .then(translated => {
+      // AI 翻译：最多 3 个并发（仿沉浸式翻译），避免同时发几十个请求被限速
+      // 每个 chunk 完成立即渲染，用户看到翻译逐块出现
+      const MAX_CONCURRENT = 3;
+      let qi = 0;
+      async function aiWorker() {
+        while (qi < chunks.length) {
+          const i = qi++;
+          const chunk = chunks[i];
+          const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
+          console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
+          try {
+            const translated = await requestTranslation(combined);
             pauseObserver();
             applyTranslationResults(chunk, translated);
             resumeObserver();
             applyDisplayMode();
             console.log(`✅ AI chunk ${i + 1} done`);
-          })
-          .catch(err => handleTranslationError(err));
-      }));
+          } catch(err) {
+            handleTranslationError(err);
+          }
+        }
+      }
+      await Promise.all(
+        Array.from({ length: Math.min(MAX_CONCURRENT, chunks.length) }, aiWorker)
+      );
     }
 
     saveTranslationCache();
