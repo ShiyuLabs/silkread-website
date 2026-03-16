@@ -2,6 +2,18 @@
 
 const CHUNK_SIZE = 4000;
 
+// 双语模式 DOM 注入：原文保留，译文作为独立块元素插在后面（仿沉浸式翻译）
+const _injectedTrMap = new WeakMap();
+
+// 注入全局样式（document_end 时 head 已存在）
+;(function() {
+  if (document.getElementById('__shiyu_style__')) return;
+  const s = document.createElement('style');
+  s.id = '__shiyu_style__';
+  s.textContent = '.shiyu-tr{display:block;color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;margin-top:2px;padding:0;border:none;background:none;}';
+  (document.head || document.documentElement).appendChild(s);
+})();
+
 let translationMap = {};
 let translatedElements = [];
 let currentDisplayMode = "bilingual";
@@ -337,17 +349,26 @@ function _cacheKey() {
   const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
   return `tc:${engine}:${currentTargetLang}:${location.hostname}${location.pathname}`;
 }
+// hostname 级缓存键：同站跨页共享（导航栏翻译在新页面直接复用，不重复消耗）
+function _hostCacheKey() {
+  const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
+  return `tc:${engine}:${currentTargetLang}:${location.hostname}`;
+}
 
 function saveTranslationCache() {
   if (Object.keys(translationMap).length === 0) return;
   const key = _cacheKey();
+  const hostKey = _hostCacheKey();
   const payload = JSON.stringify({ ts: Date.now(), map: translationMap });
-  // Layer 1: sessionStorage 同步写入，刷新立即生效
   try {
     sessionStorage.setItem(key, payload);
-    console.log('💾 Cache saved to sessionStorage, key:', key, 'entries:', Object.keys(translationMap).length);
+    // 同时更新 hostname 级缓存（合并，保留其他页面的词条）
+    const existing = sessionStorage.getItem(hostKey);
+    const hostMap = existing ? (JSON.parse(existing).map || {}) : {};
+    Object.assign(hostMap, translationMap);
+    sessionStorage.setItem(hostKey, JSON.stringify({ ts: Date.now(), map: hostMap }));
+    console.log('💾 Cache saved, entries:', Object.keys(translationMap).length);
   } catch(e) { console.warn('sessionStorage save failed:', e); }
-  // Layer 2: chrome.storage.local 持久化
   try {
     const obj = { ts: Date.now(), map: translationMap };
     chrome.storage.local.set({ [key]: obj }, () => {
@@ -358,18 +379,34 @@ function saveTranslationCache() {
 
 function loadTranslationCache() {
   const key = _cacheKey();
-  // Layer 1: 先同步读 sessionStorage（刷新场景，命中率 100%）
+  const hostKey = _hostCacheKey();
+
+  // 读 hostname 级缓存（跨页共享，导航翻译可直接复用）
+  let hostMap = null;
+  try {
+    const raw = sessionStorage.getItem(hostKey);
+    if (raw) { const e = JSON.parse(raw); if (e?.map) hostMap = e.map; }
+  } catch(_) {}
+
+  // 读页面级缓存
   try {
     const raw = sessionStorage.getItem(key);
     if (raw) {
       const entry = JSON.parse(raw);
-      if (entry && entry.map && Object.keys(entry.map).length > 0) {
+      if (entry?.map && Object.keys(entry.map).length > 0) {
         console.log('📦 Cache hit (sessionStorage)');
-        return Promise.resolve(entry.map);
+        return Promise.resolve(hostMap ? { ...hostMap, ...entry.map } : entry.map);
       }
     }
   } catch(_) {}
-  // Layer 2: 异步读 chrome.storage.local（新 tab / 新 session）
+
+  // 只有 hostname 级命中（新页面，同站导航有缓存）
+  if (hostMap && Object.keys(hostMap).length > 0) {
+    console.log('📦 Cache hit (hostname-level cross-page)');
+    return Promise.resolve(hostMap);
+  }
+
+  // Layer 2: 异步读 chrome.storage.local（新 session）
   return new Promise(resolve => {
     chrome.storage.local.get([key], result => {
       const entry = result[key];
@@ -445,11 +482,16 @@ async function translatePageNow() {
   console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldNodes.length} 个节点（滚动时翻译）`);
 
   if (inViewNodes.length > 0) {
+    showNotification('⏳ 翻译中...', 'info', 60000);
     isIncrementalTranslation = false;
     await translateNodes(inViewNodes);
   }
   console.log("🎉 Translation complete!");
   applyDisplayMode();
+
+  // 初始翻译完成后补扫一次：页面加载时 getBoundingClientRect 可能不准
+  // （图片/懒加载改变布局），把实际已可见的"折叠以下"节点立即翻译
+  setTimeout(_translateNewlyVisible, 150);
 
   // 翻译完成后显示消耗明细（AI 模式）
   if (currentEngine === 'ai') {
@@ -459,16 +501,18 @@ async function translatePageNow() {
       if (creditsBefore !== null && creditsAfter !== null) {
         const consumed = Math.max(0, creditsBefore - creditsAfter);
         if (consumed > 0) {
-          const lazyNote = belowFoldNodes.length > 0 ? `，折叠以下滚动时自动翻译` : '';
+          const lazyNote = belowFoldNodes.length > 0 ? `，滚动加载更多` : '';
           showNotification(
             `✅ 翻译完成｜首屏 ${apiCharCount.toLocaleString()} 字符，消耗 ${consumed} 积分，剩余 ${creditsAfter.toLocaleString()} 积分${lazyNote}`,
-            'info', 8000
+            'info', 6000
           );
         } else if (apiCharCount === 0) {
-          showNotification(`✅ 全部命中缓存，0 积分消耗`, 'info', 4000);
+          showNotification(`✅ 全部命中缓存，0 积分消耗`, 'info', 3000);
         }
       }
     } catch(_) {}
+  } else {
+    showNotification('✅ 翻译完成', 'info', 2500);
   }
 }
 
@@ -792,13 +836,27 @@ function applyTranslationResults(nodes, resultText) {
 }
 
 function applyNodeTranslation(node, originalText, translatedText) {
+  // 先清除上次注入的译文元素（模式切换 / 重新翻译时）
+  const prevTr = _injectedTrMap.get(node);
+  if (prevTr && prevTr.parentNode) prevTr.parentNode.removeChild(prevTr);
+  _injectedTrMap.delete(node);
+
   if (currentDisplayMode === 'original') {
     node.nodeValue = originalText;
   } else if (currentDisplayMode === 'translationOnly') {
     node.nodeValue = translatedText;
   } else {
-    // 双语模式：译文 + 原文
-    node.nodeValue = translatedText + ' \u300e' + originalText.trim() + '\u300f';
+    // 双语模式：原文保留，译文作为块级元素紧接在后（仿沉浸式翻译）
+    node.nodeValue = originalText;
+    if (node.parentNode) {
+      const tr = document.createElement('font');
+      tr.className = 'shiyu-tr';
+      tr.textContent = translatedText;
+      const next = node.nextSibling;
+      if (next) node.parentNode.insertBefore(tr, next);
+      else node.parentNode.appendChild(tr);
+      _injectedTrMap.set(node, tr);
+    }
   }
 }
 
@@ -813,13 +871,17 @@ function applyDisplayMode() {
 
 // ============ 清空翻译 ============
 function clearTranslations() {
-  resetLazyObserver(); // 清空懒翻译 observer，避免旧 observer 在重新翻译后仍触发
+  resetLazyObserver();
   pauseObserver();
   translatedElements.forEach(({ node, originalText }) => {
-    if (node && node.parentNode) {
-      node.nodeValue = originalText;
-    }
+    if (node && node.parentNode) node.nodeValue = originalText;
+    // 移除注入的译文元素
+    const tr = _injectedTrMap.get(node);
+    if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+    _injectedTrMap.delete(node);
   });
+  // 扫除所有残留（node 已脱离 DOM 但 font 还在的情况）
+  document.querySelectorAll('.shiyu-tr').forEach(el => el.remove());
   translatedElements = [];
   translationMap = {};
   observerTranslateCount.clear();
