@@ -246,11 +246,24 @@ async function handleAITranslation(text, sourceLang, targetLang, settings) {
     : handleManagedTranslation(text, sourceLang, targetLang, settings);
 }
 
+// 旧模型 key 迁移映射（与 popup.js 保持一致）
+const MANAGED_MODEL_MIGRATION = {
+  'deepseek-chat':    'deepseek-v3.2',
+  'gemini-2.5-flash': 'gemini-2.5-flash-nothinking',
+  'gpt-5-mini':       'deepseek-v3.2',
+};
+
 // ===== 托管版翻译（通过代理服务器，按 token 计费，自动赚取差价）=====
 async function handleManagedTranslation(text, sourceLang, targetLang, settings) {
   const token = await getAuthToken();
   if (!token) throw new Error('LOGGED_OUT');
-  const modelKey = settings.managedModel || 'deepseek';
+  let modelKey = settings.managedModel || 'deepseek-v3.2';
+  // 旧 key 自动迁移，并持久化到 storage 避免下次再走这里
+  if (MANAGED_MODEL_MIGRATION[modelKey]) {
+    modelKey = MANAGED_MODEL_MIGRATION[modelKey];
+    chrome.storage.sync.set({ managedModel: modelKey });
+    _cachedSettings.managedModel = modelKey;
+  }
 
   const resp = await fetch(`${PROXY_URL}/api/translate`, {
     method:  'POST',

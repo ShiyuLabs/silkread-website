@@ -4,8 +4,10 @@ const CHUNK_SIZE = 4000;
 
 // 模型费率（积分/1K Token），用于将积分差值换算成 Token 显示
 const MODEL_CREDIT_RATES = {
-  'deepseek-chat': 8, 'qwen3-235b-a22b': 18, 'gemini-2.5-flash': 25,
-  'gpt-5-mini': 80, 'claude-sonnet-4-6': 179,
+  'deepseek-v3.2': 8, 'qwen3-235b-a22b': 18, 'gemini-2.5-flash-nothinking': 25,
+  'claude-sonnet-4-6': 250,
+  // 旧 key 兼容（老用户 storage 迁移前的过渡期）
+  'deepseek-chat': 8, 'gemini-2.5-flash': 25, 'gpt-5-mini': 80,
 };
 function _creditsToTokenStr(credits) {
   const rate = MODEL_CREDIT_RATES[currentManagedModel] || 8;
