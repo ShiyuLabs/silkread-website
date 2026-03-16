@@ -88,6 +88,10 @@ let _belowFoldNodes = [];       // 待翻译的视口以下文本节点
 let _lazyScrollTimer = null;
 let _lazyScrollAttached = false;
 
+// 账单版本 defer—等到所有懒加载翻译都完成后再下载
+let _billDebounceTimer = null;  // 最后一批翻译完成后的抖樠定时器
+let _billCreditsBefore = null;  // translatePageNow 开头时记播的余额
+
 function resetLazyObserver() {
   _belowFoldNodes = [];
   clearTimeout(_lazyScrollTimer);
@@ -150,7 +154,12 @@ function _translateNewlyVisible() {
       isIncrementalTranslation = false;
       applyDisplayMode();
       saveTranslationCache();
+      // 每批懒加载翻译完成后都重排账单 debounce
+      _scheduleBill();
     });
+  } else {
+    // 全部命中缓存，也触发一次
+    _scheduleBill();
   }
 }
 
@@ -729,18 +738,29 @@ async function translatePageNow() {
   if (currentEngine === 'ai') {
     try {
       const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
-      const creditsAfter = s.cachedCredits !== undefined ? s.cachedCredits : null;
-      if (creditsBefore !== null && creditsAfter !== null) {
-        const consumed = Math.max(0, creditsBefore - creditsAfter);
+      const creditsAfterFirst = s.cachedCredits !== undefined ? s.cachedCredits : null;
+      if (creditsBefore !== null && creditsAfterFirst !== null) {
+        const consumed = Math.max(0, creditsBefore - creditsAfterFirst);
+        const lazyNote = belowFoldNodes.length > 0 ? '，滚动继续加载' : '';
+        const yuan = (consumed * 0.001).toFixed(4);
         if (consumed > 0) {
-          const lazyNote = belowFoldNodes.length > 0 ? `，滚动加载更多` : '';
-          const yuan = (consumed * 0.001).toFixed(4);
-          // 自动下载账单
-          _downloadTranslationReport(consumed, creditsAfter);
-          showNotification(
-            `✅ 翻译完成｜消耗 ¥${yuan}，账单已下载${lazyNote}`,
-            'info', 8000
-          );
+          // 记录初始余额，最终账单由 _flushBill 在懒加载全部完成后下载
+          _billCreditsBefore = creditsBefore;
+          if (belowFoldNodes.length === 0) {
+            // 没有懒加载节点，直接下载
+            _downloadTranslationReport(consumed, creditsAfterFirst);
+            showNotification(`✅ 翻译完成｜消耗 ¥${yuan}，账单已下载`, 'info', 8000);
+            _billCreditsBefore = null;
+          } else {
+            // 有懒加载，展示首屏消耗，最终账单等全部加载完
+            showNotification(`✅ 首屏已翻译｜消耗 ¥${yuan}${lazyNote}，账单待全部加载完后下载`, 'info', 8000);
+            // 如果用户不滚动，5s 后多放一条提示
+            setTimeout(() => {
+              if (_belowFoldNodes.length > 0) {
+                showNotification('📜 下方还有内容待翻译，向下滚动继续', 'info', 4000);
+              }
+            }, 5000);
+          }
         } else if (apiCharCount === 0) {
           showNotification(`✅ 全部命中缓存，0 消耗`, 'info', 3000);
         }
@@ -749,6 +769,30 @@ async function translatePageNow() {
   } else {
     showNotification('✅ 翻译完成', 'info', 2500);
   }
+}
+
+// 账单 debounce—最后一批翻译 3s 后左右没有新翻译再下载
+function _scheduleBill() {
+  if (currentEngine !== 'ai') return;
+  clearTimeout(_billDebounceTimer);
+  _billDebounceTimer = setTimeout(_flushBill, 3000);
+}
+
+async function _flushBill() {
+  if (currentEngine !== 'ai') return;
+  if (_billCreditsBefore === null) return;
+  try {
+    const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
+    const creditsAfter = s.cachedCredits !== undefined ? s.cachedCredits : null;
+    if (creditsAfter === null) return;
+    const consumed = Math.max(0, _billCreditsBefore - creditsAfter);
+    if (consumed > 0) {
+      _downloadTranslationReport(consumed, creditsAfter);
+      const yuan = (consumed * 0.001).toFixed(4);
+      showNotification(`📄 第终账单已下载（共消耗 ¥${yuan}）`, 'info', 6000);
+    }
+  } catch(_) {}
+  _billCreditsBefore = null; // 重置，防止重复下载
 }
 
 function _downloadTranslationReport(consumed, creditsAfter) {
