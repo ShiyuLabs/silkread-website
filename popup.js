@@ -183,7 +183,7 @@ function updateBalanceUI(credits) {
     return;
   }
   // 显示人民币余额（1积分 = ¥0.001，与模型无关）
-  const yuan = (credits * 0.001).toFixed(3);
+  const yuan = (credits * 0.001).toFixed(4);
   balanceText.textContent = `余额：¥${yuan}`;
   balanceText.style.color = '#10b981';
 }
