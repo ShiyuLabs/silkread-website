@@ -19,16 +19,39 @@ function _creditsToTokenStr(credits) {
 
 // 双语模式 DOM 注入：原文保留，译文作为独立块元素插在后面（仿沉浸式翻译）
 const _injectedTrMap = new WeakMap();
+// 每个文本节点对应的加载转圈元素
+const _loadingMap = new WeakMap();
 
 // 本页翻译统计（AI 模式）
 let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 };
+
+function _showChunkLoading(chunk) {
+  if (currentDisplayMode === 'original') return;
+  chunk.forEach(node => {
+    if (!node.parentNode || _loadingMap.has(node)) return;
+    const sp = document.createElement('font');
+    sp.className = 'shiyu-loading';
+    const next = node.nextSibling;
+    if (next) node.parentNode.insertBefore(sp, next);
+    else node.parentNode.appendChild(sp);
+    _loadingMap.set(node, sp);
+  });
+}
+
+function _hideChunkLoading(chunk) {
+  chunk.forEach(node => {
+    const sp = _loadingMap.get(node);
+    if (sp && sp.parentNode) sp.parentNode.removeChild(sp);
+    _loadingMap.delete(node);
+  });
+}
 
 // 注入全局样式（document_end 时 head 已存在）
 ;(function() {
   if (document.getElementById('__shiyu_style__')) return;
   const s = document.createElement('style');
   s.id = '__shiyu_style__';
-  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}';  
+  s.textContent = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}';
   (document.head || document.documentElement).appendChild(s);
 })();
 
@@ -75,7 +98,7 @@ function _onLazyScroll() {
 }
 
 function _translateNewlyVisible() {
-  if (!isAutoTranslateEnabled || !isContextValid() || isTranslating) return;
+  if (!isContextValid() || isTranslating) return;
   if (_belowFoldNodes.length === 0) return;
 
   const viewportH = window.innerHeight;
@@ -565,15 +588,9 @@ function _downloadTranslationReport(consumed, creditsAfter) {
     '* 以上为向您收取的费用，实际API成本请查阅上游服务商账单',
   ];
   const content = lines.join('\n');
-  // content script 无法用 createObjectURL 触发下载，改用 data: URI
-  const dataUri = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
-  const a = document.createElement('a');
-  a.href = dataUri;
-  a.download = `\u8bd7\u8bed\u8d26\u5355-${new Date().toISOString().slice(0,10)}.txt`;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => a.remove(), 500);
+  // content script 无法直接触发下载，通过 background.js 的 chrome.downloads API
+  const filename = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;
+  chrome.runtime.sendMessage({ action: 'downloadReport', content, filename });
 }
 
 // isIncrementalTranslation: 区分初始全页翻译 vs Observer 增量翻译
@@ -588,11 +605,13 @@ async function translateNodes(textNodes) {
     console.log("📦 Created chunks:", chunks.length);
 
     if (isFree) {
-      // 免费翻译：并行全部发送，全部完成后一次性渲染
+      // 免费翻译：并行全部发送，先显示转圈，全部完成后渲染
+      textNodes.forEach(n => _showChunkLoading([n]));
       const settled = await Promise.allSettled(chunks.map((chunk, i) => {
         const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
         return requestTranslation(combined).then(translated => ({ chunk, translated }));
       }));
+      textNodes.forEach(n => _hideChunkLoading([n]));
       pauseObserver();
       for (const result of settled) {
         if (result.status === 'fulfilled') {
@@ -613,6 +632,7 @@ async function translateNodes(textNodes) {
           const chunk = chunks[i];
           const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
           console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
+          _showChunkLoading(chunk);
           try {
             const result = await requestTranslation(combined);
             // result 可能是字符串（旧路径）或带统计的对象
@@ -623,12 +643,14 @@ async function translateNodes(textNodes) {
               _pageStats.totalTokens  += result.totalTokens  || 0;
               _pageStats.cost         += result.cost         || 0;
             }
+            _hideChunkLoading(chunk);
             pauseObserver();
             applyTranslationResults(chunk, translatedText);
             resumeObserver();
             applyDisplayMode();
             console.log(`✅ AI chunk ${i + 1} done`);
           } catch(err) {
+            _hideChunkLoading(chunk);
             handleTranslationError(err);
           }
         }

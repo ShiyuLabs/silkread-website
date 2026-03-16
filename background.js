@@ -98,6 +98,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  // 下载账单文件
+  if (request.action === 'downloadReport') {
+    const dataUrl = 'data:text/plain;charset=utf-8,' + encodeURIComponent(request.content);
+    chrome.downloads.download({ url: dataUrl, filename: request.filename, saveAs: false });
+    sendResponse({ ok: true });
+    return false;
+  }
+
   // 查询余额
   if (request.action === 'getBalance') {
     getAuthToken().then(token => {
