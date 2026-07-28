@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Log in to SilkRead to manage pay-as-you-go AI translation tokens.">
+  <title>Log In - SilkRead</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .input-field {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 11px 14px;
+      border: 1px solid #dbe3ee;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      background: white;
+      color: #0f172a;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .input-field:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+    .input-field.is-error { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .1); }
+    .input-field.has-icon { padding-right: 44px; }
+    .input-wrap { position: relative; }
+    .eye-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      padding: 6px;
+    }
+    .msg-box { border-radius: 8px; padding: 12px 14px; font-size: 14px; font-weight: 600; text-align: center; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/favicon.png" alt="SilkRead logo" class="h-9 w-9 rounded-lg">
+        <span class="text-xl font-bold text-slate-950">SilkRead</span>
+      </a>
+      <a href="/register.html" class="text-sm font-semibold text-blue-700 hover:text-blue-900">Create account</a>
+    </div>
+  </header>
+
+  <main class="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-10">
+    <section class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
+      <div class="mb-7 text-center">
+        <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Log in to SilkRead</h1>
+        <p class="mt-2 text-sm leading-6 text-slate-500">Manage your AI translation tokens and connect the browser extension.</p>
+      </div>
+
+      <div class="space-y-4">
+        <input id="inp-username" type="text" class="input-field" placeholder="Username" autocomplete="username" autocorrect="off" autocapitalize="none" autofocus>
+
+        <div class="input-wrap">
+          <input id="inp-password" type="password" class="input-field has-icon" placeholder="Password" autocomplete="current-password">
+          <button type="button" class="eye-btn" id="toggle-pw" tabindex="-1" aria-label="Toggle password visibility">
+            <svg id="eye-show" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            <svg id="eye-hide" class="hidden h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587A2 2 0 0012 14a2 2 0 001.414-.586M9.88 4.24A10.68 10.68 0 0112 4c4.478 0 8.268 2.943 9.542 7a10.53 10.53 0 01-2.322 3.592M6.228 6.228A10.576 10.576 0 002.458 12C3.732 16.057 7.523 19 12 19a10.68 10.68 0 003.772-.692"/>
+            </svg>
+          </button>
+        </div>
+
+        <div id="msg-box" class="hidden"></div>
+
+        <div id="lockout-panel" class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-center">
+          <p class="mb-2 text-sm font-semibold text-red-700">Too many failed attempts. Try again in <span id="lockout-sec">30</span> seconds.</p>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-red-100">
+            <div id="lockout-bar" class="h-full rounded-full bg-red-400" style="width:100%"></div>
+          </div>
+        </div>
+
+        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Log in</button>
+      </div>
+
+      <p class="mt-5 text-center text-sm text-slate-500">No account yet? <a href="/register.html" class="font-semibold text-blue-700 hover:underline">Create one</a></p>
+      <div class="mt-6 flex justify-center gap-5 border-t border-slate-200 pt-5 text-xs font-semibold text-slate-500">
+        <a href="/terms.html" class="hover:text-blue-700">Terms</a>
+        <a href="/privacy.html" class="hover:text-blue-700">Privacy</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const inpUsername = document.getElementById("inp-username");
+    const inpPassword = document.getElementById("inp-password");
+    const btnLogin = document.getElementById("btn-login");
+    const msgBox = document.getElementById("msg-box");
+    const lockoutPanel = document.getElementById("lockout-panel");
+    const lockoutSec = document.getElementById("lockout-sec");
+    const lockoutBar = document.getElementById("lockout-bar");
+    const fromExtension = new URLSearchParams(window.location.search).get("from") === "extension";
+
+    const LOCKOUT_KEY = "shiyu_login_failures";
+    const LOCKOUT_TIME_KEY = "shiyu_login_lockout_until";
+    const MAX_FAILURES = 5;
+    const LOCKOUT_SECS = 30;
+
+    function getFailures() { return parseInt(localStorage.getItem(LOCKOUT_KEY) || "0", 10); }
+    function getLockoutUntil() { return parseInt(localStorage.getItem(LOCKOUT_TIME_KEY) || "0", 10); }
+    function setFailures(n) { localStorage.setItem(LOCKOUT_KEY, n); }
+    function clearFailures() {
+      localStorage.removeItem(LOCKOUT_KEY);
+      localStorage.removeItem(LOCKOUT_TIME_KEY);
+    }
+
+    function showMsg(text, ok) {
+      msgBox.textContent = text;
+      msgBox.className = "msg-box " + (ok
+        ? "bg-green-50 text-green-700 border border-green-200"
+        : "bg-red-50 text-red-700 border border-red-200");
+      msgBox.classList.remove("hidden");
+    }
+
+    function startLockoutUI(remainSecs) {
+      btnLogin.disabled = true;
+      lockoutPanel.classList.remove("hidden");
+      msgBox.classList.add("hidden");
+
+      let seconds = remainSecs;
+      lockoutSec.textContent = seconds;
+      lockoutBar.style.transition = "none";
+      lockoutBar.style.width = (seconds / LOCKOUT_SECS * 100) + "%";
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          lockoutBar.style.transition = "width " + seconds + "s linear";
+          lockoutBar.style.width = "0%";
+        });
+      });
+
+      const timer = setInterval(() => {
+        seconds -= 1;
+        lockoutSec.textContent = seconds;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          lockoutPanel.classList.add("hidden");
+          btnLogin.disabled = false;
+          clearFailures();
+        }
+      }, 1000);
+    }
+
+    if (fromExtension) {
+      btnLogin.disabled = true;
+      btnLogin.textContent = "Preparing...";
+      fetch("/api/user/logout", { credentials: "include" })
+        .catch(() => {})
+        .finally(() => {
+          localStorage.removeItem("user");
+          localStorage.removeItem("api_token");
+          btnLogin.disabled = false;
+          btnLogin.textContent = "Log in";
+        });
+    }
+
+    (function checkOnLoad() {
+      const until = getLockoutUntil();
+      if (until && Date.now() < until) {
+        startLockoutUI(Math.ceil((until - Date.now()) / 1000));
+      }
+    })();
+
+    document.getElementById("toggle-pw").addEventListener("click", () => {
+      const isPassword = inpPassword.type === "password";
+      inpPassword.type = isPassword ? "text" : "password";
+      document.getElementById("eye-show").classList.toggle("hidden", isPassword);
+      document.getElementById("eye-hide").classList.toggle("hidden", !isPassword);
+    });
+
+    async function doLogin() {
+      if (btnLogin.disabled) return;
+
+      const username = inpUsername.value.trim();
+      const password = inpPassword.value;
+
+      if (!username) { showMsg("Enter your username.", false); inpUsername.focus(); return; }
+      if (!password) { showMsg("Enter your password.", false); inpPassword.focus(); return; }
+
+      const until = getLockoutUntil();
+      if (until && Date.now() < until) return;
+
+      btnLogin.disabled = true;
+      btnLogin.textContent = "Logging in...";
+      msgBox.classList.add("hidden");
+
+      try {
+        const resp = await fetch("/api/user/login", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await resp.json();
+
+        if (data.success === true) {
+          clearFailures();
+          localStorage.setItem("user", JSON.stringify(data.data));
+
+          if (fromExtension) {
+            showMsg("Login successful. Connecting your extension...", true);
+            let freshUsername = data.data?.username || data.data?.display_name || "User";
+            let freshQuota = data.data?.quota ?? 0;
+
+            try {
+              const selfResp = await fetch("/api/user/self", { credentials: "include" });
+              const selfData = await selfResp.json();
+              if (selfData.success && selfData.data) {
+                freshUsername = selfData.data.username || selfData.data.display_name || freshUsername;
+                freshQuota = selfData.data.quota ?? freshQuota;
+              }
+            } catch (_) {}
+
+            try {
+              const tokenRes = await fetch("/api/token/", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: "SilkRead extension",
+                  remain_quota: 0,
+                  expired_time: -1,
+                  unlimited_quota: true,
+                }),
+              });
+              const tokenData = await tokenRes.json();
+              if (tokenData.success && tokenData.data?.key) {
+                const p = new URLSearchParams({
+                  token: tokenData.data.key,
+                  username: freshUsername,
+                  quota: String(freshQuota),
+                });
+                window.location.href = "/callback?" + p.toString();
+                return;
+              }
+              showMsg(tokenData.message || "Could not create extension token.", false);
+            } catch (err) {
+              showMsg("Could not connect the extension token. Please try again.", false);
+            }
+
+            btnLogin.disabled = false;
+            btnLogin.textContent = "Log in";
+          } else {
+            showMsg("Login successful. Redirecting...", true);
+            setTimeout(() => { window.location.href = "/dashboard.html"; }, 500);
+          }
+          return;
+        }
+
+        const failures = getFailures() + 1;
+        setFailures(failures);
+        const remaining = MAX_FAILURES - failures;
+
+        if (failures >= MAX_FAILURES) {
+          const lockUntil = Date.now() + LOCKOUT_SECS * 1000;
+          localStorage.setItem(LOCKOUT_TIME_KEY, String(lockUntil));
+          startLockoutUI(LOCKOUT_SECS);
+          showMsg("Too many failed attempts. Locked for " + LOCKOUT_SECS + " seconds.", false);
+        } else {
+          showMsg((data.message || "Incorrect username or password.") + " Attempts remaining: " + remaining + ".", false);
+          inpPassword.classList.add("is-error");
+          setTimeout(() => inpPassword.classList.remove("is-error"), 1500);
+          btnLogin.disabled = false;
+          btnLogin.textContent = "Log in";
+        }
+      } catch (_) {
+        showMsg("Network error. Please check your connection and try again.", false);
+        btnLogin.disabled = false;
+        btnLogin.textContent = "Log in";
+      }
+    }
+
+    btnLogin.addEventListener("click", doLogin);
+    inpPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    inpUsername.addEventListener("keydown", (e) => { if (e.key === "Enter") inpPassword.focus(); });
+    inpPassword.addEventListener("input", () => inpPassword.classList.remove("is-error"));
+  </script>
+</body>
+</html>

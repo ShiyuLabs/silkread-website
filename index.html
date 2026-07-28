@@ -1,688 +1,312 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>诗语翻译 - AI 沉浸式翻译插件，支持 DeepSeek / Claude / GPT</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <script src="https://cdn.tailwindcss.com">        // 和插件通信，实现账号跨端恢复
-        window.addEventListener("message", (event) => {
-            if (event.source !== window || !event.data || event.data.type !== 'UPDATE_EXTENSION_UID') return;
-            // 通过扩展程序的 background 去修改真正的 chrome.storage
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                chrome.runtime.sendMessage({ action: 'forceUpdateUserId', newUserId: event.data.newUid });
-            }
-        });
-    </script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; scroll-behavior: smooth; }
-        .blur-sm { backdrop-filter: blur(4px); }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SilkRead is a browser extension for real-time AI webpage translation with pay-as-you-go translation tokens and no subscriptions.">
+  <title>SilkRead - AI Webpage Translation Extension</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.addEventListener("message", (event) => {
+      if (event.source !== window || !event.data || event.data.type !== "UPDATE_EXTENSION_UID") return;
+      if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ action: "forceUpdateUserId", newUserId: event.data.newUid });
+      }
+    });
+  </script>
+  <style>
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      scroll-behavior: smooth;
+    }
+    .pricing-card {
+      border: 1px solid #dbe3ee;
+      border-radius: 8px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+    }
+    .pricing-card:hover {
+      transform: translateY(-3px);
+      border-color: #2563eb;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, .08);
+    }
+    .hero-grid {
+      background-image:
+        linear-gradient(rgba(15, 23, 42, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, .06) 1px, transparent 1px);
+      background-size: 34px 34px;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-800 antialiased font-sans">
-    <!-- 导航栏 -->
-    <nav class="bg-white shadow fixed w-full top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <!-- 品牌和 logo -->
-                <div class="flex items-center gap-2">
-                    <img src="/favicon.png" alt="诗语翻译" class="w-8 h-8 rounded-lg">
-                    <span class="text-xl font-bold text-blue-600 tracking-tight">诗语翻译</span>
-                </div>
-                <!-- 导航链接与用户状态 -->
-                <div class="flex items-center">
-                    <div class="hidden md:flex space-x-6 text-sm font-medium text-gray-600">
-                        <a href="#hero" class="hover:text-blue-600 transition-colors">功能介绍</a>
-                        <a href="#pricing" class="hover:text-blue-600 transition-colors">套餐定价</a>
-                        <a href="#contact" class="hover:text-blue-600 transition-colors">联系我们</a>
-                    </div>
-                    
-                    <!-- 用户状态区域 -->
-                    <div class="flex items-center ml-8 md:pl-8 md:border-l border-gray-200">
-                        <!-- 未登录状态 -->
-                        <button id="btn-login-show" class="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-full shadow-sm transition transform hover:-translate-y-0.5">登录 / 注册</button>
-                        
-                        <!-- 已登录状态 -->
-                        <div id="user-info" class="hidden items-center space-x-4">
-                            <span id="nav-user-id" class="text-sm font-medium text-gray-700 truncate max-w-[120px]" title="用户ID"></span>
-                            <span id="nav-user-balance" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full shadow-inner">已连接插件</span>
-                            <button id="btn-logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors">退出</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
+<body class="bg-slate-50 text-slate-900 antialiased">
+  <nav class="fixed top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <a href="/" class="flex items-center gap-3" aria-label="SilkRead home">
+        <img src="/favicon.png" alt="SilkRead logo" class="h-9 w-9 rounded-lg">
+        <span class="text-xl font-bold tracking-tight text-slate-950">SilkRead</span>
+      </a>
+      <div class="hidden items-center gap-7 text-sm font-semibold text-slate-600 md:flex">
+        <a href="#features" class="hover:text-blue-700">Features</a>
+        <a href="#pricing" class="hover:text-blue-700">Pricing</a>
+        <a href="#privacy" class="hover:text-blue-700">Privacy</a>
+        <a href="#contact" class="hover:text-blue-700">Contact</a>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/login.html" id="btn-login-show" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-blue-600 hover:text-blue-700">Log in</a>
+        <a href="#pricing" class="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-800">Buy tokens</a>
+      </div>
+    </div>
+  </nav>
 
-    <!-- 首屏区域 (Hero Section) -->
-    <main id="hero" class="pt-28 pb-6 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight mb-4">
-            读懂全球，<span class="text-blue-600">一键沉浸翻译</span>
-        </h1>
-        <p class="text-xl sm:text-2xl font-semibold text-gray-400 mb-4">用 AI 大模型，告别机器腔</p>
-        <div class="flex flex-wrap justify-center gap-3 mb-10">
-            <span class="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-50 text-purple-700 rounded-full text-base font-semibold border border-purple-100">
-                ⭐ 精选 5 款模型，专为网页翻译深度调优
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-base font-semibold border border-blue-100">
-                🎯 只专注网页翻译，不堆砌鸡肋功能
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 rounded-full text-base font-semibold border border-green-100">
-                💰 按量付费，Token 永不过期，不锁定订阅
-            </span>
-        </div>
-
-        <!-- 双浏览器安装按钮 -->
-        <div class="flex justify-center items-center gap-4 mb-5 flex-wrap">
-            <a id="btn-install-edge" href="/extension.zip?v=20260312-2" download="诗语翻译.zip"
-               class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold text-white shadow-lg transition transform hover:-translate-y-0.5"
-               style="background:#0078d4;">
-                <img src="/microsoft-edge-1.svg" class="w-5 h-5 flex-shrink-0" alt="Edge">
-                安装到 Edge
+  <main>
+    <section id="hero" class="hero-grid border-b border-slate-200 bg-white pt-28">
+      <div class="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:px-8">
+        <div>
+          <p class="mb-4 inline-flex rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-800">AI translation for Chrome and Edge</p>
+          <h1 class="max-w-3xl text-4xl font-extrabold leading-tight tracking-normal text-slate-950 sm:text-5xl lg:text-6xl">SilkRead</h1>
+          <p class="mt-5 max-w-2xl text-xl leading-8 text-slate-600 sm:text-2xl">Translate webpages in place with modern AI models, readable bilingual layout, and transparent pay-as-you-go tokens.</p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a id="btn-install-edge" href="/extension.zip?v=20260728-1" download="silkread-extension.zip" class="inline-flex items-center gap-2 rounded-md bg-[#0078d4] px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#006cbe]">
+              <img src="/microsoft-edge-1.svg" class="h-5 w-5" alt=""> Install for Edge
             </a>
-            <a id="btn-install-chrome" href="/extension.zip?v=20260312-2" download="诗语翻译.zip"
-               class="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full text-base font-semibold shadow-lg transition transform hover:-translate-y-0.5"
-               style="background:#fff;color:#202124;border:2px solid #e0e0e0;">
-                <img src="/chrome.svg" class="w-5 h-5 flex-shrink-0" alt="Chrome">
-                安装到 Chrome
+            <a id="btn-install-chrome" href="/extension.zip?v=20260728-1" download="silkread-extension.zip" class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-900 shadow-sm hover:border-blue-500 hover:text-blue-700">
+              <img src="/chrome.svg" class="h-5 w-5" alt=""> Install for Chrome
             </a>
+          </div>
+          <p class="mt-4 text-sm text-slate-500">No subscriptions. Token packs never renew automatically. Free browser translation remains available for basic use.</p>
         </div>
 
-        <!-- 平台图标行 -->
-        <div class="flex justify-center items-center gap-2 mb-4">
-            <span class="text-xs text-gray-400 mr-2">支持：</span>
-            <button onclick="document.getElementById('btn-install-edge').click()"
-                    class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-blue-50 transition cursor-pointer border-0 bg-transparent">
-                <img src="/microsoft-edge-1.svg" class="w-7 h-7" alt="Edge">
-                <span class="text-xs text-gray-500">Edge</span>
-            </button>
-            <button onclick="document.getElementById('btn-install-chrome').click()"
-                    class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl hover:bg-gray-100 transition cursor-pointer border-0 bg-transparent">
-                <img src="/chrome.svg" class="w-7 h-7" alt="Chrome">
-                <span class="text-xs text-gray-500">Chrome</span>
-            </button>
+        <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-xl">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div class="flex gap-1.5">
+              <span class="h-3 w-3 rounded-full bg-red-400"></span>
+              <span class="h-3 w-3 rounded-full bg-amber-400"></span>
+              <span class="h-3 w-3 rounded-full bg-emerald-400"></span>
+            </div>
+            <span class="text-xs font-semibold text-slate-400">getsilkread.com</span>
+          </div>
+          <div class="grid gap-4 pt-5 md:grid-cols-[1fr_.9fr]">
+            <article class="space-y-4">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wider text-blue-700">Original</p>
+                <p class="mt-2 text-sm leading-6 text-slate-600">When you read technical documentation, SilkRead keeps the original paragraph visible and inserts a clear translation next to it.</p>
+              </div>
+              <div class="rounded-md border border-blue-100 bg-blue-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-blue-800">Translation</p>
+                <p class="mt-2 text-sm leading-6 text-slate-700">AI translation appears directly inside the page, preserving context so you can read without switching tabs.</p>
+              </div>
+            </article>
+            <aside class="rounded-md bg-slate-950 p-4 text-white">
+              <p class="text-sm font-bold">Model</p>
+              <div class="mt-4 space-y-3 text-sm">
+                <div class="flex items-center justify-between"><span>DeepSeek</span><span class="text-emerald-300">$0.010 / 1K</span></div>
+                <div class="flex items-center justify-between"><span>GPT mini</span><span class="text-emerald-300">$0.030 / 1K</span></div>
+                <div class="flex items-center justify-between"><span>Claude</span><span class="text-emerald-300">$0.150 / 1K</span></div>
+              </div>
+              <div class="mt-6 rounded-md bg-white/10 p-3 text-xs leading-5 text-slate-200">Only selected webpage text is processed in real time for translation.</div>
+            </aside>
+          </div>
         </div>
-
-        <p class="text-xs text-gray-400">下载解压后 &rarr; 浏览器扩展页开启「开发者模式」&rarr; 加载已解压文件夹</p>
-    </main>
-
-    <script>
-    (function(){
-        var ua = navigator.userAgent;
-        var isEdge = /Edg\//.test(ua);
-        var isChrome = /Chrome\//.test(ua) && !/Edg\//.test(ua);
-        var btnEdge = document.getElementById('btn-install-edge');
-        var btnChrome = document.getElementById('btn-install-chrome');
-        if (isEdge) {
-            btnEdge.style.boxShadow = '0 0 0 3px rgba(0,120,212,0.3), 0 8px 24px rgba(0,120,212,0.35)';
-            btnEdge.innerHTML += '<span style="font-size:11px;background:rgba(255,255,255,0.22);border-radius:99px;padding:1px 7px;margin-left:4px;">当前浏览器</span>';
-        } else if (isChrome) {
-            btnChrome.style.borderColor = '#4285F4';
-            btnChrome.style.boxShadow = '0 0 0 3px rgba(66,133,244,0.2), 0 8px 24px rgba(66,133,244,0.15)';
-            btnChrome.innerHTML += '<span style="font-size:11px;background:#e8f0fe;color:#4285F4;border-radius:99px;padding:1px 7px;margin-left:4px;">当前浏览器</span>';
-        }
-    })();
-    </script>
-
-    <!-- 商业定价与套餐 -->
-    <section id="pricing" class="bg-white py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-100">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-extrabold text-gray-900">灵活充值，按量计费</h2>
-                <p class="mt-4 text-lg text-gray-500">精准扣费，用多少扣多少，Token <strong class="text-indigo-600">永不过期，可跨月累计</strong>，不浪费一分。</p>
-                <p class="mt-2 text-sm text-gray-400">供参考：日均翻译 20 篇文章使用 DeepSeek V3，¥50 套餐可用半年以上</p>
-            </div>
-            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl px-6 py-4 mb-10 flex flex-col sm:flex-row items-center justify-center gap-4 text-center">
-                <span class="text-3xl">🔒</span>
-                <div>
-                    <p class="font-bold text-indigo-800">充值 Token 永不过期 · 本月用不完自动累计到下月</p>
-                    <p class="text-xs text-indigo-500 mt-0.5">和订阅制产品每月清零不同，你充的每一个 Token 都是你的，永久有效，随用随取</p>
-                </div>
-                <div class="hidden sm:block w-px h-10 bg-indigo-200"></div>
-                <p class="text-base font-semibold text-green-700">🆓 谷歌通道永久免费，无需注册即可开用</p>
-            </div>
-            
-            <!-- 全模型说明横幅 -->
-            <div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-8 text-center text-sm text-amber-800 font-medium">
-                💡 精选 5 款调优模型：<strong>DeepSeek V3 / Qwen3-235B / Gemini 2.5 Flash / GPT-5 mini / Claude Sonnet 4.6</strong>。任意档位充值后均可自由切换，套餐只决定 Token 数量。
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                <!-- 入门包 ¥10 -->
-                <div class="border-2 border-gray-300 rounded-2xl shadow-lg p-8 bg-white relative flex flex-col">
-                    <div class="absolute top-0 inset-x-0 transform -translate-y-1/2 flex justify-center">
-                        <span class="inline-flex rounded-full bg-gray-500 px-4 py-1 text-xs font-bold tracking-wider text-white">入门 · 随买随用</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900">入门包</h3>
-                    <p class="mt-2 text-sm text-gray-500">随时可买，感受顶级 AI 翻译品质</p>
-                    <div class="my-6 flex items-baseline">
-                        <span class="text-4xl font-extrabold text-gray-900">￥10</span>
-                        <span class="ml-2 text-lg text-gray-500">/ 1,250,000 Token</span>
-                    </div>
-                    <ul class="mb-8 space-y-4 text-gray-600 flex-1">
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>⚡ DeepSeek V3 — <strong>1,250,000 Token</strong>（¥0.008/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>👑 Claude Sonnet 4.6 — <strong>56,000 Token</strong>（¥0.179/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>全部 5 款模型<strong>均可自由切换</strong>，按实际用量精准扣费</span>
-                        </li>
-                    </ul>
-                    <button class="btn-buy w-full py-3 px-4 bg-gray-700 text-white font-medium rounded-lg hover:bg-gray-800 shadow-md transition" data-price="10">立即充值</button>
-                </div>
-
-                <!-- 主力包 ¥50 推荐 -->
-                <div class="border-2 border-blue-600 rounded-2xl shadow-xl p-8 bg-white relative flex flex-col z-10">
-                    <div class="absolute top-0 inset-x-0 transform -translate-y-1/2 flex justify-center">
-                        <span class="inline-flex rounded-full bg-blue-600 px-4 py-1 text-xs font-bold uppercase tracking-wider text-white">推荐 · 最超值</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900">主力流量包</h3>
-                    <p class="mt-2 text-sm text-gray-500">最受欢迎，日常深度阅读首选</p>
-                    <div class="my-6 flex items-baseline">
-                        <span class="text-4xl font-extrabold text-gray-900">￥50</span>
-                        <span class="ml-2 text-lg text-gray-500">/ 6,875,000 Token</span>
-                    </div>
-                    <div class="mb-4">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">赠额外 625,000 Token · 相当于九折</span>
-                    </div>
-                    <ul class="mb-8 space-y-4 text-gray-600 flex-1">
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>⚡ DeepSeek V3 — <strong>6,875,000 Token</strong>（¥0.008/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>👑 Claude Sonnet 4.6 — <strong>307,000 Token</strong>（¥0.179/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>全部 5 款模型<strong>均可自由切换</strong>，按实际用量精准扣费</span>
-                        </li>
-                    </ul>
-                    <button class="btn-buy w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md transition" data-price="50">立即充值</button>
-                </div>
-
-                <!-- 旗舰包 ¥100 -->
-                <div class="border-2 border-purple-500 rounded-2xl shadow-xl p-8 bg-white relative flex flex-col z-10">
-                    <div class="absolute top-0 inset-x-0 transform -translate-y-1/2 flex justify-center">
-                        <span class="inline-flex rounded-full bg-purple-600 px-4 py-1 text-xs font-bold uppercase tracking-wider text-white">旗舰 · 重度首选</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900">旗舰流量包</h3>
-                    <p class="mt-2 text-sm text-gray-500">深度研究者、出海工作者专属</p>
-                    <div class="my-6 flex items-baseline">
-                        <span class="text-4xl font-extrabold text-gray-900">￥100</span>
-                        <span class="ml-2 text-lg text-gray-500">/ 15,000,000 Token</span>
-                    </div>
-                    <div class="mb-4">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800">赠额外 2,500,000 Token · 相当于八三折</span>
-                    </div>
-                    <ul class="mb-8 space-y-4 text-gray-600 flex-1">
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>⚡ DeepSeek V3 — <strong>15,000,000 Token</strong>（¥0.008/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>👑 Claude Sonnet 4.6 — <strong>670,000 Token</strong>（¥0.179/1K）</span>
-                        </li>
-                        <li class="flex items-start">
-                            <svg class="h-6 w-6 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            <span>全部 5 款模型<strong>均可自由切换</strong>，按实际用量精准扣费</span>
-                        </li>
-                    </ul>
-                    <button class="btn-buy w-full py-3 px-4 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 shadow-md transition" data-price="100">立即充值</button>
-                </div>
-
-            </div>
-        </div>
+      </div>
     </section>
 
-    <!-- 合规信息与联系页脚 (Footer) -->
-    <footer id="contact" class="bg-gray-900 text-gray-300 py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-                <span class="text-2xl font-bold text-white mb-4 block">诗语翻译</span>
-                <p class="text-gray-400 max-w-sm">我们致力于提供最流畅的智能外文阅读支持，随时随地打破语言壁垒。</p>
-            </div>
-            <div class="flex flex-col md:items-end space-y-2">
-                <p class="font-medium text-white mb-2">联系方式及支持</p>
-                <p>商务及售后 Email：<a href="mailto:lslczhq@126.com" class="text-blue-400 hover:text-blue-300 transition">lslczhq@126.com</a></p>
-                <div class="pt-1">
-                    <p class="mb-2">微信咨询（扫码添加）</p>
-                    <img src="/image.png" alt="微信咨询二维码" class="w-28 h-28 rounded-lg border border-gray-700 bg-white p-1 md:ml-auto" />
-                </div>
-                <div class="flex space-x-6 pt-4 mt-4 border-t border-gray-700 w-full md:w-auto">
-                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">用户协议</a>
-                    <a href="#" class="text-sm text-gray-400 hover:text-white underline decoration-gray-500 underline-offset-4">隐私政策</a>
-                </div>
-                <p class="text-xs text-gray-500 pt-6 mt-6 w-full md:text-right">&copy; 2026 诗语翻译团队. All rights reserved.</p>
-            </div>
+    <section id="features" class="bg-slate-50 py-16 px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-7xl py-16">
+        <div class="mb-10 max-w-2xl">
+          <h2 class="text-3xl font-extrabold tracking-normal text-slate-950">Built for serious web reading</h2>
+          <p class="mt-3 text-lg leading-8 text-slate-600">SilkRead is a browser extension for researchers, developers, students, and multilingual readers who need accurate page-level translation without clutter.</p>
         </div>
-    </footer>
-
-    <!-- ========== 登录弹窗 ========== -->
-    <div id="login-modal" style="display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);">
-        <div id="login-box" style="background:#fff;border-radius:16px;padding:28px 28px 24px;width:400px;max-width:92vw;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-            <button id="close-login" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:#9ca3af;font-size:18px;line-height:1;padding:4px;">&times;</button>
-
-            <!-- Tab 切换 -->
-            <div style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:22px;">
-                <button id="tab-login-btn" style="flex:1;padding:10px 0;font-size:15px;font-weight:700;color:#2563eb;background:none;border:none;border-bottom:2px solid #2563eb;margin-bottom:-2px;cursor:pointer;">登录</button>
-                <button id="tab-register-btn" style="flex:1;padding:10px 0;font-size:15px;font-weight:600;color:#9ca3af;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;">注册</button>
-            </div>
-
-            <!-- 登录面板 -->
-            <div id="panel-login">
-                <input id="lg-email" type="email" placeholder="邮箱地址"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
-                <input id="lg-password" type="password" placeholder="密码"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;">
-                <button id="btn-do-login"
-                    style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-                    登录
-                </button>
-            </div>
-
-            <!-- 注册面板 Step 1: 填写信息 -->
-            <div id="panel-register-1" style="display:none;">
-                <input id="reg-email" type="email" placeholder="邮箱地址"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
-                <input id="reg-password" type="password" placeholder="设置密码（至少6位）"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit;">
-                <input id="reg-password2" type="password" placeholder="确认密码"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;outline:none;margin-bottom:14px;font-family:inherit;">
-                <button id="btn-send-reg-code"
-                    style="width:100%;padding:12px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;">
-                    发送验证码到邮箱
-                </button>
-            </div>
-
-            <!-- 注册面板 Step 2: 输入验证码 -->
-            <div id="panel-register-2" style="display:none;">
-                <p style="text-align:center;font-size:13px;color:#6b7280;margin:0 0 16px;">验证码已发送至 <span id="reg-email-display" style="color:#2563eb;font-weight:600;"></span></p>
-                <input id="reg-code" type="text" inputmode="numeric" maxlength="6" placeholder="输入6位验证码"
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:22px;font-family:monospace;letter-spacing:0.4em;text-align:center;outline:none;margin-bottom:14px;">
-                <button id="btn-complete-register"
-                    style="width:100%;padding:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
-                    完成注册
-                </button>
-                <button id="btn-back-register"
-                    style="width:100%;padding:8px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;">
-                    ← 返回修改
-                </button>
-            </div>
-
-            <p id="login-msg" style="text-align:center;font-size:13px;font-weight:600;margin:14px 0 0;min-height:20px;"></p>
+        <div class="grid gap-5 md:grid-cols-3">
+          <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-bold text-slate-950">In-page translation</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Translate selected text or full webpage sections while keeping the source page readable.</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-bold text-slate-950">Multiple AI models</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Choose cost-effective or higher-accuracy models based on the page and your reading goals.</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-bold text-slate-950">No recurring billing</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Buy translation tokens only when you need them. Token packs do not create a subscription.</p>
+          </div>
         </div>
+      </div>
+    </section>
+
+    <section id="pricing" class="border-y border-slate-200 bg-white py-20 px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-7xl">
+        <div class="mx-auto mb-12 max-w-3xl text-center">
+          <h2 class="text-3xl font-extrabold tracking-normal text-slate-950 sm:text-4xl">Pay-as-you-go pricing</h2>
+          <p class="mt-4 text-lg leading-8 text-slate-600">SilkRead sells prepaid digital translation tokens. There are no subscriptions, renewal fees, setup fees, or hidden charges.</p>
+        </div>
+
+        <div class="grid gap-6 md:grid-cols-3">
+          <article class="pricing-card p-6">
+            <div class="mb-5">
+              <h3 class="text-xl font-extrabold text-slate-950">Starter</h3>
+              <p class="mt-1 text-sm text-slate-500">For occasional AI translation.</p>
+            </div>
+            <div class="mb-6">
+              <span class="text-5xl font-extrabold text-slate-950">$5</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
+            </div>
+            <p class="mb-6 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">50,000 translation tokens included</p>
+            <ul class="mb-8 flex-1 space-y-3 text-sm leading-6 text-slate-600">
+              <li>Works with all paid AI models</li>
+              <li>Use tokens across supported languages</li>
+              <li>No subscription or auto-renewal</li>
+            </ul>
+            <button class="btn-buy rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" data-pack="starter" data-price="5">Buy $5 token pack</button>
+          </article>
+
+          <article class="pricing-card border-blue-600 p-6 shadow-lg">
+            <div class="mb-5">
+              <div class="mb-3 inline-flex rounded-md bg-blue-700 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">Popular</div>
+              <h3 class="text-xl font-extrabold text-slate-950">Reader</h3>
+              <p class="mt-1 text-sm text-slate-500">For regular web reading.</p>
+            </div>
+            <div class="mb-6">
+              <span class="text-5xl font-extrabold text-blue-700">$10</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
+            </div>
+            <p class="mb-6 rounded-md bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">120,000 translation tokens included</p>
+            <ul class="mb-8 flex-1 space-y-3 text-sm leading-6 text-slate-600">
+              <li>Best for documents and articles</li>
+              <li>Includes bonus tokens versus Starter</li>
+              <li>No subscription or auto-renewal</li>
+            </ul>
+            <button class="btn-buy rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800" data-pack="reader" data-price="10">Buy $10 token pack</button>
+          </article>
+
+          <article class="pricing-card p-6">
+            <div class="mb-5">
+              <h3 class="text-xl font-extrabold text-slate-950">Pro</h3>
+              <p class="mt-1 text-sm text-slate-500">For heavy research sessions.</p>
+            </div>
+            <div class="mb-6">
+              <span class="text-5xl font-extrabold text-slate-950">$25</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
+            </div>
+            <p class="mb-6 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">350,000 translation tokens included</p>
+            <ul class="mb-8 flex-1 space-y-3 text-sm leading-6 text-slate-600">
+              <li>More tokens for long-form reading</li>
+              <li>Use premium models when accuracy matters</li>
+              <li>No subscription or auto-renewal</li>
+            </ul>
+            <button class="btn-buy rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" data-pack="pro" data-price="25">Buy $25 token pack</button>
+          </article>
+        </div>
+
+        <div class="mt-10 overflow-hidden rounded-lg border border-slate-200">
+          <table class="w-full bg-white text-left text-sm">
+            <thead class="bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="px-5 py-3">Translation engine</th>
+                <th class="px-5 py-3">Token rate</th>
+                <th class="hidden px-5 py-3 sm:table-cell">Best for</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 text-slate-600">
+              <tr>
+                <td class="px-5 py-4 font-bold text-emerald-700">Browser basic translation</td>
+                <td class="px-5 py-4 font-bold text-emerald-700">Free</td>
+                <td class="hidden px-5 py-4 sm:table-cell">Quick everyday translation</td>
+              </tr>
+              <tr>
+                <td class="px-5 py-4 font-bold">DeepSeek V3</td>
+                <td class="px-5 py-4">$0.010 / 1,000 tokens</td>
+                <td class="hidden px-5 py-4 sm:table-cell">Cost-effective AI translation</td>
+              </tr>
+              <tr>
+                <td class="px-5 py-4 font-bold">GPT Mini</td>
+                <td class="px-5 py-4">$0.030 / 1,000 tokens</td>
+                <td class="hidden px-5 py-4 sm:table-cell">Natural general-purpose output</td>
+              </tr>
+              <tr>
+                <td class="px-5 py-4 font-bold">Gemini Flash</td>
+                <td class="px-5 py-4">$0.060 / 1,000 tokens</td>
+                <td class="hidden px-5 py-4 sm:table-cell">Long-context pages and documents</td>
+              </tr>
+              <tr>
+                <td class="px-5 py-4 font-bold">Claude Sonnet</td>
+                <td class="px-5 py-4">$0.150 / 1,000 tokens</td>
+                <td class="hidden px-5 py-4 sm:table-cell">High-accuracy translation</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy" class="bg-slate-50 py-16 px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto grid max-w-7xl gap-8 py-16 lg:grid-cols-[.85fr_1.15fr]">
+        <div>
+          <h2 class="text-3xl font-extrabold tracking-normal text-slate-950">Privacy by design</h2>
+          <p class="mt-3 text-lg leading-8 text-slate-600">A translation extension must be clear about what it does with webpage content. SilkRead keeps the data flow narrow and purpose-based.</p>
+        </div>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-bold text-slate-950">No browsing history storage</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">We do not store your browsing history. We only process the text you choose to translate in real-time.</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-6">
+            <h3 class="text-lg font-bold text-slate-950">Purpose-limited processing</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Text is sent to the selected translation engine only to return the translation you requested.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contact" class="bg-slate-950 py-12 text-slate-300">
+    <div class="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 md:grid-cols-2 lg:px-8">
+      <div>
+        <div class="flex items-center gap-3">
+          <img src="/favicon.png" alt="SilkRead logo" class="h-9 w-9 rounded-lg">
+          <span class="text-2xl font-bold text-white">SilkRead</span>
+        </div>
+        <p class="mt-4 max-w-md text-sm leading-6 text-slate-400">AI-powered webpage translation extension for Chrome and Edge. Operated from getsilkread.com.</p>
+      </div>
+      <div class="space-y-3 md:text-right">
+        <p class="font-semibold text-white">Contact us: <a href="mailto:support@getsilkread.com" class="text-blue-300 hover:text-blue-200">support@getsilkread.com</a></p>
+        <p class="text-sm text-slate-400">Buyer support, billing questions, and refund requests are handled through this email address.</p>
+        <div class="flex flex-wrap gap-5 pt-3 text-sm md:justify-end">
+          <a href="/terms.html" class="text-slate-300 underline decoration-slate-500 underline-offset-4 hover:text-white">Terms of Service</a>
+          <a href="/privacy.html" class="text-slate-300 underline decoration-slate-500 underline-offset-4 hover:text-white">Privacy Policy</a>
+        </div>
+        <p class="pt-4 text-xs text-slate-500">&copy; 2026 SilkRead. All rights reserved.</p>
+      </div>
     </div>
+  </footer>
 
-    <!-- ========== 支付二维码弹窗 (Payment Modal) ========== -->
-    <div id="payment-modal" style="display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);">
-        <!-- 半透明遮罩层 -->
-        <div class="absolute inset-0 bg-black bg-opacity-60 blur-sm" id="payment-overlay"></div>
-        <!-- 弹窗内容 -->
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-[90%] max-w-sm relative z-10 text-center transform scale-95 transition-transform duration-300" id="payment-box">
-            <button id="close-payment" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-            <h3 class="text-xl font-bold text-gray-900 mb-1">微信扫码支付</h3>
-            <p class="text-sm text-gray-500 mb-2">订单安全支付，即时充值</p>
-            <p id="payment-amount" class="text-4xl font-extrabold text-blue-600 mb-6">￥0.00</p>
-            <!-- 真实二维码 -->
-            <div id="qrcode-wrap" class="w-48 h-48 mx-auto bg-gray-50 border-2 border-dashed border-blue-200 rounded-xl flex items-center justify-center mb-6 relative overflow-hidden transition">
-                <div id="qrcode-loading" class="text-center">
-                    <svg class="mx-auto h-10 w-10 text-blue-400 mb-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span class="text-blue-500 text-sm font-medium">二维码加载中...</span>
-                </div>
-                <img id="qrcode-img" src="/image.png" alt="微信支付二维码" class="hidden w-full h-full object-contain rounded-xl" />
-                <div id="qrcode-error" class="hidden text-center px-3">
-                    <span class="text-red-500 text-sm">加载失败，请重试</span>
-                </div>
-            </div>
-            <div class="bg-green-50 text-green-700 text-xs px-3 py-2 rounded-lg inline-flex items-center">
-                <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                请使用微信扫码，支付成功后自动到账
-            </div>
-        </div>
-    </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const store = {
+        get: (key) => { try { return localStorage.getItem(key); } catch (_) { return null; } },
+      };
 
-    <!-- 交互逻辑 JS -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const API = 'https://shiyuai.top';
-
-            // ===== localStorage 安全封装 =====
-            const store = {
-                get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
-                set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
-                del: (k) => { try { localStorage.removeItem(k); } catch {} },
-            };
-
-            // ===== 读取 URL 中的 token（从插件充值跳转过来）=====
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlToken = urlParams.get('token');
-            if (urlToken) {
-                store.set('authToken', urlToken);
-                try { window.history.replaceState({}, document.title, window.location.pathname); } catch {}
-            }
-
-            let authToken = store.get('authToken');
-            let authEmail = store.get('authEmail');
-            let isLoggedIn = !!(authToken && authEmail);
-
-            // ===== DOM refs =====
-            const btnLoginShow = document.getElementById('btn-login-show');
-            const userInfo     = document.getElementById('user-info');
-            const navUserId    = document.getElementById('nav-user-id');
-            const btnLogout    = document.getElementById('btn-logout');
-
-            const loginModal      = document.getElementById('login-modal');
-            const closeLoginBtn  = document.getElementById('close-login');
-            const loginMsg       = document.getElementById('login-msg');
-
-            const tabLoginBtn    = document.getElementById('tab-login-btn');
-            const tabRegBtn      = document.getElementById('tab-register-btn');
-            const panelLogin     = document.getElementById('panel-login');
-            const panelReg1      = document.getElementById('panel-register-1');
-            const panelReg2      = document.getElementById('panel-register-2');
-
-            const lgEmail        = document.getElementById('lg-email');
-            const lgPassword     = document.getElementById('lg-password');
-            const btnDoLogin     = document.getElementById('btn-do-login');
-
-            const regEmail       = document.getElementById('reg-email');
-            const regPassword    = document.getElementById('reg-password');
-            const regPassword2   = document.getElementById('reg-password2');
-            const regEmailDisp   = document.getElementById('reg-email-display');
-            const regCode        = document.getElementById('reg-code');
-            const btnSendRegCode = document.getElementById('btn-send-reg-code');
-            const btnCompleteReg = document.getElementById('btn-complete-register');
-            const btnBackReg     = document.getElementById('btn-back-register');
-
-            const loginMsg2 = loginMsg; // alias kept for setLoginMsg
-
-            const navBalance        = document.getElementById('nav-user-balance');
-            const paymentModal     = document.getElementById('payment-modal');
-            const paymentBox       = document.getElementById('payment-box');
-            const paymentOverlay   = document.getElementById('payment-overlay');
-            const closePaymentBtn  = document.getElementById('close-payment');
-            const paymentAmountText = document.getElementById('payment-amount');
-            const buyButtons       = document.querySelectorAll('.btn-buy');
-
-            // ===== Nav 状态 =====
-            async function loadWebBalance() {
-                if (!authToken || !navBalance) return;
-                try {
-                    const r = await fetch(API + '/api/balance?token=' + authToken);
-                    const d = await r.json();
-                    if (d.credits !== undefined) {
-                        // 显示人民币余额（1积分 = ¥0.001，与模型无关）
-                        const yuan = (d.credits * 0.001).toFixed(4);
-                        navBalance.textContent = '¥' + yuan;
-                    }
-                } catch {}
-            }
-
-            function updateNav() {
-                if (isLoggedIn) {
-                    if (btnLoginShow) btnLoginShow.classList.add('hidden');
-                    if (userInfo) { userInfo.classList.remove('hidden'); userInfo.classList.add('flex'); }
-                    if (navUserId) { navUserId.innerText = authEmail; navUserId.title = authEmail; }
-                    loadWebBalance();
-                } else {
-                    if (btnLoginShow) btnLoginShow.classList.remove('hidden');
-                    if (userInfo) { userInfo.classList.add('hidden'); userInfo.classList.remove('flex'); }
-                    if (navBalance) navBalance.textContent = '已连接插件';
-                }
-            }
-            updateNav();
-
-            // ===== 退出 =====
-            if (btnLogout) btnLogout.addEventListener('click', () => {
-                store.del('authToken');
-                store.del('authEmail');
-                authToken = null; authEmail = null; isLoggedIn = false;
-                // Notify extension relay to clear extension-side login too
-                window.postMessage({ type: 'SHIYU_LOGOUT' }, '*');
-                updateNav();
-            });
-
-            // Extension-side logout sync: clear webpage session and refresh nav state.
-            window.addEventListener('message', (event) => {
-                if (event.source !== window || !event.data) return;
-                if (event.data.type !== 'SHIYU_LOGOUT_FROM_EXTENSION') return;
-                store.del('authToken');
-                store.del('authEmail');
-                authToken = null; authEmail = null; isLoggedIn = false;
-                updateNav();
-            });
-
-            // ===== 模态框辅助 =====
-            function openModal(modalEl) {
-                if (!modalEl) return;
-                modalEl.style.display = 'flex';
-            }
-            function closeModal(modalEl) {
-                if (!modalEl) return;
-                modalEl.style.display = 'none';
-            }
-
-            // ===== 登录/注册模态框 =====
-            function setLoginMsg(text, ok) {
-                if (!loginMsg) return;
-                loginMsg.textContent = text;
-                loginMsg.style.color = ok ? '#16a34a' : '#dc2626';
-            }
-
-            function switchTab(tab) {
-                const isLogin = tab === 'login';
-                tabLoginBtn.style.color    = isLogin ? '#2563eb' : '#9ca3af';
-                tabLoginBtn.style.borderBottomColor  = isLogin ? '#2563eb' : 'transparent';
-                tabRegBtn.style.color      = isLogin ? '#9ca3af' : '#2563eb';
-                tabRegBtn.style.borderBottomColor    = isLogin ? 'transparent' : '#2563eb';
-                panelLogin.style.display   = isLogin ? '' : 'none';
-                panelReg1.style.display    = (!isLogin) ? '' : 'none';
-                panelReg2.style.display    = 'none';
-                setLoginMsg('', true);
-                setTimeout(() => {
-                    if (isLogin && lgEmail) lgEmail.focus();
-                    else if (!isLogin && regEmail) regEmail.focus();
-                }, 100);
-            }
-
-            function openLoginModal() {
-                if (lgEmail) lgEmail.value = '';
-                if (lgPassword) lgPassword.value = '';
-                if (regEmail) regEmail.value = '';
-                if (regPassword) regPassword.value = '';
-                if (regPassword2) regPassword2.value = '';
-                if (regCode) regCode.value = '';
-                switchTab('login');
-                openModal(loginModal);
-            }
-
-            if (btnLoginShow) btnLoginShow.addEventListener('click', openLoginModal);
-            if (closeLoginBtn) closeLoginBtn.addEventListener('click', () => closeModal(loginModal));
-            loginModal.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
-
-            if (tabLoginBtn) tabLoginBtn.addEventListener('click', () => switchTab('login'));
-            if (tabRegBtn)   tabRegBtn.addEventListener('click',   () => switchTab('register'));
-
-            // ===== 登录 =====
-            async function doLogin() {
-                const email    = lgEmail ? lgEmail.value.trim() : '';
-                const password = lgPassword ? lgPassword.value : '';
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginMsg('请输入有效的邮箱地址', false); return; }
-                if (!password) { setLoginMsg('请输入密码', false); return; }
-                btnDoLogin.disabled = true; btnDoLogin.textContent = '登录中...';
-                try {
-                    const resp = await fetch(API + '/api/login', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password })
-                    });
-                    const data = await resp.json();
-                    if (data.ok && data.token) {
-                        authToken = data.token; authEmail = data.email; isLoggedIn = true;
-                        store.set('authToken', authToken);
-                        store.set('authEmail', authEmail);
-                        window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
-                        setLoginMsg('登录成功！', true);
-                        setTimeout(() => { closeModal(loginModal); updateNav(); }, 600);
-                    } else {
-                        setLoginMsg(data.error || '登录失败，请重试', false);
-                    }
-                } catch { setLoginMsg('网络错误，请稍后重试', false); }
-                finally { btnDoLogin.disabled = false; btnDoLogin.textContent = '登录'; }
-            }
-            if (btnDoLogin) btnDoLogin.addEventListener('click', doLogin);
-            if (lgPassword) lgPassword.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-            // ===== 注册 Step 1: 发送验证码 =====
-            if (btnSendRegCode) btnSendRegCode.addEventListener('click', async () => {
-                const email = regEmail ? regEmail.value.trim() : '';
-                const pw1   = regPassword ? regPassword.value : '';
-                const pw2   = regPassword2 ? regPassword2.value : '';
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginMsg('请输入有效的邮箱地址', false); return; }
-                if (!pw1 || pw1.length < 6) { setLoginMsg('密码至少需要6位', false); return; }
-                if (pw1 !== pw2) { setLoginMsg('两次密码输入不一致', false); return; }
-                btnSendRegCode.disabled = true; btnSendRegCode.textContent = '发送中...';
-                setLoginMsg('', true);
-                try {
-                    const resp = await fetch(API + '/api/sendCode', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email })
-                    });
-                    const data = await resp.json();
-                    if (data.ok) {
-                        if (regEmailDisp) regEmailDisp.textContent = email;
-                        panelReg1.style.display = 'none';
-                        panelReg2.style.display = '';
-                        setLoginMsg('验证码已发送，请查收邮件', true);
-                        setTimeout(() => regCode && regCode.focus(), 100);
-                    } else {
-                        setLoginMsg(data.error || '发送失败，请稍后重试', false);
-                    }
-                } catch { setLoginMsg('网络错误，请稍后重试', false); }
-                finally { btnSendRegCode.disabled = false; btnSendRegCode.textContent = '发送验证码到邮箱'; }
-            });
-
-            // ===== 注册 Step 2: 完成注册 =====
-            if (btnCompleteReg) btnCompleteReg.addEventListener('click', async () => {
-                const email    = regEmailDisp ? regEmailDisp.textContent : '';
-                const password = regPassword ? regPassword.value : '';
-                const code     = regCode ? regCode.value.trim() : '';
-                if (!code || code.length !== 6) { setLoginMsg('请输入6位验证码', false); return; }
-                btnCompleteReg.disabled = true; btnCompleteReg.textContent = '注册中...';
-                try {
-                    const resp = await fetch(API + '/api/register', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password, code })
-                    });
-                    const data = await resp.json();
-                    if (data.ok && data.token) {
-                        authToken = data.token; authEmail = data.email; isLoggedIn = true;
-                        store.set('authToken', authToken);
-                        store.set('authEmail', authEmail);
-                        window.postMessage({ type: 'SHIYU_AUTH', token: authToken, email: authEmail }, '*');
-                        setLoginMsg('注册成功，赠送 125,000 Token！', true);
-                        setTimeout(() => { closeModal(loginModal); updateNav(); }, 800);
-                    } else {
-                        setLoginMsg(data.error || '注册失败，请重试', false);
-                    }
-                } catch { setLoginMsg('网络错误，请稍后重试', false); }
-                finally { btnCompleteReg.disabled = false; btnCompleteReg.textContent = '完成注册'; }
-            });
-            if (regCode) regCode.addEventListener('keydown', e => { if (e.key === 'Enter') btnCompleteReg && btnCompleteReg.click(); });
-
-            if (btnBackReg) btnBackReg.addEventListener('click', () => {
-                panelReg2.style.display = 'none';
-                panelReg1.style.display = '';
-                setLoginMsg('', true);
-            });
-
-            // ===== 支付弹窗 =====
-            if (closePaymentBtn) closePaymentBtn.addEventListener('click', () => closeModal(paymentModal));
-            if (paymentOverlay) paymentOverlay.addEventListener('click', () => closeModal(paymentModal));
-
-            if (buyButtons) buyButtons.forEach(btn => {
-                btn.addEventListener('click', async function () {
-                    if (!isLoggedIn) { openLoginModal(); return; }
-                    const price = this.getAttribute('data-price');
-                    if (paymentAmountText) paymentAmountText.innerText = '￥' + price + '.00';
-                    const fallbackQrcode = '/image.png';
-                    const qrImg     = document.getElementById('qrcode-img');
-                    const qrLoading = document.getElementById('qrcode-loading');
-                    const qrError   = document.getElementById('qrcode-error');
-                    qrImg.src = fallbackQrcode;
-                    qrImg.classList.add('hidden');
-                    qrError.classList.add('hidden');
-                    qrLoading.classList.remove('hidden');
-                    openModal(paymentModal);
-                    let pollTimer = null;
-                    function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
-
-                    try {
-                        const resp = await fetch(API + '/api/pay', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ token: authToken, amount: price })
-                        });
-                        const data = await resp.json();
-                        qrLoading.classList.add('hidden');
-                        if (data.qrcode) {
-                            qrImg.src = data.qrcode; qrImg.classList.remove('hidden');
-                            const orderId = data.orderId;
-                            if (orderId) {
-                                // Poll payment status by order ID every 3s
-                                pollTimer = setInterval(async () => {
-                                    try {
-                                        const ps = await fetch(API + '/api/pay-status?orderId=' + encodeURIComponent(orderId));
-                                        const pd = await ps.json();
-                                        if (pd.paid || pd.callbackStatus === 'OD' || pd.credited) {
-                                            stopPoll();
-                                            closeModal(paymentModal);
-                                            loadWebBalance();
-                                            const toast = document.createElement('div');
-                                            toast.textContent = '\u652f\u4ed8\u6210\u529f\uff01\u5df2\u5145\u503c ' + Math.floor(parseFloat(price) * 1000) + ' \u70b9\u6570';
-                                            toast.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:12px 28px;border-radius:12px;font-size:16px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
-                                            document.body.appendChild(toast);
-                                            setTimeout(() => toast.remove(), 4000);
-                                        } else if (pd.error) {
-                                            qrError.querySelector('span').textContent = '回调异常: ' + pd.error;
-                                            qrError.classList.remove('hidden');
-                                        }
-                                    } catch {}
-                                }, 3000);
-                            }
-                        } else if (data.url) {
-                            window.open(data.url, '_blank'); closeModal(paymentModal);
-                        } else {
-                            qrImg.src = fallbackQrcode;
-                            qrImg.classList.remove('hidden');
-                            qrError.querySelector('span').textContent = (data.error || '获取二维码失败') + '，已展示备用二维码';
-                            qrError.classList.remove('hidden');
-                        }
-                    } catch {
-                        qrLoading.classList.add('hidden');
-                        qrImg.src = fallbackQrcode;
-                        qrImg.classList.remove('hidden');
-                        qrError.querySelector('span').textContent = '网络错误，请稍后再试，已展示备用二维码';
-                        qrError.classList.remove('hidden');
-                    }
-                    // Stop polling when modal is closed
-                    const origClose = closePaymentBtn && closePaymentBtn.onclick;
-                    if (closePaymentBtn) closePaymentBtn.onclick = () => { stopPoll(); closeModal(paymentModal); };
-                    if (paymentOverlay) paymentOverlay.onclick = () => { stopPoll(); closeModal(paymentModal); };
-                });
-            });
+      document.querySelectorAll(".btn-buy").forEach((button) => {
+        button.addEventListener("click", () => {
+          window.location.href = store.get("token") || store.get("api_token") ? "/dashboard.html" : "/login.html";
         });
-    </script>
+      });
+
+      const ua = navigator.userAgent;
+      const isEdge = /Edg\//.test(ua);
+      const isChrome = /Chrome\//.test(ua) && !isEdge;
+      const btnEdge = document.getElementById("btn-install-edge");
+      const btnChrome = document.getElementById("btn-install-chrome");
+
+      if (isEdge && btnEdge) {
+        btnEdge.insertAdjacentHTML("beforeend", '<span class="rounded bg-white/20 px-2 py-0.5 text-xs">Current browser</span>');
+      } else if (isChrome && btnChrome) {
+        btnChrome.classList.add("border-blue-500", "text-blue-700");
+        btnChrome.insertAdjacentHTML("beforeend", '<span class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700">Current browser</span>');
+      }
+    });
+  </script>
 </body>
 </html>

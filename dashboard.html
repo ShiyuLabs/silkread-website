@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SilkRead account dashboard for managing pay-as-you-go AI translation tokens.">
+  <title>Dashboard - SilkRead</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .plan-card {
+      border: 1px solid #dbe3ee;
+      border-radius: 8px;
+      padding: 24px;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .plan-card:hover { transform: translateY(-3px); border-color: #2563eb; box-shadow: 0 14px 34px rgba(15, 23, 42, .08); }
+    .toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      border-radius: 8px;
+      background: #0f172a;
+      color: white;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .25);
+    }
+    .spin {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #dbeafe;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <nav class="sticky top-0 z-50 border-b border-slate-200 bg-white shadow-sm">
+    <div class="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/favicon.png" alt="SilkRead logo" class="h-9 w-9 rounded-lg">
+        <span class="text-xl font-bold text-slate-950">SilkRead</span>
+      </a>
+      <div class="flex items-center gap-3">
+        <span id="nav-username" class="hidden text-sm font-semibold text-slate-700"><span id="nav-name"></span></span>
+        <button onclick="doLogout()" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700">Log out</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <div id="state-loading" class="py-20 text-center">
+      <div class="spin"></div>
+      <p class="text-sm text-slate-500">Loading your account...</p>
+    </div>
+
+    <div id="state-error" class="hidden py-20 text-center">
+      <h1 class="mb-2 text-2xl font-extrabold text-slate-950">Could not load your account</h1>
+      <p class="mb-6 text-sm text-slate-500" id="error-desc">Please log in again.</p>
+      <a href="/login.html" class="inline-flex rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800">Log in</a>
+    </div>
+
+    <div id="state-content" class="hidden space-y-8">
+      <section class="rounded-lg bg-slate-950 p-6 text-white shadow-sm sm:p-8">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-4">
+            <div id="avatar" class="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-xl font-extrabold">U</div>
+            <div>
+              <p class="text-sm font-semibold text-blue-200">Welcome back</p>
+              <h1 id="welcome-name" class="text-2xl font-extrabold tracking-normal">User</h1>
+            </div>
+          </div>
+          <div class="rounded-lg bg-white/10 p-4 sm:min-w-64">
+            <p class="text-xs font-bold uppercase tracking-wider text-blue-200">Current translation balance</p>
+            <p class="mt-2 text-3xl font-extrabold" id="balance-display">-- tokens</p>
+          </div>
+        </div>
+        <p class="mt-5 text-sm leading-6 text-slate-300">Paid AI translation uses prepaid digital tokens. There are no subscriptions, automatic renewals, or recurring charges.</p>
+      </section>
+
+      <section>
+        <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-normal text-slate-950">Buy translation tokens</h2>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Choose a one-time token pack. Token usage depends on the selected AI model and translated text length.</p>
+          </div>
+          <a href="/terms.html" class="text-sm font-semibold text-blue-700 hover:text-blue-900">Refund policy</a>
+        </div>
+
+        <div class="grid gap-5 md:grid-cols-3">
+          <article class="plan-card">
+            <h3 class="text-lg font-extrabold text-slate-950">Starter</h3>
+            <p class="mt-1 text-sm text-slate-500">For occasional AI translation.</p>
+            <div class="mt-5">
+              <span class="text-4xl font-extrabold text-slate-950">$5</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+            </div>
+            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">50,000 translation tokens</p>
+            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Starter', 5, '50,000')">Contact support to buy</button>
+          </article>
+
+          <article class="plan-card border-blue-600 shadow-sm">
+            <p class="mb-3 inline-flex w-fit rounded-md bg-blue-700 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">Popular</p>
+            <h3 class="text-lg font-extrabold text-slate-950">Reader</h3>
+            <p class="mt-1 text-sm text-slate-500">For regular web reading.</p>
+            <div class="mt-5">
+              <span class="text-4xl font-extrabold text-blue-700">$10</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+            </div>
+            <p class="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">120,000 translation tokens</p>
+            <button class="mt-6 rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800" onclick="contactPurchase('Reader', 10, '120,000')">Contact support to buy</button>
+          </article>
+
+          <article class="plan-card">
+            <h3 class="text-lg font-extrabold text-slate-950">Pro</h3>
+            <p class="mt-1 text-sm text-slate-500">For heavy research sessions.</p>
+            <div class="mt-5">
+              <span class="text-4xl font-extrabold text-slate-950">$25</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+            </div>
+            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">350,000 translation tokens</p>
+            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Pro', 25, '350,000')">Contact support to buy</button>
+          </article>
+        </div>
+
+        <p class="mt-4 text-center text-xs leading-5 text-slate-500">Buyer support and billing questions: <a href="mailto:support@getsilkread.com" class="font-semibold text-blue-700 hover:underline">support@getsilkread.com</a></p>
+      </section>
+
+      <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-lg font-extrabold text-slate-950">Usage rates</h2>
+        <div class="mt-5 overflow-hidden rounded-lg border border-slate-200">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="px-4 py-3">Engine</th>
+                <th class="px-4 py-3">Rate</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 text-slate-600">
+              <tr><td class="px-4 py-3 font-bold text-emerald-700">Browser basic translation</td><td class="px-4 py-3 font-bold text-emerald-700">Free</td></tr>
+              <tr><td class="px-4 py-3 font-bold">DeepSeek V3</td><td class="px-4 py-3">$0.010 / 1,000 tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">GPT Mini</td><td class="px-4 py-3">$0.030 / 1,000 tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Gemini Flash</td><td class="px-4 py-3">$0.060 / 1,000 tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Claude Sonnet</td><td class="px-4 py-3">$0.150 / 1,000 tokens</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="border-t border-slate-200 bg-white py-8">
+    <div class="mx-auto flex max-w-5xl flex-col gap-3 px-4 text-sm text-slate-500 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+      <p>&copy; 2026 SilkRead. All rights reserved.</p>
+      <div class="flex gap-5">
+        <a href="/terms.html" class="font-semibold text-slate-700 hover:text-blue-700">Terms of Service</a>
+        <a href="/privacy.html" class="font-semibold text-slate-700 hover:text-blue-700">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function showState(id) {
+      ["state-loading", "state-error", "state-content"].forEach((stateId) => {
+        document.getElementById(stateId).classList.toggle("hidden", stateId !== id);
+      });
+    }
+
+    function formatTokens(value) {
+      const n = Number(value || 0);
+      if (!Number.isFinite(n)) return "-- tokens";
+      return Math.max(0, Math.floor(n)).toLocaleString("en-US") + " tokens";
+    }
+
+    async function loadUser() {
+      try {
+        const resp = await fetch("/api/user/self", { credentials: "include" });
+        const data = await resp.json();
+
+        if (!data.success) {
+          localStorage.removeItem("user");
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const user = data.data;
+        const name = user.username || user.display_name || "User";
+        localStorage.setItem("user", JSON.stringify(user));
+
+        document.getElementById("welcome-name").textContent = name;
+        document.getElementById("balance-display").textContent = formatTokens(user.quota);
+        document.getElementById("avatar").textContent = name.charAt(0).toUpperCase();
+        document.getElementById("nav-name").textContent = name;
+        document.getElementById("nav-username").classList.remove("hidden");
+
+        showState("state-content");
+      } catch (_) {
+        document.getElementById("error-desc").textContent = "Network error. Refresh the page or log in again.";
+        showState("state-error");
+      }
+    }
+
+    async function doLogout() {
+      localStorage.removeItem("user");
+      localStorage.removeItem("api_token");
+      try {
+        await fetch("/api/user/logout", { credentials: "include" });
+      } catch (_) {}
+      window.location.href = "/";
+    }
+
+    let toastTimer = null;
+    function showToast(text) {
+      if (toastTimer) return;
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = text;
+      document.body.appendChild(toast);
+      toastTimer = setTimeout(() => {
+        toast.style.transition = "opacity .25s";
+        toast.style.opacity = "0";
+        setTimeout(() => { toast.remove(); toastTimer = null; }, 300);
+      }, 2200);
+    }
+
+    function contactPurchase(pack, price, tokens) {
+      const subject = encodeURIComponent("SilkRead " + pack + " token pack");
+      const body = encodeURIComponent("Hello SilkRead support,\n\nI would like to purchase the " + pack + " token pack: $" + price + " for " + tokens + " translation tokens.\n\nMy account username is: ");
+      window.location.href = "mailto:support@getsilkread.com?subject=" + subject + "&body=" + body;
+      showToast("Opening your email app for buyer support.");
+    }
+
+    loadUser();
+
+    window.addEventListener("storage", (e) => {
+      if (e.key === "user" || e.key === "api_token") {
+        window.location.reload();
+      }
+    });
+  </script>
+</body>
+</html>
