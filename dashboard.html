@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="SilkRead account dashboard for managing pay-as-you-go AI translation tokens.">
+  <meta name="description" content="SilkRead dashboard for managing pay-as-you-go AI Credits.">
   <title>Dashboard - SilkRead</title>
   <link rel="icon" type="image/svg+xml" href="/silkread-logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         <span class="text-xl font-bold text-slate-950">SilkRead</span>
       </a>
       <div class="flex items-center gap-3">
-        <span id="nav-username" class="hidden text-sm font-semibold text-slate-700"><span id="nav-name"></span></span>
+        <span id="nav-account" class="hidden text-sm font-semibold text-slate-700"><span id="nav-name"></span></span>
         <button onclick="doLogout()" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700">Log out</button>
       </div>
     </div>
@@ -67,8 +67,8 @@
 
     <div id="state-error" class="hidden py-20 text-center">
       <h1 class="mb-2 text-2xl font-extrabold text-slate-950">Could not load your account</h1>
-      <p class="mb-6 text-sm text-slate-500" id="error-desc">Please log in again.</p>
-      <a href="/login.html" class="inline-flex rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800">Log in</a>
+      <p class="mb-6 text-sm text-slate-500" id="error-desc">Please activate your License again.</p>
+      <a href="/login.html" class="inline-flex rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800">Activate License</a>
     </div>
 
     <div id="state-content" class="hidden space-y-8">
@@ -82,18 +82,18 @@
             </div>
           </div>
           <div class="rounded-lg bg-white/10 p-4 sm:min-w-64">
-            <p class="text-xs font-bold uppercase tracking-wider text-blue-200">Current translation balance</p>
-            <p class="mt-2 text-3xl font-extrabold" id="balance-display">-- tokens</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-blue-200">Credits Balance</p>
+            <p class="mt-2 text-3xl font-extrabold" id="balance-display">-- Credits</p>
           </div>
         </div>
-        <p class="mt-5 text-sm leading-6 text-slate-300">Paid AI translation uses prepaid digital tokens. There are no subscriptions, automatic renewals, or recurring charges.</p>
+        <p class="mt-5 text-sm leading-6 text-slate-300">Pay once. Credits never expire. No subscription. No auto-renewal.</p>
       </section>
 
       <section>
         <div class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 class="text-2xl font-extrabold tracking-normal text-slate-950">Buy translation tokens</h2>
-            <p class="mt-2 text-sm leading-6 text-slate-600">Choose a one-time token pack. Token usage depends on the selected AI model and translated text length.</p>
+            <h2 class="text-2xl font-extrabold tracking-normal text-slate-950">Buy Credits</h2>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Choose a one-time AI Credits package. Usage depends on the selected AI model and translated text length.</p>
           </div>
           <a href="/terms.html" class="text-sm font-semibold text-blue-700 hover:text-blue-900">Refund policy</a>
         </div>
@@ -104,33 +104,41 @@
             <p class="mt-1 text-sm text-slate-500">For occasional AI translation.</p>
             <div class="mt-5">
               <span class="text-4xl font-extrabold text-slate-950">$5</span>
-              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
             </div>
-            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">50,000 translation tokens</p>
-            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Starter', 5, '50,000')">Contact support to buy</button>
+            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">50,000 AI Credits</p>
+            <p class="mt-2 text-sm text-slate-600">Up to ~2M Economy source tokens · No expiration</p>
+            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Starter', 5, '50,000')">Buy Credits</button>
           </article>
 
           <article class="plan-card border-blue-600 shadow-sm">
-            <p class="mb-3 inline-flex w-fit rounded-md bg-blue-700 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">Popular</p>
+            <p class="mb-3 inline-flex w-fit rounded-md bg-blue-700 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">MOST POPULAR</p>
             <h3 class="text-lg font-extrabold text-slate-950">Reader</h3>
             <p class="mt-1 text-sm text-slate-500">For regular web reading.</p>
             <div class="mt-5">
               <span class="text-4xl font-extrabold text-blue-700">$10</span>
-              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
             </div>
-            <p class="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">120,000 translation tokens</p>
-            <button class="mt-6 rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800" onclick="contactPurchase('Reader', 10, '120,000')">Contact support to buy</button>
+            <p class="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm font-bold text-blue-800">120,000 AI Credits</p>
+            <p class="mt-2 text-sm font-semibold text-blue-700">+30,000 Launch Bonus</p>
+            <p class="mt-2 text-sm text-slate-600">150,000 total during launch</p>
+            <p class="mt-2 text-sm text-slate-600">Up to ~6M Economy source tokens · No expiration</p>
+            <button class="mt-6 rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800" onclick="contactPurchase('Reader', 10, '120,000')">Buy Credits</button>
           </article>
 
           <article class="plan-card">
+            <p class="mb-3 inline-flex w-fit rounded-md bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-700">BEST VALUE</p>
             <h3 class="text-lg font-extrabold text-slate-950">Pro</h3>
             <p class="mt-1 text-sm text-slate-500">For heavy research sessions.</p>
             <div class="mt-5">
               <span class="text-4xl font-extrabold text-slate-950">$25</span>
-              <span class="ml-2 text-sm font-semibold text-slate-500">one-time</span>
+              <span class="ml-2 text-sm font-semibold text-slate-500">one-time purchase</span>
             </div>
-            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">350,000 translation tokens</p>
-            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Pro', 25, '350,000')">Contact support to buy</button>
+            <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">350,000 AI Credits</p>
+            <p class="mt-2 text-sm font-semibold text-slate-700">+50,000 Launch Bonus</p>
+            <p class="mt-2 text-sm text-slate-600">400,000 total during launch</p>
+            <p class="mt-2 text-sm text-slate-600">Up to ~16M Economy source tokens · No expiration</p>
+            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Pro', 25, '350,000')">Buy Credits</button>
           </article>
         </div>
 
@@ -148,11 +156,11 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 text-slate-600">
-              <tr><td class="px-4 py-3 font-bold text-emerald-700">Browser basic translation</td><td class="px-4 py-3 font-bold text-emerald-700">Free</td></tr>
-              <tr><td class="px-4 py-3 font-bold">DeepSeek V3</td><td class="px-4 py-3">$0.010 / 1,000 tokens</td></tr>
-              <tr><td class="px-4 py-3 font-bold">GPT Mini</td><td class="px-4 py-3">$0.030 / 1,000 tokens</td></tr>
-              <tr><td class="px-4 py-3 font-bold">Gemini Flash</td><td class="px-4 py-3">$0.060 / 1,000 tokens</td></tr>
-              <tr><td class="px-4 py-3 font-bold">Claude Sonnet</td><td class="px-4 py-3">$0.150 / 1,000 tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold text-emerald-700">Browser Basic (Free)</td><td class="px-4 py-3 font-bold text-emerald-700">Free</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Economy — Qwen3.7 Flash</td><td class="px-4 py-3">Est. ~25 Credits / 1K source tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Smart ★ Recommended — GPT-5.6 Luna</td><td class="px-4 py-3">Est. ~70 Credits / 1K source tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Natural — Claude Haiku 4.5</td><td class="px-4 py-3">Est. ~300 Credits / 1K source tokens</td></tr>
+              <tr><td class="px-4 py-3 font-bold">Expert — Claude Sonnet 5</td><td class="px-4 py-3">Est. ~600 Credits / 1K source tokens</td></tr>
             </tbody>
           </table>
         </div>
@@ -170,6 +178,7 @@
     </div>
   </footer>
 
+  <script src="/account-api.js"></script>
   <script>
     function showState(id) {
       ["state-loading", "state-error", "state-content"].forEach((stateId) => {
@@ -179,45 +188,79 @@
 
     function formatTokens(value) {
       const n = Number(value || 0);
-      if (!Number.isFinite(n)) return "-- tokens";
-      return Math.max(0, Math.floor(n)).toLocaleString("en-US") + " tokens";
+      if (!Number.isFinite(n)) return "-- Credits";
+      return Math.max(0, Math.floor(n)).toLocaleString("en-US") + " Credits";
     }
 
     async function loadUser() {
-      try {
-        const resp = await fetch("/api/user/self", { credentials: "include" });
-        const data = await resp.json();
+      const authToken = localStorage.getItem("authToken");
+      const storedEmail = localStorage.getItem("authEmail") || "";
+      if (!authToken) {
+        window.location.href = "/login.html";
+        return;
+      }
 
-        if (!data.success) {
-          localStorage.removeItem("user");
-          window.location.href = "/login.html";
+      try {
+        const resp = await fetch(SilkReadAccountApi.url("/api/balance"), {
+          headers: SilkReadAccountApi.authHeaders(authToken),
+        });
+        const data = await SilkReadAccountApi.readJson(resp);
+
+        if (resp.status === 401) {
+          SilkReadAccountApi.clearSession();
+          window.location.href = "/login.html?reason=session-expired";
           return;
         }
 
-        const user = data.data;
-        const name = user.username || user.display_name || "User";
-        localStorage.setItem("user", JSON.stringify(user));
+        if (!resp.ok || data.success === false) {
+          document.getElementById("error-desc").textContent = SilkReadAccountApi.errorMessage(
+            resp,
+            data,
+            "Could not load your Credits Balance. Please try again."
+          );
+          showState("state-error");
+          return;
+        }
 
-        document.getElementById("welcome-name").textContent = name;
-        document.getElementById("balance-display").textContent = formatTokens(user.quota);
-        document.getElementById("avatar").textContent = name.charAt(0).toUpperCase();
-        document.getElementById("nav-name").textContent = name;
-        document.getElementById("nav-username").classList.remove("hidden");
+        const credits = data.credits ?? data.data?.credits;
+        if (!Number.isFinite(Number(credits))) {
+          document.getElementById("error-desc").textContent = "The balance response was incomplete. Please try again.";
+          showState("state-error");
+          return;
+        }
+
+        const email = data.email || data.data?.email || storedEmail || "SilkRead account";
+        if (email !== "SilkRead account") localStorage.setItem("authEmail", email);
+
+        document.getElementById("welcome-name").textContent = email;
+        document.getElementById("balance-display").textContent = formatTokens(credits);
+        document.getElementById("avatar").textContent = email.charAt(0).toUpperCase();
+        document.getElementById("nav-name").textContent = email;
+        document.getElementById("nav-account").classList.remove("hidden");
 
         showState("state-content");
       } catch (_) {
-        document.getElementById("error-desc").textContent = "Network error. Refresh the page or log in again.";
+        document.getElementById("error-desc").textContent = "Network error. Refresh the page or activate your License again.";
         showState("state-error");
       }
     }
 
     async function doLogout() {
-      localStorage.removeItem("user");
-      localStorage.removeItem("api_token");
+      const authToken = localStorage.getItem("authToken");
       try {
-        await fetch("/api/user/logout", { credentials: "include" });
-      } catch (_) {}
-      window.location.href = "/";
+        if (authToken) {
+          await fetch(SilkReadAccountApi.url("/api/logout"), {
+            method: "POST",
+            headers: SilkReadAccountApi.authHeaders(authToken, true),
+            body: "{}",
+          });
+        }
+      } catch (_) {
+        // Local sign-out must still complete if the network is unavailable.
+      } finally {
+        SilkReadAccountApi.clearSession();
+        window.location.href = "/";
+      }
     }
 
     let toastTimer = null;
@@ -235,8 +278,8 @@
     }
 
     function contactPurchase(pack, price, tokens) {
-      const subject = encodeURIComponent("SilkRead " + pack + " token pack");
-      const body = encodeURIComponent("Hello SilkRead support,\n\nI would like to purchase the " + pack + " token pack: $" + price + " for " + tokens + " translation tokens.\n\nMy account username is: ");
+      const subject = encodeURIComponent("SilkRead " + pack + " AI Credits");
+      const body = encodeURIComponent("Hello SilkRead support,\n\nI would like to purchase the " + pack + " AI Credits package: $" + price + " for " + tokens + " AI Credits.\n\nMy account email is: " + (localStorage.getItem("authEmail") || ""));
       window.location.href = "mailto:support@getsilkread.com?subject=" + subject + "&body=" + body;
       showToast("Opening your email app for buyer support.");
     }
@@ -244,7 +287,7 @@
     loadUser();
 
     window.addEventListener("storage", (e) => {
-      if (e.key === "user" || e.key === "api_token") {
+      if (e.key === "authToken" || e.key === "authEmail") {
         window.location.reload();
       }
     });

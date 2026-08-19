@@ -47,7 +47,7 @@
         <img src="/silkread-logo.svg" alt="SilkRead logo" class="h-9 w-9 rounded-lg">
         <span class="text-xl font-bold text-slate-950">SilkRead</span>
       </a>
-      <a href="/login.html" class="text-sm font-semibold text-blue-700 hover:text-blue-900">Log in</a>
+      <a href="/login.html" class="text-sm font-semibold text-blue-700 hover:text-blue-900">Activate License</a>
     </div>
   </header>
 
@@ -55,23 +55,26 @@
     <section class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
       <div class="mb-7 text-center">
         <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Create your account</h1>
-        <p class="mt-2 text-sm leading-6 text-slate-500">Start using SilkRead with free browser translation and optional paid AI tokens.</p>
+        <p class="mt-2 text-sm leading-6 text-slate-500">Start using SilkRead with free browser translation and optional paid AI Credits.</p>
       </div>
 
       <div class="space-y-4">
         <div>
-          <input id="inp-username" type="text" class="input-field" placeholder="Username" autocomplete="username" autocorrect="off" autocapitalize="none" autofocus>
-          <p id="hint-username" class="hint text-slate-400">3-20 characters. Letters, numbers, and underscores only.</p>
-        </div>
-
-        <div>
-          <input id="inp-email" type="email" class="input-field" placeholder="Email address optional" autocomplete="email">
+          <input id="inp-email" type="email" class="input-field" placeholder="Email address" autocomplete="email" autocapitalize="none" autofocus>
           <p id="hint-email" class="hint text-slate-400"></p>
         </div>
 
         <div>
+          <div class="flex gap-2">
+            <input id="inp-code" type="text" class="input-field min-w-0" placeholder="6-digit verification code" autocomplete="one-time-code" inputmode="numeric" maxlength="6">
+            <button id="btn-send-code" type="button" class="min-w-[112px] shrink-0 rounded-md border border-blue-700 px-3 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400" disabled>Send code</button>
+          </div>
+          <p id="hint-code" class="hint text-slate-400">The code is valid for 10 minutes.</p>
+        </div>
+
+        <div>
           <div class="input-wrap">
-            <input id="inp-password" type="password" class="input-field has-icon" placeholder="Password, at least 8 characters" autocomplete="new-password">
+            <input id="inp-password" type="password" class="input-field has-icon" placeholder="Password, at least 6 characters" autocomplete="new-password">
             <button type="button" class="eye-btn" id="toggle-password" tabindex="-1" aria-label="Toggle password visibility">
               <svg id="eye1-show" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -119,20 +122,24 @@
         <button id="btn-register" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" disabled>Create account</button>
       </div>
 
-      <p class="mt-5 text-center text-sm text-slate-500">Already have an account? <a href="/login.html" class="font-semibold text-blue-700 hover:underline">Log in</a></p>
+      <p class="mt-5 text-center text-sm text-slate-500">Already have a SilkRead License? <a href="/login.html" class="font-semibold text-blue-700 hover:underline">Activate License</a></p>
     </section>
   </main>
 
+  <script src="/account-api.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const inpUsername = $("inp-username");
     const inpEmail = $("inp-email");
+    const inpCode = $("inp-code");
     const inpPassword = $("inp-password");
     const inpPassword2 = $("inp-password2");
     const inpAgree = $("inp-agree");
+    const btnSendCode = $("btn-send-code");
     const btnRegister = $("btn-register");
     const msgBox = $("msg-box");
-    const V = { username: false, email: true, password: false, password2: false, agree: false };
+    const V = { email: false, code: false, password: false, password2: false, agree: false };
+    let resendSeconds = 0;
+    let resendTimer = null;
 
     function syncBtn() {
       btnRegister.disabled = !Object.values(V).every(Boolean);
@@ -146,45 +153,19 @@
       msgBox.classList.remove("hidden");
     }
 
-    inpUsername.addEventListener("input", () => {
-      const value = inpUsername.value;
-      const hint = $("hint-username");
-      if (!value) {
-        inpUsername.className = "input-field";
-        hint.textContent = "3-20 characters. Letters, numbers, and underscores only.";
-        hint.className = "hint text-slate-400";
-        V.username = false;
-      } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-        inpUsername.className = "input-field is-error";
-        hint.textContent = "Use letters, numbers, and underscores only.";
-        hint.className = "hint text-red-600";
-        V.username = false;
-      } else if (value.length < 3) {
-        inpUsername.className = "input-field is-error";
-        hint.textContent = "Add at least " + (3 - value.length) + " more character(s).";
-        hint.className = "hint text-red-600";
-        V.username = false;
-      } else if (value.length > 20) {
-        inpUsername.className = "input-field is-error";
-        hint.textContent = "Use 20 characters or fewer.";
-        hint.className = "hint text-red-600";
-        V.username = false;
-      } else {
-        inpUsername.className = "input-field is-success";
-        hint.textContent = "Username format looks good.";
-        hint.className = "hint text-green-700";
-        V.username = true;
-      }
-      syncBtn();
-    });
+    function syncSendCode() {
+      btnSendCode.disabled = !V.email || resendSeconds > 0;
+      btnSendCode.textContent = resendSeconds > 0 ? "Resend in " + resendSeconds + "s" : "Send code";
+    }
 
     inpEmail.addEventListener("input", () => {
       const value = inpEmail.value.trim();
       const hint = $("hint-email");
       if (!value) {
         inpEmail.className = "input-field";
-        hint.textContent = "";
-        V.email = true;
+        hint.textContent = "Enter the email address you will use to sign in.";
+        hint.className = "hint text-slate-400";
+        V.email = false;
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
         inpEmail.className = "input-field is-error";
         hint.textContent = "Enter a valid email address.";
@@ -196,11 +177,70 @@
         hint.className = "hint text-green-700";
         V.email = true;
       }
+      syncSendCode();
       syncBtn();
     });
 
+    inpCode.addEventListener("input", () => {
+      const code = inpCode.value.replace(/\D/g, "").slice(0, 6);
+      inpCode.value = code;
+      V.code = /^\d{6}$/.test(code);
+      inpCode.className = "input-field min-w-0" + (code && !V.code ? " is-error" : V.code ? " is-success" : "");
+      $("hint-code").textContent = V.code ? "Verification code format looks good." : "The code is valid for 10 minutes.";
+      $("hint-code").className = "hint " + (V.code ? "text-green-700" : "text-slate-400");
+      syncBtn();
+    });
+
+    function startResendCountdown() {
+      clearInterval(resendTimer);
+      resendSeconds = 60;
+      syncSendCode();
+      resendTimer = setInterval(() => {
+        resendSeconds -= 1;
+        if (resendSeconds <= 0) clearInterval(resendTimer);
+        syncSendCode();
+      }, 1000);
+    }
+
+    async function sendCode() {
+      if (btnSendCode.disabled) return;
+      btnSendCode.disabled = true;
+      btnSendCode.textContent = "Sending...";
+      msgBox.classList.add("hidden");
+
+      try {
+        const resp = await fetch(SilkReadAccountApi.url("/api/sendCode"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: inpEmail.value.trim().toLowerCase() }),
+        });
+        const data = await SilkReadAccountApi.readJson(resp);
+        if (resp.ok && data.success === true) {
+          showMsg("Verification code sent. Check your inbox and spam folder.", true);
+          inpCode.focus();
+          startResendCountdown();
+          return;
+        }
+        showMsg(SilkReadAccountApi.errorMessage(
+          resp,
+          data,
+          "Could not send the verification code. Please try again.",
+          { emailService: true }
+        ), false);
+        if (resp.status === 429) {
+          startResendCountdown();
+          return;
+        }
+      } catch (_) {
+        showMsg("Network error. Please check your connection and try again.", false);
+      }
+      syncSendCode();
+    }
+
+    btnSendCode.addEventListener("click", sendCode);
+
     function strengthLevel(password) {
-      if (password.length < 8) return 0;
+      if (password.length < 6) return 0;
       let score = 0;
       if (/[a-zA-Z]/.test(password)) score += 1;
       if (/[0-9]/.test(password)) score += 1;
@@ -227,7 +267,7 @@
 
       wrap.classList.remove("hidden");
       const level = strengthLevel(password);
-      const longEnough = password.length >= 8;
+      const longEnough = password.length >= 6;
       const hasLetters = /[a-zA-Z]/.test(password);
       const hasNumbers = /[0-9]/.test(password);
       const color = !longEnough ? "#ef4444" : STRENGTH_COLOR[level - 1];
@@ -238,13 +278,13 @@
 
       const label = $("strength-label");
       if (!longEnough) {
-        label.textContent = "Password is too short. Add " + (8 - password.length) + " more character(s).";
+        label.textContent = "Password is too short. Add " + (6 - password.length) + " more character(s).";
         label.style.color = "#ef4444";
         V.password = false;
       } else if (!hasLetters || !hasNumbers) {
-        label.textContent = STRENGTH_TEXT[0];
+        label.textContent = "Accepted. Add both letters and numbers for a stronger password.";
         label.style.color = STRENGTH_COLOR[0];
-        V.password = false;
+        V.password = true;
       } else {
         label.textContent = STRENGTH_TEXT[level - 1];
         label.style.color = STRENGTH_COLOR[level - 1];
@@ -301,26 +341,37 @@
 
     async function doRegister() {
       if (btnRegister.disabled) return;
-      const username = inpUsername.value.trim();
+      const email = inpEmail.value.trim().toLowerCase();
       const password = inpPassword.value;
+      const code = inpCode.value;
 
       btnRegister.disabled = true;
       btnRegister.textContent = "Creating account...";
       msgBox.classList.add("hidden");
 
       try {
-        const resp = await fetch("/api/user/register", {
+        const resp = await fetch(SilkReadAccountApi.url("/api/register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ email, password, code }),
         });
-        const data = await resp.json();
+        const data = await SilkReadAccountApi.readJson(resp);
 
-        if (data.success) {
-          showMsg("Account created. Redirecting to login...", true);
-          setTimeout(() => { window.location.href = "/login.html"; }, 1200);
+        if (resp.ok && data.success === true) {
+          if (typeof data.authToken === "string" && data.authToken.trim()) {
+            SilkReadAccountApi.saveSession(data.authToken.trim(), data.email || email);
+            showMsg("Account created. Opening your dashboard...", true);
+            setTimeout(() => { window.location.href = "/dashboard.html"; }, 700);
+          } else {
+            showMsg("Account created. Please sign in to continue.", true);
+            setTimeout(() => { window.location.href = "/login.html"; }, 900);
+          }
         } else {
-          showMsg(data.message || "Registration failed. Please try again.", false);
+          showMsg(SilkReadAccountApi.errorMessage(
+            resp,
+            data,
+            "Registration failed. Please try again."
+          ), false);
           btnRegister.disabled = false;
           btnRegister.textContent = "Create account";
           syncBtn();
@@ -334,7 +385,7 @@
     }
 
     btnRegister.addEventListener("click", doRegister);
-    [inpUsername, inpEmail, inpPassword, inpPassword2].forEach((input) => {
+    [inpEmail, inpCode, inpPassword, inpPassword2].forEach((input) => {
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") doRegister(); });
     });
   </script>

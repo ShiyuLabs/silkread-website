@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Log in to SilkRead to manage pay-as-you-go AI translation tokens.">
-  <title>Log In - SilkRead</title>
+  <meta name="description" content="Activate a SilkRead License to manage pay-as-you-go AI Credits.">
+  <title>Activate License - SilkRead</title>
   <link rel="icon" type="image/svg+xml" href="/silkread-logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -50,12 +50,12 @@
   <main class="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-10">
     <section class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
       <div class="mb-7 text-center">
-        <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Log in to SilkRead</h1>
-        <p class="mt-2 text-sm leading-6 text-slate-500">Manage your AI translation tokens and connect the browser extension.</p>
+        <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Activate your SilkRead License</h1>
+        <p class="mt-2 text-sm leading-6 text-slate-500">Connect your SilkRead License and manage your AI Credits.</p>
       </div>
 
       <div class="space-y-4">
-        <input id="inp-username" type="text" class="input-field" placeholder="Username" autocomplete="username" autocorrect="off" autocapitalize="none" autofocus>
+        <input id="inp-email" type="email" class="input-field" placeholder="Email address" autocomplete="email" autocapitalize="none" autofocus>
 
         <div class="input-wrap">
           <input id="inp-password" type="password" class="input-field has-icon" placeholder="Password" autocomplete="current-password">
@@ -72,14 +72,7 @@
 
         <div id="msg-box" class="hidden"></div>
 
-        <div id="lockout-panel" class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-center">
-          <p class="mb-2 text-sm font-semibold text-red-700">Too many failed attempts. Try again in <span id="lockout-sec">30</span> seconds.</p>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-red-100">
-            <div id="lockout-bar" class="h-full rounded-full bg-red-400" style="width:100%"></div>
-          </div>
-        </div>
-
-        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Log in</button>
+        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Activate License</button>
       </div>
 
       <p class="mt-5 text-center text-sm text-slate-500">No account yet? <a href="/register.html" class="font-semibold text-blue-700 hover:underline">Create one</a></p>
@@ -90,28 +83,12 @@
     </section>
   </main>
 
+  <script src="/account-api.js"></script>
   <script>
-    const inpUsername = document.getElementById("inp-username");
+    const inpEmail = document.getElementById("inp-email");
     const inpPassword = document.getElementById("inp-password");
     const btnLogin = document.getElementById("btn-login");
     const msgBox = document.getElementById("msg-box");
-    const lockoutPanel = document.getElementById("lockout-panel");
-    const lockoutSec = document.getElementById("lockout-sec");
-    const lockoutBar = document.getElementById("lockout-bar");
-    const fromExtension = new URLSearchParams(window.location.search).get("from") === "extension";
-
-    const LOCKOUT_KEY = "shiyu_login_failures";
-    const LOCKOUT_TIME_KEY = "shiyu_login_lockout_until";
-    const MAX_FAILURES = 5;
-    const LOCKOUT_SECS = 30;
-
-    function getFailures() { return parseInt(localStorage.getItem(LOCKOUT_KEY) || "0", 10); }
-    function getLockoutUntil() { return parseInt(localStorage.getItem(LOCKOUT_TIME_KEY) || "0", 10); }
-    function setFailures(n) { localStorage.setItem(LOCKOUT_KEY, n); }
-    function clearFailures() {
-      localStorage.removeItem(LOCKOUT_KEY);
-      localStorage.removeItem(LOCKOUT_TIME_KEY);
-    }
 
     function showMsg(text, ok) {
       msgBox.textContent = text;
@@ -121,54 +98,9 @@
       msgBox.classList.remove("hidden");
     }
 
-    function startLockoutUI(remainSecs) {
-      btnLogin.disabled = true;
-      lockoutPanel.classList.remove("hidden");
-      msgBox.classList.add("hidden");
-
-      let seconds = remainSecs;
-      lockoutSec.textContent = seconds;
-      lockoutBar.style.transition = "none";
-      lockoutBar.style.width = (seconds / LOCKOUT_SECS * 100) + "%";
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          lockoutBar.style.transition = "width " + seconds + "s linear";
-          lockoutBar.style.width = "0%";
-        });
-      });
-
-      const timer = setInterval(() => {
-        seconds -= 1;
-        lockoutSec.textContent = seconds;
-        if (seconds <= 0) {
-          clearInterval(timer);
-          lockoutPanel.classList.add("hidden");
-          btnLogin.disabled = false;
-          clearFailures();
-        }
-      }, 1000);
+    if (new URLSearchParams(window.location.search).get("reason") === "session-expired") {
+      showMsg("Your session has expired. Please sign in again.", false);
     }
-
-    if (fromExtension) {
-      btnLogin.disabled = true;
-      btnLogin.textContent = "Preparing...";
-      fetch("/api/user/logout", { credentials: "include" })
-        .catch(() => {})
-        .finally(() => {
-          localStorage.removeItem("user");
-          localStorage.removeItem("api_token");
-          btnLogin.disabled = false;
-          btnLogin.textContent = "Log in";
-        });
-    }
-
-    (function checkOnLoad() {
-      const until = getLockoutUntil();
-      if (until && Date.now() < until) {
-        startLockoutUI(Math.ceil((until - Date.now()) / 1000));
-      }
-    })();
 
     document.getElementById("toggle-pw").addEventListener("click", () => {
       const isPassword = inpPassword.type === "password";
@@ -180,108 +112,49 @@
     async function doLogin() {
       if (btnLogin.disabled) return;
 
-      const username = inpUsername.value.trim();
+      const email = inpEmail.value.trim().toLowerCase();
       const password = inpPassword.value;
 
-      if (!username) { showMsg("Enter your username.", false); inpUsername.focus(); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg("Enter a valid email address.", false); inpEmail.focus(); return; }
       if (!password) { showMsg("Enter your password.", false); inpPassword.focus(); return; }
-
-      const until = getLockoutUntil();
-      if (until && Date.now() < until) return;
 
       btnLogin.disabled = true;
       btnLogin.textContent = "Logging in...";
       msgBox.classList.add("hidden");
 
       try {
-        const resp = await fetch("/api/user/login", {
+        const resp = await fetch(SilkReadAccountApi.url("/api/login"), {
           method: "POST",
-          credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ email, password }),
         });
-        const data = await resp.json();
+        const data = await SilkReadAccountApi.readJson(resp);
 
-        if (data.success === true) {
-          clearFailures();
-          localStorage.setItem("user", JSON.stringify(data.data));
-
-          if (fromExtension) {
-            showMsg("Login successful. Connecting your extension...", true);
-            let freshUsername = data.data?.username || data.data?.display_name || "User";
-            let freshQuota = data.data?.quota ?? 0;
-
-            try {
-              const selfResp = await fetch("/api/user/self", { credentials: "include" });
-              const selfData = await selfResp.json();
-              if (selfData.success && selfData.data) {
-                freshUsername = selfData.data.username || selfData.data.display_name || freshUsername;
-                freshQuota = selfData.data.quota ?? freshQuota;
-              }
-            } catch (_) {}
-
-            try {
-              const tokenRes = await fetch("/api/token/", {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  name: "SilkRead extension",
-                  remain_quota: 0,
-                  expired_time: -1,
-                  unlimited_quota: true,
-                }),
-              });
-              const tokenData = await tokenRes.json();
-              if (tokenData.success && tokenData.data?.key) {
-                const p = new URLSearchParams({
-                  token: tokenData.data.key,
-                  username: freshUsername,
-                  quota: String(freshQuota),
-                });
-                window.location.href = "/callback?" + p.toString();
-                return;
-              }
-              showMsg(tokenData.message || "Could not create extension token.", false);
-            } catch (err) {
-              showMsg("Could not connect the extension token. Please try again.", false);
-            }
-
-            btnLogin.disabled = false;
-            btnLogin.textContent = "Log in";
-          } else {
-            showMsg("Login successful. Redirecting...", true);
-            setTimeout(() => { window.location.href = "/dashboard.html"; }, 500);
-          }
+        if (resp.ok && data.success === true && typeof data.authToken === "string" && data.authToken.trim()) {
+          SilkReadAccountApi.saveSession(data.authToken.trim(), data.email || email);
+          showMsg("Sign-in successful. Opening your dashboard...", true);
+          setTimeout(() => { window.location.href = "/dashboard.html"; }, 500);
           return;
         }
-
-        const failures = getFailures() + 1;
-        setFailures(failures);
-        const remaining = MAX_FAILURES - failures;
-
-        if (failures >= MAX_FAILURES) {
-          const lockUntil = Date.now() + LOCKOUT_SECS * 1000;
-          localStorage.setItem(LOCKOUT_TIME_KEY, String(lockUntil));
-          startLockoutUI(LOCKOUT_SECS);
-          showMsg("Too many failed attempts. Locked for " + LOCKOUT_SECS + " seconds.", false);
-        } else {
-          showMsg((data.message || "Incorrect username or password.") + " Attempts remaining: " + remaining + ".", false);
-          inpPassword.classList.add("is-error");
-          setTimeout(() => inpPassword.classList.remove("is-error"), 1500);
-          btnLogin.disabled = false;
-          btnLogin.textContent = "Log in";
-        }
+        showMsg(SilkReadAccountApi.errorMessage(
+          resp,
+          data,
+          resp.ok ? "The sign-in response did not include an auth token." : "Incorrect email or password."
+        ), false);
+        inpPassword.classList.add("is-error");
+        setTimeout(() => inpPassword.classList.remove("is-error"), 1500);
+        btnLogin.disabled = false;
+        btnLogin.textContent = "Activate License";
       } catch (_) {
         showMsg("Network error. Please check your connection and try again.", false);
         btnLogin.disabled = false;
-        btnLogin.textContent = "Log in";
+        btnLogin.textContent = "Activate License";
       }
     }
 
     btnLogin.addEventListener("click", doLogin);
     inpPassword.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-    inpUsername.addEventListener("keydown", (e) => { if (e.key === "Enter") inpPassword.focus(); });
+    inpEmail.addEventListener("keydown", (e) => { if (e.key === "Enter") inpPassword.focus(); });
     inpPassword.addEventListener("input", () => inpPassword.classList.remove("is-error"));
   </script>
 </body>
