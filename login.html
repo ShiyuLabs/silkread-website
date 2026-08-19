@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Activate a SilkRead License to manage pay-as-you-go AI Credits.">
-  <title>Activate License - SilkRead</title>
+  <meta name="description" content="Log in to SilkRead to manage your pay-as-you-go AI Credits.">
+  <title>Log in - SilkRead</title>
   <link rel="icon" type="image/svg+xml" href="/silkread-logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -50,8 +50,8 @@
   <main class="flex min-h-[calc(100vh-64px)] items-center justify-center px-4 py-10">
     <section class="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
       <div class="mb-7 text-center">
-        <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Activate your SilkRead License</h1>
-        <p class="mt-2 text-sm leading-6 text-slate-500">Connect your SilkRead License and manage your AI Credits.</p>
+        <h1 class="text-2xl font-extrabold tracking-normal text-slate-950">Log in to SilkRead</h1>
+        <p class="mt-2 text-sm leading-6 text-slate-500">Sign in to manage your AI Credits and translation account.</p>
       </div>
 
       <div class="space-y-4">
@@ -72,7 +72,7 @@
 
         <div id="msg-box" class="hidden"></div>
 
-        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Activate License</button>
+        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Log in</button>
       </div>
 
       <p class="mt-5 text-center text-sm text-slate-500">No account yet? <a href="/register.html" class="font-semibold text-blue-700 hover:underline">Create one</a></p>
@@ -144,11 +144,11 @@
         inpPassword.classList.add("is-error");
         setTimeout(() => inpPassword.classList.remove("is-error"), 1500);
         btnLogin.disabled = false;
-        btnLogin.textContent = "Activate License";
+        btnLogin.textContent = "Log in";
       } catch (_) {
         showMsg("Network error. Please check your connection and try again.", false);
         btnLogin.disabled = false;
-        btnLogin.textContent = "Activate License";
+        btnLogin.textContent = "Log in";
       }
     }
 
