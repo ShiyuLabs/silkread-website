@@ -4,10 +4,14 @@
   "description": "Vercel serverless backend for translator extension",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:turnstile-config": "node scripts/generate-turnstile-config.js"
   },
   "dependencies": {
     "@vercel/kv": "^1.0.0",
     "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "terser": "^5.47.1"
   }
 }

@@ -6,7 +6,7 @@
     INVALID_EMAIL: "Enter a valid email address.",
     INVALID_PASSWORD: "Enter a valid password.",
     PASSWORD_TOO_SHORT: "Password must be at least 6 characters.",
-    INVALID_CODE: "Enter the 6-digit verification code.",
+    INVALID_CODE: "Enter the 4-digit verification code.",
     INVALID_VERIFICATION_CODE: "The verification code is incorrect.",
     VERIFICATION_CODE_INVALID: "The verification code is incorrect.",
     CODE_INCORRECT: "The verification code is incorrect.",
@@ -24,6 +24,11 @@
     TOO_MANY_ATTEMPTS: "Too many attempts. Please try again later.",
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
     TOO_MANY_REQUESTS: "Too many requests. Please wait a moment and try again.",
+    TURNSTILE_REQUIRED: "Complete the security check and try again.",
+    TURNSTILE_INVALID: "Security verification failed. Please retry.",
+    TURNSTILE_FAILED: "Security verification failed. Please retry.",
+    CAPTCHA_REQUIRED: "Complete the security check and try again.",
+    CAPTCHA_INVALID: "Security verification failed. Please retry.",
     UNAUTHORIZED: "Your session has expired. Please sign in again.",
     MAIL_SERVICE_UNAVAILABLE: "Email service is temporarily unavailable. Please try again later.",
     EMAIL_SEND_FAILED: "The verification email could not be sent. Please try again later.",
@@ -86,6 +91,11 @@
     localStorage.removeItem("user");
   }
 
+  function getTurnstileSiteKey() {
+    const key = String(global.SILKREAD_TURNSTILE_SITE_KEY || '').trim();
+    return key || null;
+  }
+
   global.SilkReadAccountApi = Object.freeze({
     BASE_URL,
     url,
@@ -94,5 +104,6 @@
     authHeaders,
     saveSession,
     clearSession,
+    getTurnstileSiteKey,
   });
 })(window);

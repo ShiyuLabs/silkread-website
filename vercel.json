@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build:turnstile-config",
   "rewrites": [
     { "source": "/login",     "destination": "/login.html" },
     { "source": "/register",  "destination": "/register.html" },

@@ -65,16 +65,17 @@
         </div>
 
         <div>
+          <label for="inp-code" class="mb-1 block text-sm font-semibold text-slate-700">Verification Code</label>
           <div class="flex gap-2">
-            <input id="inp-code" type="text" class="input-field min-w-0" placeholder="6-digit verification code" autocomplete="one-time-code" inputmode="numeric" maxlength="6">
-            <button id="btn-send-code" type="button" class="min-w-[112px] shrink-0 rounded-md border border-blue-700 px-3 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400" disabled>Send code</button>
+            <input id="inp-code" type="text" class="input-field min-w-0" placeholder="Enter 4-digit code" autocomplete="one-time-code" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}">
+            <button id="btn-send-code" type="button" class="min-w-[112px] shrink-0 rounded-md border border-blue-700 px-3 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400" disabled>Send Code</button>
           </div>
-          <p id="hint-code" class="hint text-slate-400">The code is valid for 10 minutes.</p>
+          <p id="hint-code" class="hint text-slate-400">Verification Code. The code is valid for 10 minutes.</p>
         </div>
 
         <div>
           <div class="input-wrap">
-            <input id="inp-password" type="password" class="input-field has-icon" placeholder="Password, at least 6 characters" autocomplete="new-password">
+            <input id="inp-password" type="password" class="input-field has-icon" placeholder="At least 6 characters with letters and numbers" autocomplete="new-password">
             <button type="button" class="eye-btn" id="toggle-password" tabindex="-1" aria-label="Toggle password visibility">
               <svg id="eye1-show" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -117,6 +118,9 @@
           <span>I agree to the <a href="/terms.html" class="font-semibold text-blue-700 hover:underline">Terms of Service</a> and <a href="/privacy.html" class="font-semibold text-blue-700 hover:underline">Privacy Policy</a>.</span>
         </label>
 
+        <div id="turnstile-register" class="min-h-[65px]" aria-label="Human verification"></div>
+        <p id="hint-turnstile" class="hint text-slate-400">Complete the security check to continue.</p>
+
         <div id="msg-box" class="hidden"></div>
 
         <button id="btn-register" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" disabled>Create account</button>
@@ -126,6 +130,8 @@
     </section>
   </main>
 
+  <script src="/turnstile-config.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="/account-api.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
@@ -137,9 +143,12 @@
     const btnSendCode = $("btn-send-code");
     const btnRegister = $("btn-register");
     const msgBox = $("msg-box");
-    const V = { email: false, code: false, password: false, password2: false, agree: false };
+    const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
+    const V = { email: false, code: false, password: false, password2: false, agree: false, turnstile: false };
     let resendSeconds = 0;
     let resendTimer = null;
+    let turnstileToken = "";
+    let turnstileWidgetId = null;
 
     function syncBtn() {
       btnRegister.disabled = !Object.values(V).every(Boolean);
@@ -154,8 +163,8 @@
     }
 
     function syncSendCode() {
-      btnSendCode.disabled = !V.email || resendSeconds > 0;
-      btnSendCode.textContent = resendSeconds > 0 ? "Resend in " + resendSeconds + "s" : "Send code";
+      btnSendCode.disabled = !V.email || !V.turnstile || resendSeconds > 0;
+      btnSendCode.textContent = resendSeconds > 0 ? "Resend in " + resendSeconds + "s" : "Send Code";
     }
 
     inpEmail.addEventListener("input", () => {
@@ -182,11 +191,11 @@
     });
 
     inpCode.addEventListener("input", () => {
-      const code = inpCode.value.replace(/\D/g, "").slice(0, 6);
+      const code = inpCode.value.replace(/\D/g, "").slice(0, 4);
       inpCode.value = code;
-      V.code = /^\d{6}$/.test(code);
+      V.code = /^\d{4}$/.test(code);
       inpCode.className = "input-field min-w-0" + (code && !V.code ? " is-error" : V.code ? " is-success" : "");
-      $("hint-code").textContent = V.code ? "Verification code format looks good." : "The code is valid for 10 minutes.";
+      $("hint-code").textContent = V.code ? "Verification Code format looks good." : "Verification Code. Enter the 4-digit code sent to your email.";
       $("hint-code").className = "hint " + (V.code ? "text-green-700" : "text-slate-400");
       syncBtn();
     });
@@ -202,6 +211,46 @@
       }, 1000);
     }
 
+    function resetTurnstile() {
+      turnstileToken = "";
+      V.turnstile = false;
+      if (window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
+      syncSendCode();
+      syncBtn();
+    }
+
+    function renderTurnstile() {
+      const siteKey = SilkReadAccountApi.getTurnstileSiteKey();
+      const hint = $("hint-turnstile");
+      if (!siteKey || !window.turnstile) {
+        hint.textContent = "Security verification is unavailable. Please refresh and try again.";
+        hint.className = "hint text-red-600";
+        return;
+      }
+      turnstileWidgetId = window.turnstile.render("#turnstile-register", {
+        sitekey: siteKey,
+        callback: token => {
+          turnstileToken = token;
+          V.turnstile = true;
+          hint.textContent = "Security check complete.";
+          hint.className = "hint text-green-700";
+          syncSendCode();
+          syncBtn();
+        },
+        "expired-callback": resetTurnstile,
+        "error-callback": () => {
+          turnstileToken = "";
+          V.turnstile = false;
+          hint.textContent = "Security verification failed. Please retry.";
+          hint.className = "hint text-red-600";
+          syncSendCode();
+          syncBtn();
+        },
+      });
+    }
+
+    window.addEventListener("load", renderTurnstile);
+
     async function sendCode() {
       if (btnSendCode.disabled) return;
       btnSendCode.disabled = true;
@@ -209,10 +258,12 @@
       msgBox.classList.add("hidden");
 
       try {
+        const verificationToken = turnstileToken;
+        resetTurnstile();
         const resp = await fetch(SilkReadAccountApi.url("/api/sendCode"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: inpEmail.value.trim().toLowerCase() }),
+          body: JSON.stringify({ email: inpEmail.value.trim().toLowerCase(), turnstileToken: verificationToken }),
         });
         const data = await SilkReadAccountApi.readJson(resp);
         if (resp.ok && data.success === true) {
@@ -267,24 +318,22 @@
 
       wrap.classList.remove("hidden");
       const level = strengthLevel(password);
-      const longEnough = password.length >= 6;
-      const hasLetters = /[a-zA-Z]/.test(password);
-      const hasNumbers = /[0-9]/.test(password);
-      const color = !longEnough ? "#ef4444" : STRENGTH_COLOR[level - 1];
+      const isValid = PASSWORD_PATTERN.test(password);
+      const color = !isValid ? "#ef4444" : STRENGTH_COLOR[level - 1];
 
       $("sb1").style.background = password.length > 0 ? color : "#e5e7eb";
-      $("sb2").style.background = longEnough && level >= 2 ? color : "#e5e7eb";
-      $("sb3").style.background = longEnough && level >= 3 ? color : "#e5e7eb";
+      $("sb2").style.background = isValid && level >= 2 ? color : "#e5e7eb";
+      $("sb3").style.background = isValid && level >= 3 ? color : "#e5e7eb";
 
       const label = $("strength-label");
-      if (!longEnough) {
+      if (password.length < 6) {
         label.textContent = "Password is too short. Add " + (6 - password.length) + " more character(s).";
         label.style.color = "#ef4444";
         V.password = false;
-      } else if (!hasLetters || !hasNumbers) {
-        label.textContent = "Accepted. Add both letters and numbers for a stronger password.";
-        label.style.color = STRENGTH_COLOR[0];
-        V.password = true;
+      } else if (!isValid) {
+        label.textContent = "Use at least one letter and one number.";
+        label.style.color = "#ef4444";
+        V.password = false;
       } else {
         label.textContent = STRENGTH_TEXT[level - 1];
         label.style.color = STRENGTH_COLOR[level - 1];
@@ -344,16 +393,18 @@
       const email = inpEmail.value.trim().toLowerCase();
       const password = inpPassword.value;
       const code = inpCode.value;
+      const verificationToken = turnstileToken;
 
       btnRegister.disabled = true;
       btnRegister.textContent = "Creating account...";
       msgBox.classList.add("hidden");
+      resetTurnstile();
 
       try {
         const resp = await fetch(SilkReadAccountApi.url("/api/register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, code }),
+          body: JSON.stringify({ email, password, code, turnstileToken: verificationToken }),
         });
         const data = await SilkReadAccountApi.readJson(resp);
 
