@@ -70,9 +70,12 @@
           </button>
         </div>
 
+        <div id="turnstile-login" class="min-h-[65px]" aria-label="Human verification"></div>
+        <p id="hint-turnstile" class="hint text-slate-400">Complete the security check to continue.</p>
+
         <div id="msg-box" class="hidden"></div>
 
-        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">Log in</button>
+        <button id="btn-login" class="w-full rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" disabled>Log in</button>
       </div>
 
       <p class="mt-5 text-center text-sm text-slate-500">No account yet? <a href="/register.html" class="font-semibold text-blue-700 hover:underline">Create one</a></p>
@@ -83,12 +86,16 @@
     </section>
   </main>
 
+  <script src="/turnstile-config.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script src="/account-api.js"></script>
   <script>
     const inpEmail = document.getElementById("inp-email");
     const inpPassword = document.getElementById("inp-password");
     const btnLogin = document.getElementById("btn-login");
     const msgBox = document.getElementById("msg-box");
+    let turnstileToken = "";
+    let turnstileWidgetId = null;
 
     function showMsg(text, ok) {
       msgBox.textContent = text;
@@ -102,6 +109,43 @@
       showMsg("Your session has expired. Please sign in again.", false);
     }
 
+    function setTurnstileReady(token) {
+      turnstileToken = token || "";
+      btnLogin.disabled = !turnstileToken;
+      document.getElementById("hint-turnstile").textContent = turnstileToken
+        ? "Security check complete."
+        : "Complete the security check to continue.";
+      document.getElementById("hint-turnstile").className = "hint " + (turnstileToken ? "text-green-700" : "text-slate-400");
+    }
+
+    function resetTurnstile() {
+      setTurnstileReady("");
+      if (window.turnstile && turnstileWidgetId !== null) window.turnstile.reset(turnstileWidgetId);
+    }
+
+    function renderTurnstile() {
+      const siteKey = SilkReadAccountApi.getTurnstileSiteKey();
+      const hint = document.getElementById("hint-turnstile");
+      if (!siteKey || !window.turnstile) {
+        hint.textContent = "Security verification is unavailable. Please refresh and try again.";
+        hint.className = "hint text-red-600";
+        btnLogin.disabled = true;
+        return;
+      }
+      turnstileWidgetId = window.turnstile.render("#turnstile-login", {
+        sitekey: siteKey,
+        callback: setTurnstileReady,
+        "expired-callback": resetTurnstile,
+        "error-callback": () => {
+          resetTurnstile();
+          hint.textContent = "Security verification failed. Please retry.";
+          hint.className = "hint text-red-600";
+        },
+      });
+    }
+
+    window.addEventListener("load", renderTurnstile);
+
     document.getElementById("toggle-pw").addEventListener("click", () => {
       const isPassword = inpPassword.type === "password";
       inpPassword.type = isPassword ? "text" : "password";
@@ -114,6 +158,7 @@
 
       const email = inpEmail.value.trim().toLowerCase();
       const password = inpPassword.value;
+      const verificationToken = turnstileToken;
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg("Enter a valid email address.", false); inpEmail.focus(); return; }
       if (!password) { showMsg("Enter your password.", false); inpPassword.focus(); return; }
@@ -121,12 +166,13 @@
       btnLogin.disabled = true;
       btnLogin.textContent = "Logging in...";
       msgBox.classList.add("hidden");
+      resetTurnstile();
 
       try {
         const resp = await fetch(SilkReadAccountApi.url("/api/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, turnstileToken: verificationToken }),
         });
         const data = await SilkReadAccountApi.readJson(resp);
 
@@ -139,15 +185,14 @@
         showMsg(SilkReadAccountApi.errorMessage(
           resp,
           data,
-          resp.ok ? "The sign-in response did not include an auth token." : "Incorrect email or password."
+          resp.ok ? "The sign-in response did not include an auth token." : "Incorrect email or password.",
+          { badRequest: "Please check your email, password, and security verification." }
         ), false);
         inpPassword.classList.add("is-error");
         setTimeout(() => inpPassword.classList.remove("is-error"), 1500);
-        btnLogin.disabled = false;
         btnLogin.textContent = "Log in";
       } catch (_) {
         showMsg("Network error. Please check your connection and try again.", false);
-        btnLogin.disabled = false;
         btnLogin.textContent = "Log in";
       }
     }

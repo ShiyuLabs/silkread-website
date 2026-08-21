@@ -25,10 +25,15 @@
     RATE_LIMITED: "Too many requests. Please wait a moment and try again.",
     TOO_MANY_REQUESTS: "Too many requests. Please wait a moment and try again.",
     TURNSTILE_REQUIRED: "Complete the security check and try again.",
+    TURNSTILE_TOKEN_REQUIRED: "Complete the security check and try again.",
     TURNSTILE_INVALID: "Security verification failed. Please retry.",
     TURNSTILE_FAILED: "Security verification failed. Please retry.",
     CAPTCHA_REQUIRED: "Complete the security check and try again.",
     CAPTCHA_INVALID: "Security verification failed. Please retry.",
+    BAD_REQUEST: "Please check the submitted information and try again.",
+    INVALID_REQUEST: "Please check the submitted information and try again.",
+    MISSING_EMAIL: "Enter your email address.",
+    MISSING_PASSWORD: "Enter your password.",
     UNAUTHORIZED: "Your session has expired. Please sign in again.",
     MAIL_SERVICE_UNAVAILABLE: "Email service is temporarily unavailable. Please try again later.",
     EMAIL_SEND_FAILED: "The verification email could not be sent. Please try again later.",
@@ -63,6 +68,7 @@
 
     const message = String(data?.message || "").trim();
     if (message && /^[\x20-\x7E]+$/.test(message)) return message;
+    if (response.status === 400 && options?.badRequest) return options.badRequest;
     return fallback;
   }
 
