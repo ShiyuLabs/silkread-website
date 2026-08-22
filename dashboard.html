@@ -200,6 +200,8 @@
 
     initializePaddle();
 
+    let authenticatedUserEmail = "";
+
     function showState(id) {
       ["state-loading", "state-error", "state-content"].forEach((stateId) => {
         document.getElementById(stateId).classList.toggle("hidden", stateId !== id);
@@ -250,7 +252,9 @@
           return;
         }
 
-        const email = data.email || data.data?.email || storedEmail || "SilkRead account";
+        const authenticatedEmail = String(data.email || data.data?.email || "").trim();
+        if (authenticatedEmail) authenticatedUserEmail = authenticatedEmail;
+        const email = authenticatedEmail || storedEmail || "SilkRead account";
         if (email !== "SilkRead account") localStorage.setItem("authEmail", email);
 
         document.getElementById("welcome-name").textContent = email;
@@ -327,6 +331,30 @@
       }
     }
 
+    async function openPaddleTransaction(transactionId, email) {
+      if (!window.Paddle || !window.Paddle.Checkout || typeof window.Paddle.Checkout.open !== "function") {
+        return false;
+      }
+      try {
+        const result = window.Paddle.Checkout.open({
+          transactionId,
+          customer: { email },
+          settings: {
+            displayMode: "overlay",
+            allowLogout: false,
+          },
+        });
+        if (result && typeof result.then === "function") await result;
+        return true;
+      } catch (error) {
+        console.error("[SilkRead] Paddle Checkout.open failed:", {
+          message: error instanceof Error ? error.message : String(error),
+          transactionId: redactTransactionId(transactionId),
+        });
+        return false;
+      }
+    }
+
     async function startCheckout(plan) {
       if (!PADDLE_PLANS.has(plan)) return;
 
@@ -359,13 +387,25 @@
         }
 
         if (response.ok && data.success === true) {
+          const transactionId = String(data.transactionId || "").trim();
+          if (!transactionId || !authenticatedUserEmail) {
+            console.debug("Paddle checkout response missing transaction or authenticated email", {
+              transactionId: redactTransactionId(transactionId),
+              hasAuthenticatedEmail: Boolean(authenticatedUserEmail),
+            });
+            showCheckoutMessage("Checkout could not be opened. Please try again.", false);
+            return;
+          }
+
+          if (await openPaddleTransaction(transactionId, authenticatedUserEmail)) return;
+
           const checkoutUrl = getSafeCheckoutUrl(data.checkoutUrl);
           if (checkoutUrl) {
             window.location.assign(checkoutUrl);
             return;
           }
-          console.debug("Paddle checkout created without checkout URL", {
-            transactionId: redactTransactionId(data.transactionId),
+          console.debug("Paddle checkout created without usable checkout URL", {
+            transactionId: redactTransactionId(transactionId),
           });
           showCheckoutMessage("Checkout could not be opened. Please try again.", false);
           return;
