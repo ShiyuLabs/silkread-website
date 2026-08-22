@@ -180,8 +180,26 @@
     </div>
   </footer>
 
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
   <script src="/account-api.js"></script>
   <script>
+    const PADDLE_CLIENT_TOKEN = "live_619b5c9378e0b7e2c2f24c4af93";
+
+    function initializePaddle() {
+      if (window.__silkReadPaddleInitialized) return;
+      try {
+        if (!window.Paddle || typeof window.Paddle.Initialize !== "function") {
+          throw new Error("Paddle.js v2 did not load.");
+        }
+        window.Paddle.Initialize({ token: PADDLE_CLIENT_TOKEN });
+        window.__silkReadPaddleInitialized = true;
+      } catch (error) {
+        console.error("[SilkRead] Paddle initialization failed:", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    initializePaddle();
+
     function showState(id) {
       ["state-loading", "state-error", "state-content"].forEach((stateId) => {
         document.getElementById(stateId).classList.toggle("hidden", stateId !== id);
