@@ -108,7 +108,7 @@
             </div>
             <p class="mt-4 rounded-md bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">50,000 AI Credits</p>
             <p class="mt-2 text-sm text-slate-600">Up to ~2M Economy source tokens · No expiration</p>
-            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Starter', 5, '50,000')">Buy Credits</button>
+            <button type="button" data-paddle-plan="starter" class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60" onclick="startCheckout('starter', this)">Buy Credits</button>
           </article>
 
           <article class="plan-card border-blue-600 shadow-sm">
@@ -123,7 +123,7 @@
             <p class="mt-2 text-sm text-slate-600">120,000 base Credits</p>
             <p class="mt-2 text-sm font-semibold text-blue-700">+30,000 Launch Bonus</p>
             <p class="mt-2 text-sm text-slate-600">Up to ~6M Economy source tokens · No expiration</p>
-            <button class="mt-6 rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800" onclick="contactPurchase('Reader', 10, '120,000')">Buy Credits</button>
+            <button type="button" data-paddle-plan="reader" class="mt-6 rounded-md bg-blue-700 px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60" onclick="startCheckout('reader', this)">Buy Credits</button>
           </article>
 
           <article class="plan-card">
@@ -138,9 +138,11 @@
             <p class="mt-2 text-sm text-slate-600">350,000 base Credits</p>
             <p class="mt-2 text-sm font-semibold text-slate-700">+50,000 Launch Bonus</p>
             <p class="mt-2 text-sm text-slate-600">Up to ~16M Economy source tokens · No expiration</p>
-            <button class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800" onclick="contactPurchase('Pro', 25, '350,000')">Buy Credits</button>
+            <button type="button" data-paddle-plan="pro" class="mt-6 rounded-md bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60" onclick="startCheckout('pro', this)">Buy Credits</button>
           </article>
         </div>
+
+        <p id="checkout-message" class="hidden mt-4 text-center text-sm font-semibold" role="status" aria-live="polite"></p>
 
         <p class="mt-4 text-center text-xs leading-5 text-slate-500">Buyer support and billing questions: <a href="mailto:support@getsilkread.com" class="font-semibold text-blue-700 hover:underline">support@getsilkread.com</a></p>
       </section>
@@ -278,11 +280,94 @@
       }, 2200);
     }
 
-    function contactPurchase(pack, price, tokens) {
-      const subject = encodeURIComponent("SilkRead " + pack + " AI Credits");
-      const body = encodeURIComponent("Hello SilkRead support,\n\nI would like to purchase the " + pack + " AI Credits package: $" + price + " for " + tokens + " AI Credits.\n\nMy account email is: " + (localStorage.getItem("authEmail") || ""));
-      window.location.href = "mailto:support@getsilkread.com?subject=" + subject + "&body=" + body;
-      showToast("Opening your email app for buyer support.");
+    const PADDLE_PLANS = new Set(["starter", "reader", "pro"]);
+
+    function showCheckoutMessage(text, ok) {
+      const message = document.getElementById("checkout-message");
+      message.textContent = text;
+      message.className = "mt-4 text-center text-sm font-semibold " + (ok ? "text-green-700" : "text-red-700");
+    }
+
+    function setCheckoutButtonsDisabled(disabled) {
+      document.querySelectorAll("[data-paddle-plan]").forEach((button) => {
+        button.disabled = disabled;
+        button.textContent = disabled ? "Opening checkout..." : "Buy Credits";
+      });
+    }
+
+    function redactTransactionId(transactionId) {
+      const value = String(transactionId || "");
+      return value.length > 8 ? value.slice(0, 4) + "..." + value.slice(-4) : "[redacted]";
+    }
+
+    function getSafeCheckoutUrl(value) {
+      try {
+        const url = new URL(String(value || ""));
+        return url.protocol === "https:" ? url.href : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function startCheckout(plan) {
+      if (!PADDLE_PLANS.has(plan)) return;
+
+      const authToken = String(localStorage.getItem("authToken") || "").trim();
+      if (!authToken) {
+        SilkReadAccountApi.clearSession();
+        window.location.href = "/login.html?reason=session-expired";
+        return;
+      }
+
+      setCheckoutButtonsDisabled(true);
+      showCheckoutMessage("Creating secure checkout...", true);
+
+      try {
+        const response = await fetch(SilkReadAccountApi.url("/api/paddle/checkout"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + authToken,
+          },
+          body: JSON.stringify({ plan }),
+        });
+        const data = await SilkReadAccountApi.readJson(response);
+
+        if (response.status === 401) {
+          SilkReadAccountApi.clearSession();
+          showCheckoutMessage("Your session has expired. Please sign in again.", false);
+          setTimeout(() => { window.location.href = "/login.html?reason=session-expired"; }, 700);
+          return;
+        }
+
+        if (response.ok && data.success === true) {
+          const checkoutUrl = getSafeCheckoutUrl(data.checkoutUrl);
+          if (checkoutUrl) {
+            window.location.assign(checkoutUrl);
+            return;
+          }
+          console.debug("Paddle checkout created without checkout URL", {
+            transactionId: redactTransactionId(data.transactionId),
+          });
+          showCheckoutMessage("Checkout could not be opened. Please try again.", false);
+          return;
+        }
+
+        const errorCode = String(data.error || "").trim().toUpperCase();
+        if (errorCode === "PADDLE_UNAVAILABLE" || errorCode === "PADDLE_ERROR") {
+          showCheckoutMessage("Recharge service is temporarily unavailable. Please try again.", false);
+          return;
+        }
+        showCheckoutMessage(SilkReadAccountApi.errorMessage(
+          response,
+          data,
+          "Checkout could not be opened. Please try again."
+        ), false);
+      } catch (_) {
+        showCheckoutMessage("Checkout could not be opened. Please try again.", false);
+      } finally {
+        setCheckoutButtonsDisabled(false);
+      }
     }
 
     loadUser();
