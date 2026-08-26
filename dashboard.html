@@ -184,6 +184,14 @@
   <script src="/account-api.js"></script>
   <script>
     const PADDLE_CLIENT_TOKEN = "live_619b5c9378e0b7e2c2f24c4af93";
+    const BALANCE_POLL_INTERVAL_MS = 2000;
+    const BALANCE_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+    let authenticatedUserEmail = "";
+    let currentBalance = null;
+    let balanceBeforePurchase = null;
+    let balanceConfirmationActive = false;
+    let balanceConfirmationDeadline = 0;
+    let checkoutCompletedReceived = false;
 
     function initializePaddle() {
       if (window.__silkReadPaddleInitialized) return;
@@ -191,7 +199,10 @@
         if (!window.Paddle || typeof window.Paddle.Initialize !== "function") {
           throw new Error("Paddle.js v2 did not load.");
         }
-        window.Paddle.Initialize({ token: PADDLE_CLIENT_TOKEN });
+        window.Paddle.Initialize({
+          token: PADDLE_CLIENT_TOKEN,
+          eventCallback: handlePaddleEvent,
+        });
         window.__silkReadPaddleInitialized = true;
       } catch (error) {
         console.error("[SilkRead] Paddle initialization failed:", error instanceof Error ? error.message : String(error));
@@ -199,8 +210,6 @@
     }
 
     initializePaddle();
-
-    let authenticatedUserEmail = "";
 
     function showState(id) {
       ["state-loading", "state-error", "state-content"].forEach((stateId) => {
@@ -252,6 +261,11 @@
           return;
         }
 
+        currentBalance = Number(credits);
+        if (new URLSearchParams(window.location.search).has("_ptxn") && !Number.isFinite(balanceBeforePurchase)) {
+          balanceBeforePurchase = currentBalance;
+        }
+        if (checkoutCompletedReceived && !balanceConfirmationActive) beginBalanceConfirmation();
         const authenticatedEmail = String(data.email || data.data?.email || "").trim();
         if (authenticatedEmail) authenticatedUserEmail = authenticatedEmail;
         const email = authenticatedEmail || storedEmail || "SilkRead account";
@@ -331,6 +345,89 @@
       }
     }
 
+    function updateBalanceDisplay(credits) {
+      currentBalance = Number(credits);
+      document.getElementById("balance-display").textContent = formatTokens(currentBalance);
+    }
+
+    function stopBalanceConfirmation() {
+      balanceConfirmationActive = false;
+      balanceConfirmationDeadline = 0;
+    }
+
+    async function pollBalanceAfterPayment() {
+      if (!balanceConfirmationActive) return;
+
+      const authToken = String(localStorage.getItem("authToken") || "").trim();
+      if (!authToken) {
+        stopBalanceConfirmation();
+        return;
+      }
+
+      try {
+        const balanceUrl = SilkReadAccountApi.url("/api/balance") + "?token=" + encodeURIComponent(authToken);
+        const response = await fetch(balanceUrl, {
+          headers: SilkReadAccountApi.authHeaders(authToken),
+        });
+        const data = await SilkReadAccountApi.readJson(response);
+
+        if (response.status === 401) {
+          stopBalanceConfirmation();
+          SilkReadAccountApi.clearSession();
+          window.location.href = "/login.html?reason=session-expired";
+          return;
+        }
+
+        const credits = data.credits ?? data.data?.credits;
+        if (response.ok && Number.isFinite(Number(credits))) {
+          const updatedBalance = Number(credits);
+          if (updatedBalance > balanceBeforePurchase) {
+            stopBalanceConfirmation();
+            updateBalanceDisplay(updatedBalance);
+            showCheckoutMessage("Payment successful. Your Credits have been added.", true);
+            return;
+          }
+        }
+      } catch (_) {
+        // Keep polling until the confirmation timeout for transient failures.
+      }
+
+      if (!balanceConfirmationActive) return;
+      if (Date.now() >= balanceConfirmationDeadline) {
+        stopBalanceConfirmation();
+        showCheckoutMessage("Payment received. Your Credits are still being confirmed. Please refresh this page shortly.", false);
+        return;
+      }
+      setTimeout(() => { void pollBalanceAfterPayment(); }, BALANCE_POLL_INTERVAL_MS);
+    }
+
+    function beginBalanceConfirmation() {
+      if (!Number.isFinite(balanceBeforePurchase) || balanceConfirmationActive) return;
+      balanceConfirmationActive = true;
+      balanceConfirmationDeadline = Date.now() + BALANCE_POLL_TIMEOUT_MS;
+      void pollBalanceAfterPayment();
+    }
+
+    function handlePaddleEvent(data) {
+      if (data?.name === "checkout.completed") {
+        checkoutCompletedReceived = true;
+        try {
+          if (window.Paddle?.Checkout && typeof window.Paddle.Checkout.close === "function") {
+            window.Paddle.Checkout.close();
+          }
+        } catch (error) {
+          console.error("[SilkRead] Paddle Checkout.close failed:", error instanceof Error ? error.message : String(error));
+        }
+        showCheckoutMessage("Payment received. Confirming your Credits...", true);
+        beginBalanceConfirmation();
+        return;
+      }
+
+      if (data?.name === "checkout.closed" && !checkoutCompletedReceived && !balanceConfirmationActive) {
+        showCheckoutMessage("Checkout closed. Payment was not confirmed.", false);
+      }
+    }
+
     async function openPaddleTransaction(transactionId, email) {
       if (!window.Paddle || !window.Paddle.Checkout || typeof window.Paddle.Checkout.open !== "function") {
         return false;
@@ -367,6 +464,14 @@
 
       setCheckoutButtonsDisabled(true);
       showCheckoutMessage("Creating secure checkout...", true);
+      balanceBeforePurchase = currentBalance;
+      if (!Number.isFinite(balanceBeforePurchase)) {
+        setCheckoutButtonsDisabled(false);
+        showCheckoutMessage("Could not verify your current Credits balance. Please refresh and try again.", false);
+        return;
+      }
+      checkoutCompletedReceived = false;
+      stopBalanceConfirmation();
 
       try {
         const response = await fetch(SilkReadAccountApi.url("/api/paddle/checkout"), {
