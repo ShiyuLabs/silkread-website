@@ -2,3 +2,23 @@
 server/translator.db
 node_modules/
 turnstile-config.js
+
+# Extension build and release artifacts
+dist/
+*.zip
+
+# Local notes and temporary analysis files
+tmp*.txt
+t9.txt
+t10.txt
+wiki*.txt
+Untitled
+content_main.js
+
+# Browser/test artifacts and one-off maintenance scripts
+tests/translator-api-probe/
+scripts/fix-*.py
+scripts/remove-stale-log.py
+scripts/verify.py
+**pycache**/
+*.pyc

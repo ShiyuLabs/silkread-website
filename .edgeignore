@@ -1,0 +1,31 @@
+# Microsoft Edge 商店上传包：下列路径不应打进扩展 zip。
+# 说明：scripts/package-edge-extension.ps1 使用「白名单」只复制 manifest 必需文件；
+# 本文件供人工核对 / 未来改用通用打包工具时参考。
+
+.git/
+.gitignore
+.cursor/
+.vscode/
+
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+vercel.json
+package.json
+
+scripts/
+icon.py
+
+dist/
+*.zip
+
+# 以下为网站/Vercel 页面与内部工具页，扩展运行时不需要（manifest 未引用）
+login.html
+register.html
+callback.html
+dashboard.html
+index.html
+finance.html
+admin.html
