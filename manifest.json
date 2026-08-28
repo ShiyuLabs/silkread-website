@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SilkRead",
-  "version": "1.4.6",
+  "version": "1.5.0",
   "description": "SilkRead: immersive AI-powered bilingual web translation for global readers.",
   "permissions": [
     "storage",
@@ -14,9 +14,7 @@
     "<all_urls>",
     "https://getsilkread.com/*",
     "https://www.getsilkread.com/*",
-    "https://api.getsilkread.com/*",
-    "https://*.microsoft.com/*",
-    "https://*.microsofttranslator.com/*"
+    "https://api.getsilkread.com/*"
   ],
   "background": {
     "service_worker": "background.js"
