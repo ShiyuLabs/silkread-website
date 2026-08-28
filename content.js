@@ -120,6 +120,10 @@ let currentSourceLang = 'auto';
 let currentEngine = 'paid';
 let currentTranslationTier = 'economy';
 let translationRunTier = 'economy';
+let resolveSettingsReady;
+const settingsReady = new Promise(resolve => {
+  resolveSettingsReady = resolve;
+});
 
 let domObserver = null;
 let observerDebounceTimer = null;
@@ -311,6 +315,7 @@ chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang', 's
   currentEngine = _normalizeTranslationEngine(result.translationEngine);
   currentTranslationTier = _normalizeTranslationTier(result.translationTier);
   translationRunTier = currentTranslationTier;
+  resolveSettingsReady();
 
   if (window.self === window.top) {
     _injectFloatingBall();
@@ -622,9 +627,11 @@ function _onBallClick() {
 }
 
 function startAutoTranslate() {
-  console.log('[SilkRead] Auto translation started');
-  translatePageNow().finally(() => {
-    startLiveObserver();
+  settingsReady.then(() => {
+    console.log('[SilkRead] Auto translation started');
+    translatePageNow().finally(() => {
+      startLiveObserver();
+    });
   });
 }
 
@@ -1006,6 +1013,7 @@ function loadTranslationCache() {
 }
 
 async function translatePageNow() {
+  await settingsReady;
   if (!isContextValid()) return;
   console.log('[SilkRead] Starting translation');
   resetLazyObserver();

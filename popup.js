@@ -82,7 +82,14 @@ chrome.storage.local.get(
         updateDisplayModeUI(local.displayMode || sync.displayMode || 'bilingual');
 
         setSelectValue(sourceLangSel, local.sourceLang || sync.sourceLang || 'auto');
-        setSelectValue(targetLangSel, local.targetLang || sync.targetLang || detectBrowserLang());
+        const resolvedTargetLang = local.targetLang || sync.targetLang || detectBrowserLang();
+        setSelectValue(targetLangSel, resolvedTargetLang);
+        if (local.targetLang !== resolvedTargetLang) {
+          chrome.storage.local.set({ targetLang: resolvedTargetLang });
+        }
+        if (sync.targetLang !== resolvedTargetLang) {
+          chrome.storage.sync.set({ targetLang: resolvedTargetLang });
+        }
 
         let tier = normalizeTier(local.selectedTier);
         if (!tier) tier = normalizeTier(sync.translationTier);
