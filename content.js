@@ -1,38 +1,39 @@
-// content.js - 完整翻译解决方案
+// content.js - SilkRead page translation engine
 
 const CHUNK_SIZE = 4000;
 
-// 模型费率（积分/1K Token），用于将积分差值换算成 Token 显示
-const MODEL_CREDIT_RATES = {
-  'deepseek-v3.2': 8, 'qwen3-235b-a22b': 18, 'gemini-2.5-flash-nothinking': 25,
-  'claude-sonnet-4-6': 250,
-  // 旧 key 兼容（老用户 storage 迁移前的过渡期）
-  'deepseek-chat': 8, 'gemini-2.5-flash': 25, 'gpt-5-mini': 80,
+// Public estimated rates in Credits per 1K source tokens.
+const TIER_CREDIT_RATES = {
+  economy: 25,
+  smart: 70,
+  natural: 300,
+  expert: 600,
 };
+function _normalizeTranslationEngine(value) {
+  return value === 'free' ? 'free' : 'paid';
+}
+function _normalizeTranslationTier(value) {
+  return Object.prototype.hasOwnProperty.call(TIER_CREDIT_RATES, value) ? value : 'economy';
+}
 function _creditsToTokenStr(credits) {
-  const rate = MODEL_CREDIT_RATES[currentManagedModel] || 8;
+  const rate = TIER_CREDIT_RATES[currentTranslationTier] || 25;
   const tokens = Math.round(credits * 1000 / rate);
   return tokens >= 1000000
-    ? (tokens / 1000000).toFixed(1) + ' M Token'
+    ? (tokens / 1000000).toFixed(1) + 'M source tokens'
     : tokens >= 1000
-      ? (tokens / 1000).toFixed(1) + ' K Token'
-      : tokens + ' Token';
+      ? (tokens / 1000).toFixed(1) + 'K source tokens'
+      : tokens + ' source tokens';
 }
 
-// 双语模式 DOM 注入：原文保留，译文作为独立块元素插在后面（仿沉浸式翻译）
-const _injectedTrMap = new WeakMap();
-// 每个文本节点对应的加载转圈元素
 const _loadingMap = new WeakMap();
-
-// 本页翻译统计（AI 模式）
-let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, costCredits: 0, inputChars: 0, outputChars: 0, sellRate: 0, costRateIn: 0, costRateOut: 0 };
 
 function _showChunkLoading(chunk) {
   if (currentDisplayMode === 'original') return;
   chunk.forEach(node => {
     if (!node.parentNode || _loadingMap.has(node)) return;
-    const sp = document.createElement('font');
+    const sp = document.createElement('span');
     sp.className = 'shiyu-loading';
+    sp.setAttribute('aria-hidden', 'true');
     const next = node.nextSibling;
     if (next) node.parentNode.insertBefore(sp, next);
     else node.parentNode.appendChild(sp);
@@ -47,12 +48,60 @@ function _hideChunkLoading(chunk) {
     _loadingMap.delete(node);
   });
 }
+const _MERGE_BLOCK_TAGS = new Set([
+  'P', 'LI', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'BLOCKQUOTE', 'TD', 'TH', 'CAPTION', 'ARTICLE', 'SECTION', 'MAIN',
+  'HEADER', 'FOOTER', 'ASIDE', 'FIGURE', 'FIGCAPTION',
+  'DETAILS', 'SUMMARY', 'DT', 'DD', 'NAV', 'DIV',
+]);
 
-// 注入全局样式（document_end 时 head 已存在）
+const _blockTrMap    = new WeakMap(); // block element -> .shiyu-tr span
+const _blockTextsMap = new WeakMap(); // block element -> Map<textNode, translatedText>
+const _blockStyleSourceMap = new WeakMap(); // block element -> source element for computed text style
+const _blockStyleScoreMap = new WeakMap(); // block element -> style source score
+let _translatedElementSet = new WeakSet();
+let _translatedTextNodeSet = new WeakSet();
+
+function _getBlockAncestor(node) {
+  let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (_MERGE_BLOCK_TAGS.has(el.tagName)) return el;
+    el = el.parentElement;
+  }
+  const parent = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  return (parent && parent !== document.body) ? parent : document.documentElement;
+}
+
+function _blockMergedTranslation(block) {
+  const blockTexts = _blockTextsMap.get(block);
+  if (!blockTexts || blockTexts.size === 0) return '';
+  const sorted = [...blockTexts.keys()].sort((a, b) => {
+    if (a === b) return 0;
+    const pos = a.compareDocumentPosition(b);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+  return sorted.map(k => blockTexts.get(k)).filter(Boolean).join(' ');
+}
+
+let _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, inputChars: 0, outputChars: 0 };
+
+// Inject global styles.
 ;(function() {
-  const css = '.shiyu-tr{color:inherit;font-size:inherit;font-weight:inherit;font-family:inherit;line-height:inherit;font-style:inherit;padding:0;border:none;background:none;}.shiyu-tr-block{display:block;margin-top:2px;}.shiyu-tr-inline{display:inline;}@keyframes shiyu-spin{to{transform:rotate(360deg)}}.shiyu-loading{display:inline-block;width:.8em;height:.8em;border:2px solid rgba(59,130,246,0.3);border-top-color:#3b82f6;border-radius:50%;animation:shiyu-spin .6s linear infinite;vertical-align:middle;margin:0 3px;}html.shiyu-mode-original .shiyu-tr{display:none!important;}html.shiyu-mode-translation .shiyu-tr{display:none!important;}';
-  // Always update textContent — after extension reload the old <style> element (without
-  // the mode CSS rules) would remain, so we must overwrite it every time.
+  const css =
+  // Normal content translations own their second visual line. Compact
+  // controls are handled as text-only blocks and never receive this wrapper.
+  '.shiyu-tr{display:block!important;margin:2px 0 0!important;padding:0!important;border:none!important;background:none!important;color:inherit!important;font-weight:inherit!important;font-style:inherit!important;font-size:inherit!important;line-height:inherit!important;word-break:break-word!important;}' +
+  '.shiyu-br{content:""!important;display:block!important;flex-basis:100%!important;width:100%!important;height:0!important;margin:0!important;padding:0!important;}' +
+  '@keyframes shiyu-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}' +
+  '.shiyu-loading{display:inline-block!important;width:.8em!important;height:.8em!important;border:2px solid rgba(59,130,246,0.3)!important;border-top-color:#3b82f6!important;border-radius:50%!important;animation:shiyu-spin .65s linear infinite!important;}' +
+  'html.shiyu-mode-original .shiyu-tr{display:none!important;}' +
+  'html.shiyu-mode-original .shiyu-br{display:none!important;}' +
+  'html.shiyu-mode-translation .shiyu-tr{display:none!important;}' +
+  'html.shiyu-mode-translation .shiyu-br{display:none!important;}';
+
+
   let s = document.getElementById('__shiyu_style__');
   if (!s) {
     s = document.createElement('style');
@@ -66,33 +115,76 @@ let translationMap = {};
 let translatedElements = [];
 let currentDisplayMode = "bilingual";
 let isAutoTranslateEnabled = false;
-let currentTargetLang = 'zh-CN'; // 目标语言，用于跳过已是目标语言的文本
-let currentEngine = 'free';
-let currentManagedModel = '';
+let currentTargetLang = 'zh-CN';
+let currentSourceLang = 'auto';
+let currentEngine = 'paid';
+let currentTranslationTier = 'economy';
+let translationRunTier = 'economy';
 
-// 动态页面监听相关
 let domObserver = null;
 let observerDebounceTimer = null;
 let isTranslating = false;
-let pendingNewNodes = false; // 翻译进行中时有新节点进来，翻译完后补跑
+let pendingNewNodes = false;
 let extensionReloadNotified = false;
 
-// Observer 增量翻译流量保护
-let initialPageCharCount = 0;   // 初始全页翻译的字符量
-let observerCharCount = 0;       // Observer 累计增量翻译量
-// 增量翻译上限：初始量的 30%（防止无限滚动页面持续消耗）
+let initialPageCharCount = 0;
+let observerCharCount = 0;
 const OBSERVER_BUDGET_RATIO = 0.3;
 
-// ── Scroll-based 懒翻译（替代 IntersectionObserver）────────────────────────────
-// IntersectionObserver 的问题：observe 几百个小元素时，rootMargin 会让它们页面加载时全部同时触发
-// 改用 scroll 监听 + 300ms 防抖，每次滚动只批量翻译刚进入视口的节点
-let _belowFoldNodes = [];       // 待翻译的视口以下文本节点
+let _belowFoldNodes = [];
 let _lazyScrollTimer = null;
 let _lazyScrollAttached = false;
+let _billDebounceTimer = null;
+let _billCreditsBefore = null;
+let _lastCacheSignature = '';
 
-// 账单版本 defer—等到所有懒加载翻译都完成后再下载
-let _billDebounceTimer = null;  // 最后一批翻译完成后的抖樠定时器
-let _billCreditsBefore = null;  // translatePageNow 开头时记播的余额
+function _captureScrollAnchors(relatedNodes) {
+  const map = new Map();
+  const add = (el) => {
+    if (!el || el.nodeType !== Node.ELEMENT_NODE) return;
+    if (map.has(el)) return;
+    try { map.set(el, { el, top: el.scrollTop, left: el.scrollLeft }); } catch (_) {}
+  };
+  add(document.scrollingElement || document.documentElement);
+  try {
+    const cx = Math.max(1, window.innerWidth >> 1);
+    const cy = Math.max(1, window.innerHeight >> 1);
+    let p = document.elementFromPoint(cx, cy);
+    while (p) {
+      add(p);
+      try {
+        const cs = getComputedStyle(p);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll' || cs.overflowY === 'overlay') &&
+            p.scrollHeight > p.clientHeight + 2) { add(p); }
+      } catch (_) {}
+      p = p.parentElement;
+    }
+  } catch (_) {}
+  const arr = Array.isArray(relatedNodes) ? relatedNodes : (relatedNodes ? [relatedNodes] : []);
+  for (const node of arr) {
+    if (!node || !node.parentElement) continue;
+    let p = node.parentElement;
+    while (p) {
+      try {
+        const cs = getComputedStyle(p);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll' || cs.overflowY === 'overlay') &&
+            p.scrollHeight > p.clientHeight + 2) { add(p); }
+      } catch (_) {}
+      p = p.parentElement;
+    }
+  }
+  return [...map.values()];
+}
+
+function _restoreScrollAnchors(snap) {
+  const apply = () => {
+    for (const s of snap) {
+      try { if (s.el && s.el.isConnected) { s.el.scrollTop = s.top; s.el.scrollLeft = s.left; } } catch (_) {}
+    }
+  };
+  apply();
+  requestAnimationFrame(apply);
+}
 
 function resetLazyObserver() {
   _belowFoldNodes = [];
@@ -119,11 +211,7 @@ function _translateNewlyVisible() {
   for (const node of _belowFoldNodes) {
     if (!node.parentNode) continue;
     const rect = node.parentElement?.getBoundingClientRect();
-    if (rect && rect.top <= viewportH + 400) {
-      nowVisible.push(node);
-    } else {
-      stillHidden.push(node);
-    }
+    if (rect && rect.top <= viewportH + 400) { nowVisible.push(node); } else { stillHidden.push(node); }
   }
   _belowFoldNodes = stillHidden;
 
@@ -133,7 +221,6 @@ function _translateNewlyVisible() {
   }
   if (nowVisible.length === 0) return;
 
-  // 缓存命中直接套用，未命中的走 API
   const translatedNodeSet = new Set(translatedElements.map(e => e.node));
   const toApi = [];
   for (const n of nowVisible) {
@@ -150,267 +237,534 @@ function _translateNewlyVisible() {
   applyDisplayMode();
 
   if (toApi.length > 0) {
-    console.log(`📜 滚动加载 ${toApi.length} 个节点`);
+    console.log(`[SilkRead] Translating ${toApi.length} newly visible nodes`);
     isIncrementalTranslation = true;
-    translateNodes(toApi).then(() => {
+    const translatePromise = _isAIEngine()
+      ? translateNodes(toApi)
+      : translateBlocksFree(_blocksForLazyNodes(toApi));
+    translatePromise.then(() => {
       isIncrementalTranslation = false;
       applyDisplayMode();
       saveTranslationCache();
-      // 每批懒加载翻译完成后都重排账单 debounce
       _scheduleBill();
     });
   } else {
-    // 全部命中缓存，也触发一次
     _scheduleBill();
   }
 }
 
 function registerBelowFoldNodes(nodes) {
-  _belowFoldNodes = nodes;
-  if (nodes.length > 0 && !_lazyScrollAttached) {
+  const pending = new Set(_belowFoldNodes);
+  for (const node of (Array.isArray(nodes) ? nodes : [])) {
+    if (!node || !node.parentNode) continue;
+    if (_translatedTextNodeSet.has(node) || pending.has(node)) continue;
+    pending.add(node);
+  }
+  _belowFoldNodes = [...pending];
+  if (_belowFoldNodes.length > 0 && !_lazyScrollAttached) {
     window.addEventListener('scroll', _onLazyScroll, { passive: true });
     _lazyScrollAttached = true;
   }
 }
 
-// Extension context 有效性检查（扩展被重载后旧 content.js 应立即停止一切操作）
+// Lazy scroll stores text nodes for compatibility with the existing scroll queue,
+// while block translation needs the surrounding extracted block metadata.
+function _blocksForLazyNodes(nodes) {
+  const wanted = new Set(nodes || []);
+  const seen = new Set();
+  const result = [];
+  for (const node of wanted) {
+    if (!node || !node.parentElement) continue;
+    const scope = _getBlockAncestor(node);
+    for (const block of extractBlocks(scope)) {
+      if (!block.textNodes || !block.textNodes.some(n => wanted.has(n))) continue;
+      if (block.element && seen.has(block.element)) continue;
+      if (block.element) seen.add(block.element);
+      result.push(block);
+    }
+  }
+  return result;
+}
+
 function isContextValid() {
   try { return !!chrome.runtime?.id; } catch (_) { return false; }
 }
 
-// ============ 初始化 ============
-console.log("✅ Content script loaded");
+function _isTargetChineseText(text) {
+  if (!currentTargetLang || !currentTargetLang.startsWith('zh')) return false;
+  const t = String(text || '').trim();
+  const cjk = (t.match(/[\u4e00-\u9fa5]/g) || []).length;
+  if (cjk < 2) return false;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  if (latin === 0) return true;
+  return cjk / (cjk + latin) >= 0.35;
+}
 
-chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang', 'translationEngine', 'managedModel'], (result) => {
+// ============ Initialization ============
+console.log('[SilkRead] Content script loaded');
+
+chrome.storage.sync.get(['autoTranslateEnabled', 'displayMode', 'targetLang', 'sourceLang', 'translationEngine', 'translationTier'], (result) => {
   isAutoTranslateEnabled = result.autoTranslateEnabled === true;
   currentDisplayMode = result.displayMode || 'bilingual';
   currentTargetLang = result.targetLang || 'zh-CN';
-  currentEngine = result.translationEngine || 'free';
-  currentManagedModel = result.managedModel || '';
-  console.log("📍 Settings loaded:", { autoTranslateEnabled: isAutoTranslateEnabled, displayMode: currentDisplayMode, targetLang: currentTargetLang });
+  currentSourceLang = result.sourceLang || 'auto';
+  currentEngine = _normalizeTranslationEngine(result.translationEngine);
+  currentTranslationTier = _normalizeTranslationTier(result.translationTier);
+  translationRunTier = currentTranslationTier;
 
-  _injectFloatingBall();
-
+  if (window.self === window.top) {
+    _injectFloatingBall();
+  }
   if (isAutoTranslateEnabled) {
     startAutoTranslate();
   }
 });
 
-// ============ 悬浮球 ============
+// ============ Floating Control ============
 let _ball = null;
+let _widget = null;
 let _ballTranslated = false;
+let _widgetDragging = false;
 
 function _injectFloatingBall() {
-  if (document.getElementById('__shiyu_ball__')) return;
+  if (document.getElementById('__shiyu_widget__')) return;
   if (!document.body) { setTimeout(_injectFloatingBall, 200); return; }
+  try {
+    chrome.storage.local.get(['ballHidden'], s => {
+      if (!chrome.runtime.lastError && s.ballHidden) return;
+      _buildWidget();
+    });
+  } catch (_) { _buildWidget(); }
+}
 
-  const ball = document.createElement('div');
-  ball.id = '__shiyu_ball__';
-  _ball = ball;
+;(function() {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !('ballHidden' in changes)) return;
+    if (changes.ballHidden.newValue) {
+      if (_widget && _widget.parentNode) _widget.parentNode.removeChild(_widget);
+      _widget = null; _ball = null;
+    } else {
+      if (!_widget) _buildWidget();
+    }
+  });
+})();
 
-  const si = (k, v) => ball.style.setProperty(k, v, 'important');
+function _buildWidget() {
+  if (document.getElementById('__shiyu_widget__')) return;
 
-  // 初始定位用 right/bottom，拖拽后切换为 left/top
-  si('position', 'fixed');
-  si('right', '18px');
-  si('bottom', '80px');
-  si('left', 'auto');
-  si('top', 'auto');
-  si('width', '48px');
-  si('height', '48px');
-  si('border-radius', '50%');
-  si('background', '#fff');
-  si('border', '2.5px solid #6366f1');
-  si('box-shadow', '0 3px 14px rgba(99,102,241,0.28),0 1px 4px rgba(0,0,0,0.10)');
-  si('cursor', 'pointer');
-  si('z-index', '2147483646');
-  si('display', 'flex');
-  si('align-items', 'center');
-  si('justify-content', 'center');
-  si('font-family', 'system-ui,"PingFang SC","Microsoft YaHei",sans-serif');
-  si('font-size', '16px');
-  si('font-weight', '700');
-  si('color', '#6366f1');
-  si('user-select', 'none');
-  si('transition', 'box-shadow .2s');
-  si('touch-action', 'none');
-  si('box-sizing', 'border-box');
-  si('padding', '0');
-  si('margin', '0');
-  si('line-height', '1');
-  si('text-align', 'center');
-  si('pointer-events', 'auto');
+  const SVG_DOTS = `<svg width="18" height="5" viewBox="0 0 18 5" aria-hidden="true"><circle cx="2.5" cy="2.5" r="1.15" fill="#64748b"/><circle cx="9" cy="2.5" r="1.15" fill="#64748b"/><circle cx="15.5" cy="2.5" r="1.15" fill="#64748b"/></svg>`;
+  const SVG_CHECK = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12.5L9.5 17L19 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const BALL_PX = 28;
+  const SVG_BALL_IDLE = `<svg class="tr-ball-svg" width="${BALL_PX}" height="${BALL_PX}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<g fill="none" stroke="rgba(255,255,255,0.44)" stroke-width="0.38" stroke-linecap="round">
+  <line x1="12" y1="5.0" x2="12" y2="8.5"/><line x1="12" y1="15.5" x2="12" y2="19.0"/>
+  <line x1="5.0" y1="12" x2="8.5" y2="12"/><line x1="15.5" y1="12" x2="19.0" y2="12"/>
+  <line x1="7.15" y1="7.15" x2="9.75" y2="9.75"/><line x1="14.25" y1="14.25" x2="16.85" y2="16.85"/>
+  <line x1="16.85" y1="7.15" x2="14.25" y2="9.75"/><line x1="9.75" y1="14.25" x2="7.15" y2="16.85"/>
+</g>
+<path fill="rgba(255,255,255,0.78)" d="M19.5 2L20.2 4.8L23 5.5L20.2 6.2L19.5 9L18.8 6.2L16 5.5L18.8 4.8Z"/>
+<path fill="rgba(255,255,255,0.78)" d="M5 16.5L5.55 18.45L7.5 19L5.55 19.55L5 21.5L4.45 19.55L2.5 19L4.45 18.45Z"/>
+<text x="12" y="15.8" text-anchor="middle" fill="#ffffff" font-family="Segoe Script,Brush Script MT,Apple Chancery,cursive" font-size="11.5" font-weight="700">S</text>
+</svg>`;
 
-  ball.title = '诗语翻译 - 点击翻译本页';
-  ball.textContent = '译';
+  const MODE_BTN_W = 28;
+  const MODE_BTN_H = 15;
+  const WIDGET_GAP = 6;
+  const HOST_W = Math.max(BALL_PX, MODE_BTN_W);
+  const STACK_H = MODE_BTN_H + WIDGET_GAP + BALL_PX;
 
-  // hover: 只加深阴影，不 scale（scale 会导致视觉中心偏移、难以点击）
-  const _shadowNormal = '0 3px 14px rgba(99,102,241,0.28),0  1px 4px rgba(0,0,0,0.10)';
-  const _shadowHover  = '0 6px 24px rgba(99,102,241,0.50),0 2px 8px rgba(0,0,0,0.13)';
-  ball.addEventListener('mouseenter', () => { if (!_ballDragging) ball.style.setProperty('box-shadow', _shadowHover, 'important'); });
-  ball.addEventListener('mouseleave', () => { ball.style.setProperty('box-shadow', _shadowNormal, 'important'); });
+  const host = document.createElement('div');
+  host.id = '__shiyu_widget__';
+  host.className = 'notranslate shiyu-extension-root';
+  host.setAttribute('translate', 'no');
+  host.setAttribute('data-shiyu', 'widget');
+  _widget = host;
+  const hsi = (k, v) => host.style.setProperty(k, v, 'important');
+  hsi('position', 'fixed');
+  hsi('right', '30px');
+  hsi('bottom', '40px');
+  hsi('left', 'auto');
+  hsi('top', 'auto');
+  hsi('z-index', '2147483647');
+  hsi('width', HOST_W + 'px');
+  hsi('pointer-events', 'auto');
+  hsi('opacity', '0.82');
+  hsi('transition', 'opacity 0.2s ease');
+  hsi('touch-action', 'none');
+  hsi('user-select', 'none');
+  host.addEventListener('mouseenter', () => hsi('opacity', '1'));
+  host.addEventListener('mouseleave', () => hsi('opacity', '0.82'));
 
-  // 拖拽：pointerdown 时立刻切换到 left/top 定位，避免方向混乱
-  let _pointerDown = false;  // 必须按住才能拖，防止松开后 move 事件误触发
-  let _ballDragging = false;
-  let _dragStartX, _dragStartY, _ballInitLeft, _ballInitTop;
+  const shadow = host.attachShadow({ mode: 'open' });
 
-  ball.addEventListener('pointerdown', (e) => {
-    _pointerDown = true;
-    _ballDragging = false;
-    _dragStartX = e.clientX;
-    _dragStartY = e.clientY;
-    const rect = ball.getBoundingClientRect();
-    _ballInitLeft = rect.left;
-    _ballInitTop  = rect.top;
-    // 切换到 left/top，数学直接：新位置 = 初始位置 + 鼠标偏移
-    ball.style.setProperty('right',  'auto', 'important');
-    ball.style.setProperty('bottom', 'auto', 'important');
-    ball.style.setProperty('left', _ballInitLeft + 'px', 'important');
-    ball.style.setProperty('top',  _ballInitTop  + 'px', 'important');
-    ball.setPointerCapture(e.pointerId);
-    e.preventDefault();
+  shadow.innerHTML = `<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+.widget{display:flex;flex-direction:column;align-items:center;gap:${WIDGET_GAP}px;pointer-events:auto;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;}
+.mode-wrap{position:relative;width:${MODE_BTN_W}px;height:${MODE_BTN_H}px;pointer-events:auto;flex-shrink:0;}
+.mode-btn{width:100%;height:100%;border-radius:${MODE_BTN_H / 2}px;background:rgba(248,250,252,0.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(226,232,240,0.95);box-shadow:0 1px 4px rgba(15,23,42,0.06);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease;outline:none;}
+.mode-btn:hover{background:rgba(255,255,255,0.98);box-shadow:0 2px 8px rgba(15,23,42,0.08);transform:scale(1.03);}
+.mode-btn.open{transform:scale(1);background:rgba(79,70,229,0.09);border-color:rgba(79,70,229,0.35);box-shadow:0 2px 12px rgba(79,70,229,0.18);}
+.mode-panel{position:absolute;right:calc(100% + 10px);top:50%;transform:translateY(-50%) translateX(10px) scale(0.85);transform-origin:right center;display:flex;flex-direction:row;align-items:center;gap:3px;background:rgba(255,255,255,0.9);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.75);border-radius:14px;padding:5px 7px;box-shadow:0 8px 32px rgba(0,0,0,0.1),0 2px 8px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.9);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .22s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;}
+.mode-panel.open{opacity:1;pointer-events:auto;transform:translateY(-50%) translateX(0) scale(1);}
+.mode-panel button{padding:5px 12px;border:none;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:#374151;font-family:system-ui,"PingFang SC","Microsoft YaHei",sans-serif;transition:background .12s,color .12s,box-shadow .12s;outline:none;line-height:1.5;flex-shrink:0;}
+.mode-panel button:hover{background:rgba(79,70,229,0.07);color:#4f46e5;}
+.mode-panel button.active{background:linear-gradient(135deg,#4f46e5,#9333ea);color:#fff;box-shadow:0 2px 8px rgba(79,70,229,0.28);}
+.sep{width:1px;height:16px;background:rgba(0,0,0,0.09);flex-shrink:0;margin:0 2px;}
+.btn-hide{background:rgba(239,68,68,0.07) !important;color:#dc2626 !important;border:1px solid rgba(239,68,68,0.18) !important;padding:5px 9px !important;}
+.btn-hide:hover{background:rgba(239,68,68,0.14) !important;}
+.tr-btn{width:28px;height:28px;border-radius:50%;padding:0;background:linear-gradient(135deg,#4f46e5 0%,#9333ea 55%,#ec4899 100%);border:1px solid rgba(255,255,255,0.28);box-shadow:0 8px 20px rgba(147,51,234,0.36),0 2px 8px rgba(0,0,0,0.1);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .18s ease,box-shadow .18s ease,background .25s ease;outline:none;pointer-events:auto;flex-shrink:0;overflow:hidden;}
+.tr-ball-svg{display:block;width:28px;height:28px;pointer-events:none;flex-shrink:0;}
+.tr-btn:hover{transform:scale(1.07);box-shadow:0 10px 28px rgba(147,51,234,0.48),0 3px 8px rgba(0,0,0,0.12);}
+.tr-btn:active{transform:scale(0.95);}
+.icon-idle,.icon-spin,.icon-done{display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
+.icon-spin,.icon-done{display:none;}
+.tr-btn.loading .icon-idle{display:none;}
+.tr-btn.loading .icon-spin{display:flex;}
+.tr-btn.loading:hover{transform:none;cursor:default;}
+.tr-btn.loading{background:linear-gradient(135deg,#4f46e5 0%,#9333ea 55%,#ec4899 100%);border:1px solid rgba(255,255,255,0.28);box-shadow:0 8px 20px rgba(147,51,234,0.32),0 2px 6px rgba(0,0,0,0.08);}
+.tr-btn.done{background:linear-gradient(135deg,#10b981 0%,#059669 100%);box-shadow:0 8px 20px rgba(16,185,129,0.4),0 2px 6px rgba(0,0,0,0.08);}
+.tr-btn.done .icon-idle{display:none;}
+.tr-btn.done .icon-done{display:flex;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin-ring{width:16px;height:16px;border:2px solid rgba(255,255,255,0.28);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+</style>
+<div class="widget">
+  <div class="mode-wrap">
+    <div class="mode-panel" id="panel">
+      <button data-mode="original">Original</button>
+      <button data-mode="bilingual">Bilingual</button>
+      <button data-mode="translationOnly">Translation</button>
+      <div class="sep"></div>
+      <button class="btn-hide" data-action="hide">Hide</button>
+    </div>
+    <button class="mode-btn" id="modeBtn" title="Change display mode">${SVG_DOTS}</button>
+  </div>
+  <button class="tr-btn" id="trBtn" title="Translate this page">
+    <span class="icon-idle">${SVG_BALL_IDLE}</span>
+    <span class="icon-spin"><div class="spin-ring"></div></span>
+    <span class="icon-done">${SVG_CHECK}</span>
+  </button>
+</div>`;
+
+  const modeBtn  = shadow.getElementById('modeBtn');
+  const panel    = shadow.getElementById('panel');
+  const trBtn    = shadow.getElementById('trBtn');
+  _ball = trBtn;
+
+  let panelOpen = false;
+
+  function openPanel() {
+    panelOpen = true;
+    panel.classList.add('open');
+    modeBtn.classList.add('open');
+    updateActive();
+  }
+  function closePanel() {
+    panelOpen = false;
+    panel.classList.remove('open');
+    modeBtn.classList.remove('open');
+  }
+  function updateActive() {
+    panel.querySelectorAll('[data-mode]').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === currentDisplayMode);
+    });
+  }
+
+  modeBtn.addEventListener('click', e => {
+    if (_widgetDragging) return;
+    e.stopPropagation();
+    panelOpen ? closePanel() : openPanel();
   });
 
-  ball.addEventListener('pointermove', (e) => {
-    if (!_pointerDown) return;  // 没按下，直接忽略
-    const dx = e.clientX - _dragStartX;
-    const dy = e.clientY - _dragStartY;
-    if (!_ballDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) _ballDragging = true;
-    if (_ballDragging) {
-      const newLeft = Math.max(0, Math.min(window.innerWidth  - 48, _ballInitLeft + dx));
-      const newTop  = Math.max(0, Math.min(window.innerHeight - 48, _ballInitTop  + dy));
-      ball.style.setProperty('left', newLeft + 'px', 'important');
-      ball.style.setProperty('top',  newTop  + 'px', 'important');
+  panel.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.action === 'hide') { _hideWidget(); return; }
+    if (btn.dataset.mode) {
+      currentDisplayMode = btn.dataset.mode;
+      chrome.storage.sync.set({ displayMode: btn.dataset.mode });
+      chrome.storage.local.set({ displayMode: btn.dataset.mode });
+      applyDisplayMode();
+      updateActive();
+      closePanel();
     }
   });
 
-  ball.addEventListener('pointerup', () => {
-    _pointerDown = false;
-    if (!_ballDragging) _onBallClick();
-    _ballDragging = false;
+  document.addEventListener('click', e => {
+    if (!panelOpen) return;
+    if (!host.contains(e.composedPath()[0])) closePanel();
+  }, { capture: true });
+
+  trBtn.addEventListener('click', e => {
+    if (_widgetDragging) return;
+    e.stopPropagation();
+    _onBallClick();
   });
 
-  ball.addEventListener('pointercancel', () => {
-    _pointerDown = false;
-    _ballDragging = false;
-  });
+  function _makeDraggable(handle) {
+    let _pDown = false, _dx0, _dy0, _l0, _t0;
+    handle.addEventListener('pointerdown', e => {
+      _pDown = true; _widgetDragging = false;
+      _dx0 = e.clientX; _dy0 = e.clientY;
+      const r = host.getBoundingClientRect(); _l0 = r.left; _t0 = r.top;
+      hsi('right', 'auto'); hsi('bottom', 'auto');
+      hsi('left', _l0 + 'px'); hsi('top', _t0 + 'px');
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', e => {
+      if (!_pDown) return;
+      const dx = e.clientX - _dx0, dy = e.clientY - _dy0;
+      if (!_widgetDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        _widgetDragging = true;
+        e.preventDefault();
+      }
+      if (_widgetDragging) {
+        hsi('left', Math.max(0, Math.min(window.innerWidth  - HOST_W, _l0 + dx)) + 'px');
+        hsi('top',  Math.max(0, Math.min(window.innerHeight - STACK_H, _t0 + dy)) + 'px');
+      }
+    });
+    handle.addEventListener('pointerup',     () => { _pDown = false; });
+    handle.addEventListener('pointercancel', () => { _pDown = false; _widgetDragging = false; });
+  }
+  _makeDraggable(modeBtn);
+  _makeDraggable(trBtn);
 
-  document.body.appendChild(ball);
-  console.log('[诗语] 悬浮球已注入', document.getElementById('__shiyu_ball__') ? '✅' : '❌');
+  document.body.appendChild(host);
+  console.log('[SilkRead] Floating control injected');
+}
+
+function _hideWidget() {
+  if (_widget && _widget.parentNode) _widget.parentNode.removeChild(_widget);
+  _widget = null; _ball = null;
+  try { chrome.storage.local.set({ ballHidden: true }); } catch (_) {}
+}
+
+function _showWidget() {
+  try { chrome.storage.local.set({ ballHidden: false }); } catch (_) {}
+  if (!_widget) _buildWidget();
 }
 
 function _setBallState(state) {
   if (!_ball) return;
-  const si = (k, v) => _ball.style.setProperty(k, v, 'important');
   if (state === 'loading') {
-    _ball.textContent = '';
-    si('background', '#fff');
-    si('border', '2.5px solid #6366f1');
-    si('color', '#6366f1');
-    const sp = document.createElement('div');
-    sp.style.cssText = 'width:22px;height:22px;border:3px solid rgba(99,102,241,0.25);border-top-color:#6366f1;border-radius:50%;animation:shiyu-spin .7s linear infinite;flex-shrink:0;';
-    _ball.appendChild(sp);
-    _ball.title = '翻译中...';
+    _ball.classList.add('loading');
+    _ball.classList.remove('done');
+    _ball.title = 'Translating...';
   } else if (state === 'done') {
-    _ball.textContent = '✓';
-    si('background', '#fff');
-    si('border', '2.5px solid #10b981');
-    si('color', '#10b981');
-    _ball.title = '已翻译 - 再次点击恢复原文';
+    _ball.classList.remove('loading');
+    _ball.classList.add('done');
+    _ball.title = 'Translated - click again to restore the original';
     _ballTranslated = true;
   } else if (state === 'idle') {
-    _ball.textContent = '译';
-    si('background', '#fff');
-    si('border', '2.5px solid #6366f1');
-    si('color', '#6366f1');
-    _ball.title = '诗语翻译 - 点击翻译本页';
+    _ball.classList.remove('loading', 'done');
+    _ball.title = 'Translate this page';
     _ballTranslated = false;
   }
 }
 
+async function broadcastTranslateAllFrames() {
+  let broadcastOk = false;
+  try {
+    const resp = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'translateAllFrames' }, (r) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(r);
+      });
+    });
+    broadcastOk = resp?.mainOk === true || (typeof resp?.mainOk === 'undefined' && resp && resp.ok);
+  } catch (e) {
+    console.warn('[SilkRead] All-frame translation failed; falling back to this document', e);
+  }
+  if (!broadcastOk) {
+    await translatePageNow();
+  }
+}
+
+function broadcastClearAllFrames() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action: 'clearTranslationsAllFrames' }, (resp) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (resp && resp.ok) resolve(resp);
+      else reject(new Error('clearTranslationsAllFrames failed'));
+    });
+  });
+}
+
 function _onBallClick() {
   if (!isContextValid()) {
-    showNotification('🔄 插件已更新，请刷新页面后再使用', 'error');
+    if (!window.__shiyu_ext_invalid) window.__shiyu_ext_invalid = true;
+    if (_ball) _ball.title = 'SilkRead was updated. Refresh the page before translating.';
     return;
   }
   if (isTranslating) return;
   if (_ballTranslated) {
-    // 已翻译 → 恢复原文
-    clearTranslations();
-    _setBallState('idle');
+    broadcastClearAllFrames()
+      .then(() => { _setBallState('idle'); })
+      .catch(() => { clearTranslations(); _setBallState('idle'); });
     return;
   }
-  // 开始翻译
   _setBallState('loading');
   creditsExhausted = false;
-  translatePageNow()
-    .then(() => { _setBallState('done'); startLiveObserver(); })
-    .catch((err) => {
+  broadcastTranslateAllFrames()
+    .then(() => {
+      _setBallState('done');
+      startLiveObserver();
+    })
+    .catch(() => {
       _setBallState('idle');
-      // NO_TRANSLATION 错误已在 translatePageNow 内显示通知，其余静默处理
     });
 }
 
 function startAutoTranslate() {
-  console.log("🚀 AUTO TRANSLATING NOW");
-  // 先翻译，翻译完成后再启动 Observer，避免翻译过程中 Observer 乱触发
+  console.log('[SilkRead] Auto translation started');
   translatePageNow().finally(() => {
     startLiveObserver();
   });
 }
 
-// 持续监听 DOM 变化，有新内容时增量翻译
-const OBSERVER_OPTIONS = { childList: true, subtree: true };
+const OBSERVER_OPTIONS = {
+  childList: true,
+  subtree: true,
+};
+const _dynamicBlockRoots = new Set();
+let _dynamicBlockTimer = null;
 
-// 把一个 DOM 子树内所有文本节点立即从缓存应用翻译（同步，浏览器绘制前完成）
 function applyCacheToSubtree(root) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const translatedNodeSet = new Set(translatedElements.map(e => e.node));
-  let node;
-  while ((node = walker.nextNode())) {
-    if (translatedNodeSet.has(node)) continue; // 已处理过，跳过
-    const text = node.nodeValue?.trim();
+  const nodes = extractTextNodes(root);
+  for (const node of nodes) {
+    if (translatedNodeSet.has(node)) continue;
+    const text = node.nodeValue.trim();
     if (!text) continue;
-    const translated = translationMap[text];
-    if (translated) {
-      translatedElements.push({ node, originalText: node.nodeValue, translatedText: translated });
-      applyNodeTranslation(node, node.nodeValue, translated);
+    const tr = translationMap[text];
+    if (tr !== undefined && tr.trim() !== text) {
+      translatedElements.push({ node, originalText: node.nodeValue, translatedText: tr });
+      applyNodeTranslation(node, node.nodeValue, tr);
     }
+  }
+}
+
+function scheduleDynamicBlockTranslation(root) {
+  if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+  if (root === document.body || root === document.documentElement) return;
+  if (root.id === '__shiyu_widget__' || root.closest?.('#__shiyu_widget__')) return;
+  if (root.classList?.contains('shiyu-tr') || root.classList?.contains('shiyu-loading')) return;
+
+  _dynamicBlockRoots.add(root);
+  clearTimeout(_dynamicBlockTimer);
+  _dynamicBlockTimer = setTimeout(translateDynamicBlockRoots, 80);
+}
+
+async function translateDynamicBlockRoots() {
+  if (!isContextValid() || creditsExhausted) return;
+  if (isTranslating) {
+    clearTimeout(_dynamicBlockTimer);
+    _dynamicBlockTimer = setTimeout(translateDynamicBlockRoots, 200);
+    return;
+  }
+  const roots = [..._dynamicBlockRoots];
+  _dynamicBlockRoots.clear();
+  if (!roots.length) return;
+  roots.forEach(root => _pruneStaleTranslations(root));
+
+  const existingElements = new WeakSet();
+  translatedElements.forEach(e => { if (!e.__stale && e.element) existingElements.add(e.element); });
+  const blocks = [];
+  for (const root of roots) {
+    if (!root.isConnected) continue;
+    const scope = root === document.documentElement || root === document.body ? root : root;
+    for (const b of extractBlocks(scope)) {
+      if (!b.text || (b.element && existingElements.has(b.element))) continue;
+      if (b.element && _translatedElementSet.has(b.element)) continue;
+      if (b.textNodes && b.textNodes.some(n => _translatedTextNodeSet.has(n))) continue;
+      if (b.element && !b.element.isConnected) continue;
+      blocks.push(b);
+      if (b.element) existingElements.add(b.element);
+    }
+  }
+  if (!blocks.length) return;
+
+  const toTranslate = [];
+  pauseObserver();
+  try {
+    for (const b of blocks) {
+      const tr = translationMap[b.text];
+      if (tr && tr.trim() !== b.text.trim()) {
+        translatedElements.push(_makeTranslatedEntry(b, tr));
+        _applyTranslatedBlock(b, tr);
+      } else {
+        toTranslate.push(b);
+      }
+    }
+  } finally {
+    resumeObserver();
+  }
+
+  if (!toTranslate.length) return;
+
+  // Apply the same initial preload boundary to dynamically inserted blocks.
+  // Blocks farther below the viewport wait in the existing scroll-based queue.
+  const viewportH = window.innerHeight;
+  const nowVisible = [];
+  const belowFold = [];
+  for (const block of toTranslate) {
+    const rect = block.element && block.element.getBoundingClientRect
+      ? block.element.getBoundingClientRect()
+      : null;
+    if (rect && rect.top <= viewportH * 2) nowVisible.push(block);
+    else belowFold.push(block);
+  }
+  if (belowFold.length > 0) {
+    registerBelowFoldNodes(belowFold.flatMap(b => b.textNodes || []));
+  }
+  if (!nowVisible.length) return;
+
+  isIncrementalTranslation = true;
+  try {
+    if (_isAIEngine()) await translateBlocksAI(nowVisible);
+    else await translateBlocksFree(nowVisible);
+    applyDisplayMode();
+    saveTranslationCache();
+    _scheduleBill();
+  } finally {
+    isIncrementalTranslation = false;
   }
 }
 
 function startLiveObserver() {
   if (domObserver) return;
   domObserver = new MutationObserver((mutations) => {
-    // 悬浮球翻译后也需要监听，让 React/SPA 重渲染的新节点能从缓存补回翻译
     if (!isAutoTranslateEnabled && !_ballTranslated) return;
     if (!isContextValid()) { stopLiveObserver(); return; }
 
-    // 快速路径：同步立即把缓存中已有翻译的新节点翻译掉
-    // MutationObserver 回调在浏览器绘制前执行，用户看不到英文闪现
-    // Pause during DOM insertions to prevent cascading observer callbacks that
-    // would cause quadratic work (n nodes × m callbacks) and freeze the page.
     const translatedNodeSet = new Set(translatedElements.map(e => e.node));
     const needsInsert = [];
+    let needsDisplayRefresh = false;
     for (const mutation of mutations) {
       for (const added of mutation.addedNodes) {
         if (added.nodeType === Node.TEXT_NODE) {
           if (translatedNodeSet.has(added)) continue;
-          // Skip shiyu-tr text nodes — those contain translated text, not source text
           if (added.parentNode && added.parentNode.classList && added.parentNode.classList.contains('shiyu-tr')) continue;
           const text = added.nodeValue?.trim();
           if (text && translationMap[text]) {
             needsInsert.push({ node: added, orig: added.nodeValue, trans: translationMap[text] });
           }
         } else if (added.nodeType === Node.ELEMENT_NODE) {
-          // Skip our own injected elements
-          if (!added.classList.contains('shiyu-tr')) needsInsert.push({ element: added });
+          if (!added.classList.contains('shiyu-tr')) {
+            needsInsert.push({ element: added });
+            scheduleDynamicBlockTranslation(added);
+          }
         }
       }
     }
     if (needsInsert.length > 0) {
-      pauseObserver(); // prevent cascading callbacks for all insertions below
+      pauseObserver();
       for (const item of needsInsert) {
         if (item.element) {
           applyCacheToSubtree(item.element);
@@ -421,8 +775,10 @@ function startLiveObserver() {
       }
       resumeObserver();
     }
+    if (needsDisplayRefresh) {
+      applyDisplayMode();
+    }
 
-    // 慢速路径（API 调用）：仅在自动翻译模式下触发，悬浮球模式只用缓存
     if (!isAutoTranslateEnabled) return;
     clearTimeout(observerDebounceTimer);
     observerDebounceTimer = setTimeout(() => {
@@ -432,7 +788,6 @@ function startLiveObserver() {
   domObserver.observe(document.body, OBSERVER_OPTIONS);
 }
 
-// 真正暫停 Observer：disconnect 后回调就不会再触发
 function pauseObserver() {
   if (domObserver) domObserver.disconnect();
 }
@@ -447,11 +802,9 @@ function stopLiveObserver() {
   }
 }
 
-// Observer 增量翻译的重试计数。
-// 只对从未翻译过的新文本限制 API 重试次数，防止无限循环
 const observerTranslateCount = new Map();
 const MAX_OBSERVER_RETRIES = 3;
-let creditsExhausted = false; // 余额不足时停止所有翻译请求
+let creditsExhausted = false;
 
 async function translateNewNodes() {
   if (!isContextValid()) { stopLiveObserver(); return; }
@@ -461,12 +814,10 @@ async function translateNewNodes() {
   }
   if (creditsExhausted) return;
 
-  // 增量流量保护：超出预算就停止
   const budget = initialPageCharCount * OBSERVER_BUDGET_RATIO;
-  if (budget > 0 && observerCharCount >= budget) return; // 余额耗尽时不再重试
+  if (budget > 0 && observerCharCount >= budget) return;
 
   const allNodes = extractTextNodes(document.body);
-  // 建立 node → entry 快速查表
   const nodeMap = new Map(translatedElements.map(e => [e.node, e]));
 
   const needsApi = [];
@@ -475,7 +826,6 @@ async function translateNewNodes() {
   for (const node of allNodes) {
     const existingEntry = nodeMap.get(node);
     if (existingEntry) {
-      // 同一个 node 对象：若 Vue 把 nodeValue 改回原文，立即重新应用
       if (node.nodeValue === existingEntry.originalText) {
         applyNodeTranslation(node, existingEntry.originalText, existingEntry.translatedText);
       }
@@ -486,14 +836,12 @@ async function translateNewNodes() {
     if (!text) continue;
 
     if (translationMap[text]) {
-      // Vue 创建了新 node 对象但文本已翻译过 → 直接从缓存应用，不走 API，不计次数
       const translated = translationMap[text];
       translatedElements.push({ node, originalText: node.nodeValue, translatedText: translated });
       applyNodeTranslation(node, node.nodeValue, translated);
     } else {
-      // 真正从未见过的文本 → 限次 API 翻译
       const count = observerTranslateCount.get(text) || 0;
-      if (count < MAX_OBSERVER_RETRIES) {
+      if (count < MAX_OBSERVER_RETRIES && !_translatedTextNodeSet.has(node)) {
         needsApi.push(node);
       }
     }
@@ -502,27 +850,36 @@ async function translateNewNodes() {
 
   if (needsApi.length === 0) return;
 
-  // 检查剩余预算
-  const newChars = needsApi.reduce((s, n) => s + n.nodeValue.trim().length, 0);
+  const viewportH = window.innerHeight;
+  const nowVisible = [];
+  const belowFold = [];
+  for (const node of needsApi) {
+    const rect = node.parentElement?.getBoundingClientRect();
+    if (rect && rect.top <= viewportH * 2) nowVisible.push(node);
+    else belowFold.push(node);
+  }
+  if (belowFold.length > 0) registerBelowFoldNodes(belowFold);
+  if (nowVisible.length === 0) return;
+
+  const newChars = nowVisible.reduce((s, n) => s + n.nodeValue.trim().length, 0);
   if (budget > 0 && observerCharCount + newChars > budget) {
-    console.log(`🛑 Observer 增量预算已满（${Math.round(observerCharCount)}/${Math.round(budget)} chars），停止增量翻译`);
+    console.log('[SilkRead] Incremental translation budget reached');
     return;
   }
   observerCharCount += newChars;
 
-  console.log(`🆕 发现 ${needsApi.length} 个新节点，增量翻译...`);
+  console.log(`[SilkRead] Translating ${nowVisible.length} new nodes`);
   isIncrementalTranslation = true;
-  await translateNodes(needsApi);
+  if (_isAIEngine()) await translateNodes(nowVisible);
+  else await translateBlocksFree(_blocksForLazyNodes(nowVisible));
   isIncrementalTranslation = false;
 }
 
-
-// 监听设置变化
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'sync') {
     if (changes.autoTranslateEnabled) {
       isAutoTranslateEnabled = changes.autoTranslateEnabled.newValue;
-      console.log("♻️ Auto-translate setting changed to:", isAutoTranslateEnabled);
+      console.log('[SilkRead] Auto-translate setting changed:', isAutoTranslateEnabled);
       if (isAutoTranslateEnabled) {
         isTranslating = false;
         startAutoTranslate();
@@ -532,114 +889,109 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
     if (changes.displayMode) {
       currentDisplayMode = changes.displayMode.newValue || 'bilingual';
-      console.log("🎨 Display mode changed to:", currentDisplayMode);
+      console.log('[SilkRead] Display mode changed:', currentDisplayMode);
       applyDisplayMode();
     }
-    // 语言或引擎变化时，若已启用自动翻译则重新翻译当前页
-    if (changes.sourceLang || changes.targetLang || changes.translationEngine || changes.managedModel) {
+    if (changes.sourceLang || changes.targetLang || changes.translationEngine || changes.translationTier) {
+      if (changes.sourceLang) currentSourceLang = changes.sourceLang.newValue || 'auto';
       if (changes.targetLang) currentTargetLang = changes.targetLang.newValue || 'zh-CN';
-      if (changes.translationEngine) currentEngine = changes.translationEngine.newValue || 'free';
-      if (changes.managedModel) currentManagedModel = changes.managedModel.newValue || '';
-      if (isAutoTranslateEnabled) {
-        console.log("🔄 语言/引擎设置已变更，重新翻译...");
-        translatePageNow();
+      if (changes.translationEngine) currentEngine = _normalizeTranslationEngine(changes.translationEngine.newValue);
+      if (changes.translationTier) currentTranslationTier = _normalizeTranslationTier(changes.translationTier.newValue);
+
+      const languageChanged = !!(changes.sourceLang || changes.targetLang);
+      if (languageChanged && isAutoTranslateEnabled) {
+        console.log('[SilkRead] Translation settings changed; retranslating');
+        if (window.self === window.top) {
+          broadcastTranslateAllFrames().catch(() => {});
+        }
       }
     }
   }
 });
 
-// ============ 消息监听 ============
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("📨 Message received:", message.action);
-  
   if (message.action === "translate") {
-    creditsExhausted = false; // 手动触发时重置，允许充值后重试
-    translatePageNow()
+    creditsExhausted = false;
+    broadcastTranslateAllFrames()
       .then(() => sendResponse({ success: true }))
       .catch(err => sendResponse({ success: false, error: err.message }));
     return true;
-  } 
-  
+  }
   if (message.action === "changeDisplayMode") {
     currentDisplayMode = message.mode;
-    console.log("🎨 Display mode changed to:", currentDisplayMode);
     applyDisplayMode();
     sendResponse({ success: true });
   }
-  
   if (message.action === "restore") {
-    clearTranslations();
-    sendResponse({ success: true });
+    broadcastClearAllFrames()
+      .then(() => sendResponse({ success: true }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
   }
 });
 
-// ============ 翻译函数 ============
+function _isAIEngine() { return currentEngine === 'paid'; }
 
-// ============ 翻译缓存 ============
-// Layer 1: sessionStorage — 同步读写，同 tab 刷新立即生效，tab 关闭清除
-// Layer 2: chrome.storage.local — 跨 session 持久化，7天有效
 function _cacheKey() {
-  const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
-  return `tc:${engine}:${currentTargetLang}:${location.hostname}${location.pathname}`;
+  const engine = _isAIEngine() ? (translationRunTier || currentTranslationTier || 'economy') : 'free';
+  return `tc:v11:${engine}:${currentTargetLang}:${location.hostname}${location.pathname}`;
 }
-// hostname 级缓存键：同站跨页共享（导航栏翻译在新页面直接复用，不重复消耗）
+
 function _hostCacheKey() {
-  const engine = currentEngine === 'ai' ? (currentManagedModel || 'ai') : 'free';
-  return `tc:${engine}:${currentTargetLang}:${location.hostname}`;
+  const engine = _isAIEngine() ? (translationRunTier || currentTranslationTier || 'economy') : 'free';
+  return `tc:v11:${engine}:${currentTargetLang}:${location.hostname}`;
 }
 
 function saveTranslationCache() {
-  if (Object.keys(translationMap).length === 0) return;
+  const entries = Object.keys(translationMap).length;
+  if (entries === 0) return;
   const key = _cacheKey();
   const hostKey = _hostCacheKey();
+  const mapPayload = JSON.stringify(translationMap);
+  const signature = `${key}:${entries}:${mapPayload}`;
+  if (signature === _lastCacheSignature) return;
+  _lastCacheSignature = signature;
   const payload = JSON.stringify({ ts: Date.now(), map: translationMap });
   try {
     sessionStorage.setItem(key, payload);
-    // 同时更新 hostname 级缓存（合并，保留其他页面的词条）
     const existing = sessionStorage.getItem(hostKey);
     const hostMap = existing ? (JSON.parse(existing).map || {}) : {};
     Object.assign(hostMap, translationMap);
     sessionStorage.setItem(hostKey, JSON.stringify({ ts: Date.now(), map: hostMap }));
-    console.log('💾 Cache saved, entries:', Object.keys(translationMap).length);
+    console.log('[SilkRead] Cache saved, entries:', entries);
   } catch(e) { console.warn('sessionStorage save failed:', e); }
   try {
     const obj = { ts: Date.now(), map: translationMap };
-    chrome.storage.local.set({ [key]: obj }, () => {
-      if (chrome.runtime.lastError) console.warn('storage.local save failed:', chrome.runtime.lastError);
-    });
-  } catch(e) { console.warn('storage.local save failed:', e); }
+    chrome.storage.local.set({ [key]: obj }, () => {});
+  } catch(e) {}
 }
 
 function loadTranslationCache() {
   const key = _cacheKey();
   const hostKey = _hostCacheKey();
 
-  // 读 hostname 级缓存（跨页共享，导航翻译可直接复用）
   let hostMap = null;
   try {
     const raw = sessionStorage.getItem(hostKey);
     if (raw) { const e = JSON.parse(raw); if (e?.map) hostMap = e.map; }
   } catch(_) {}
 
-  // 读页面级缓存
   try {
     const raw = sessionStorage.getItem(key);
     if (raw) {
       const entry = JSON.parse(raw);
       if (entry?.map && Object.keys(entry.map).length > 0) {
-        console.log('📦 Cache hit (sessionStorage)');
+        console.log('[SilkRead] Cache hit (sessionStorage)');
         return Promise.resolve(hostMap ? { ...hostMap, ...entry.map } : entry.map);
       }
     }
   } catch(_) {}
 
-  // 只有 hostname 级命中（新页面，同站导航有缓存）
   if (hostMap && Object.keys(hostMap).length > 0) {
-    console.log('📦 Cache hit (hostname-level cross-page)');
+    console.log('[SilkRead] Cache hit (hostname-level cross-page)');
     return Promise.resolve(hostMap);
   }
 
-  // Layer 2: 异步读 chrome.storage.local（新 session）
   return new Promise(resolve => {
     chrome.storage.local.get([key], result => {
       const entry = result[key];
@@ -647,141 +999,79 @@ function loadTranslationCache() {
         if (entry) chrome.storage.local.remove([key]);
         return resolve(null);
       }
-      console.log('📦 Cache hit (storage.local)');
+      console.log('[SilkRead] Cache hit (storage.local)');
       resolve(entry.map);
     });
   });
 }
+
 async function translatePageNow() {
   if (!isContextValid()) return;
-  console.log("▶️ Starting translation...");
+  console.log('[SilkRead] Starting translation');
   resetLazyObserver();
-  _shownChunkErrors.clear(); // 每次翻译重置错误去重
-
-  // AI 模式下，翻译前重置本页统计，翻译前记录余额（双重校验）
-  if (currentEngine === 'ai') {
-    _pageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, costCredits: 0, inputChars: 0, outputChars: 0, sellRate: 0, costRateIn: 0, costRateOut: 0 };
-  }
-  let creditsBefore = null;
-  if (currentEngine === 'ai') {
-    try {
-      const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
-      if (s.cachedCredits !== undefined) creditsBefore = s.cachedCredits;
-    } catch(_) {}
-  }
-
+  _shownChunkErrors.clear();
   clearTranslations();
-  const textNodes = extractTextNodes(document.body);
-  console.log("📝 Found text nodes:", textNodes.length);
-  if (textNodes.length === 0) {
-    console.log("⚠️ No text nodes to translate");
-    return;
-  }
+  translationRunTier = currentTranslationTier || 'economy';
 
-  // 加载缓存，立即将命中项渲染到页面（无需等待 API）
+  const blocks = extractBlocks(document.body);
+  console.log('[SilkRead] extractBlocks found:', blocks.length);
+  if (!blocks.length) return;
+
   const cached = await loadTranslationCache();
   if (cached) Object.assign(translationMap, cached);
 
-  // 按视口位置分流：首屏内/附近 → 立即翻译；视口以下 → scroll 懒翻译
-  const inViewNodes = [];
-  const belowFoldNodes = [];
-  const viewportH = window.innerHeight;
+  const vh = window.innerHeight;
+  const inViewBlocks = [];
+  const belowBlocks = [];
+
+  const isFree = !_isAIEngine();
 
   pauseObserver();
-  for (const node of textNodes) {
-    const text = node.nodeValue?.trim();
-    if (!text) continue;
-    if (translationMap[text]) {
-      // 缓存命中，立即应用，无论在不在视口
-      translatedElements.push({ node, originalText: node.nodeValue, translatedText: translationMap[text] });
-      applyNodeTranslation(node, node.nodeValue, translationMap[text]);
-      continue;
-    }
-    const rect = node.parentElement?.getBoundingClientRect();
-    if (rect && rect.top <= viewportH * 2) {
-      inViewNodes.push(node);    // 在视口内或近处，立即翻译
+  for (const b of blocks) {
+    const tr = translationMap[b.text];
+    if (tr) {
+      translatedElements.push(_makeTranslatedEntry(b, tr));
+      _applyTranslatedBlock(b, tr);
     } else {
-      belowFoldNodes.push(node); // 视口以下，滚到时再翻译
+      const rect = b.element && b.element.getBoundingClientRect ? b.element.getBoundingClientRect() : null;
+      if (rect && rect.top <= vh * 2) inViewBlocks.push(b);
+      else belowBlocks.push(b);
     }
   }
+
+  if (belowBlocks.length > 0) {
+    const belowNodes = belowBlocks.flatMap(b => b.textNodes && b.textNodes.length > 0 ? b.textNodes : []);
+    registerBelowFoldNodes(belowNodes);
+  }
+
   resumeObserver();
-  applyDisplayMode(); // 缓存命中部分立即呈现
-
-  // 注册 scroll 监听，用户滚动时按需翻译
-  if (belowFoldNodes.length > 0) {
-    registerBelowFoldNodes(belowFoldNodes);
-    console.log(`📜 折叠以下 ${belowFoldNodes.length} 个节点注册滚动懒翻译`);
-  }
-
-  const apiCharCount = inViewNodes.reduce((s, n) => s + (n.nodeValue?.trim().length || 0), 0);
-  initialPageCharCount = apiCharCount + Object.keys(translationMap).reduce((s, k) => s + k.length, 0);
-  observerCharCount = 0;
-  console.log(`📊 首屏字符: ${apiCharCount}，折叠以下: ${belowFoldNodes.length} 个节点（滚动时翻译）`);
-
-  const _elemsBefore = translatedElements.length;
-  if (inViewNodes.length > 0) {
-    showNotification('⏳ 翻译中...', 'info', 15000);
-    isIncrementalTranslation = false;
-    await translateNodes(inViewNodes);
-  }
-  // 如果有节点需要翻译但翻译后数量没增加，说明全部 chunk 静默失败
-  if (inViewNodes.length > 0 && translatedElements.length <= _elemsBefore) {
-    showNotification('❌ 翻译失败，请重试', 'error', 5000);
-    throw new Error('NO_TRANSLATION');
-  }
-  console.log("🎉 Translation complete!");
   applyDisplayMode();
 
-  // 初始翻译完成后补扫一次：页面加载时 getBoundingClientRect 可能不准
-  // （图片/懒加载改变布局），把实际已可见的"折叠以下"节点立即翻译
-  setTimeout(_translateNewlyVisible, 150);
-
-  // 翻译完成后显示消耗明细（AI 模式）
-  if (currentEngine === 'ai') {
-    try {
-      const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
-      const creditsAfterFirst = s.cachedCredits !== undefined ? s.cachedCredits : null;
-      if (creditsBefore !== null && creditsAfterFirst !== null) {
-        const consumed = Math.max(0, creditsBefore - creditsAfterFirst);
-        const lazyNote = belowFoldNodes.length > 0 ? '，滚动继续加载' : '';
-        const yuan = (consumed * 0.001).toFixed(4);
-        if (consumed > 0) {
-          // 记录初始余额，最终账单由 _flushBill 在懒加载全部完成后下载
-          _billCreditsBefore = creditsBefore;
-          if (belowFoldNodes.length === 0) {
-            // 没有懒加载节点，直接下载
-            _downloadTranslationReport(consumed, creditsAfterFirst);
-            showNotification(`✅ 翻译完成｜消耗 ¥${yuan}，账单已下载`, 'info', 8000);
-            _billCreditsBefore = null;
-          } else {
-            // 有懒加载，展示首屏消耗，最终账单等全部加载完
-            showNotification(`✅ 首屏已翻译｜消耗 ¥${yuan}${lazyNote}，账单待全部加载完后下载`, 'info', 8000);
-            // 如果用户不滚动，5s 后多放一条提示
-            setTimeout(() => {
-              if (_belowFoldNodes.length > 0) {
-                showNotification('📜 下方还有内容待翻译，向下滚动继续', 'info', 4000);
-              }
-            }, 5000);
-          }
-        } else if (apiCharCount === 0) {
-          showNotification(`✅ 全部命中缓存，0 消耗`, 'info', 3000);
-        }
-      }
-    } catch(_) {}
-  } else {
-    showNotification('✅ 翻译完成', 'info', 2500);
+  if (inViewBlocks.length > 0) {
+    isIncrementalTranslation = false;
+    if (isFree) {
+      await translateBlocksFree(inViewBlocks);
+    } else {
+      await translateBlocksAI(inViewBlocks);
+    }
   }
+
+  applyDisplayMode();
+  saveTranslationCache();
+  _ballTranslated = true;
+  _setBallState('done');
 }
 
-// 账单 debounce—最后一批翻译 3s 后左右没有新翻译再下载
 function _scheduleBill() {
-  if (currentEngine !== 'ai') return;
+  if (window.self !== window.top) return;
+  if (!_isAIEngine()) return;
   clearTimeout(_billDebounceTimer);
   _billDebounceTimer = setTimeout(_flushBill, 3000);
 }
 
 async function _flushBill() {
-  if (currentEngine !== 'ai') return;
+  if (window.self !== window.top) return;
+  if (!_isAIEngine()) return;
   if (_billCreditsBefore === null) return;
   try {
     const s = await new Promise(r => chrome.storage.local.get(['cachedCredits'], r));
@@ -790,102 +1080,84 @@ async function _flushBill() {
     const consumed = Math.max(0, _billCreditsBefore - creditsAfter);
     if (consumed > 0) {
       _downloadTranslationReport(consumed, creditsAfter);
-      const yuan = (consumed * 0.001).toFixed(4);
-      showNotification(`📄 第终账单已下载（共消耗 ¥${yuan}）`, 'info', 6000);
     }
   } catch(_) {}
-  _billCreditsBefore = null; // 重置，防止重复下载
+  _billCreditsBefore = null;
 }
 
 function _downloadTranslationReport(consumed, creditsAfter) {
-  const sellRate    = _pageStats.sellRate   || MODEL_CREDIT_RATES[currentManagedModel] || 8;
-  const costRateIn  = _pageStats.costRateIn  || 0;
-  const costRateOut = _pageStats.costRateOut || 0;
-  const sellYuan    = ((_pageStats.cost || consumed) * 0.001).toFixed(4);
-  const costYuan    = (_pageStats.costCredits * 0.001).toFixed(4);
-  const profitYuan  = ((_pageStats.cost - _pageStats.costCredits) * 0.001).toFixed(4);
-  const marginPct   = _pageStats.costCredits > 0
-    ? (((_pageStats.cost - _pageStats.costCredits) / _pageStats.cost) * 100).toFixed(1)
-    : '—';
-  const balanceYuan = (creditsAfter * 0.001).toFixed(4);
-  // 分别计算输入/输出成本
-  const inputCostYuan  = (_pageStats.inputTokens  / 1000 * costRateIn  * 0.001).toFixed(4);
-  const outputCostYuan = (_pageStats.outputTokens / 1000 * costRateOut * 0.001).toFixed(4);
+  const publicRate = TIER_CREDIT_RATES[currentTranslationTier] || 25;
 
   const lines = [
-    '诗语翻译 · 本页翻译账单（运营视角）',
-    '══════════════════════════════════════════',
-    `时间：${new Date().toLocaleString('zh-CN')}`,
-    `页面：${location.href}`,
-    `模型：${currentManagedModel}`,
+    'SilkRead Translation Report',
+    '==========================================',
+    `Time: ${new Date().toLocaleString('en-US')}`,
+    `Page: ${location.href}`,
+    `Tier: ${currentTranslationTier}`,
     '',
-    '━━━ Token & 字符统计 ━━━━━━━━━━━━━━━━━━━━━━━',
-    `输入 Token：${_pageStats.inputTokens.toLocaleString().padStart(8)}   输入字符：${_pageStats.inputChars.toLocaleString()}`,
-    `输出 Token：${_pageStats.outputTokens.toLocaleString().padStart(8)}   输出字符：${_pageStats.outputChars.toLocaleString()}`,
-    `合计 Token：${_pageStats.totalTokens.toLocaleString().padStart(8)}`,
+    '--- Usage ---',
+    `Input tokens:  ${_pageStats.inputTokens.toLocaleString().padStart(8)}   Input characters: ${_pageStats.inputChars.toLocaleString()}`,
+    `Output tokens: ${_pageStats.outputTokens.toLocaleString().padStart(8)}   Output characters: ${_pageStats.outputChars.toLocaleString()}`,
+    `Total tokens:  ${_pageStats.totalTokens.toLocaleString().padStart(8)}`,
     '',
-    '━━━ 成本明细（ChatAnywhere 进价）━━━━━━━━━━━━━━',
-    `输入单价：¥${(costRateIn  * 0.001).toFixed(5)}/1K Token  小计：¥${inputCostYuan}`,
-    `输出单价：¥${(costRateOut * 0.001).toFixed(5)}/1K Token  小计：¥${outputCostYuan}`,
-    `进价小计：¥${costYuan}`,
+    '--- Credits Charged ---',
+    `Estimated rate: ${publicRate} Credits / 1K source tokens`,
+    `This page: ${Math.round(consumed).toLocaleString()} Credits`,
     '',
-    '━━━ 收入明细（向用户收取）━━━━━━━━━━━━━━━━━━',
-    `售价单价：¥${(sellRate * 0.001).toFixed(4)}/1K Token（不分输入输出）`,
-    `本页收入：¥${sellYuan}`,
-    '',
-    '━━━ 利润 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `毛利润：  ¥${profitYuan}`,
-    `毛利率：  ${marginPct}%`,
-    '',
-    '━━━ 账户余额 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `当前余额：¥${balanceYuan}`,
+    '--- Account ---',
+    `Current balance: ${Math.round(creditsAfter).toLocaleString()} Credits`,
   ];
   const content = lines.join('\n');
-  const filename = `诗语账单-${new Date().toISOString().slice(0,10)}.txt`;
+  const filename = `silkread-report-${new Date().toISOString().slice(0,10)}.txt`;
   chrome.runtime.sendMessage({ action: 'downloadReport', content, filename });
 }
 
-// isIncrementalTranslation: 区分初始全页翻译 vs Observer 增量翻译
 let isIncrementalTranslation = false;
 
-// 核心翻译逻辑
+function groupNodesByBlock(nodes) {
+  const blockMap = new Map();
+  for (const node of nodes) {
+    const block = _getBlockAncestor(node);
+    if (!blockMap.has(block)) blockMap.set(block, { block, nodes: [] });
+    blockMap.get(block).nodes.push(node);
+  }
+
+  const blockEntries = [];
+  for (const [, entry] of blockMap) {
+    entry.nodes.sort((a, b) => {
+      if (a === b) return 0;
+      const pos = a.compareDocumentPosition(b);
+      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (pos & Node.DOCUMENT_POSITION_PRECEDING)  return  1;
+      return 0;
+    });
+    const fullText = entry.nodes.map(n => n.textContent).join('');
+    blockEntries.push({ block: entry.block, nodes: entry.nodes, fullText });
+  }
+
+  const chunks = [];
+  let cur = [], curLen = 0;
+  for (const e of blockEntries) {
+    const len = e.fullText.trim().length;
+    if (curLen + len > CHUNK_SIZE && cur.length > 0) {
+      chunks.push(cur);
+      cur = []; curLen = 0;
+    }
+    cur.push(e);
+    curLen += len;
+  }
+  if (cur.length > 0) chunks.push(cur);
+  return chunks;
+}
+
 async function translateNodes(textNodes) {
   isTranslating = true;
-  const isFree = (currentEngine !== 'ai');
+  const isFree = !_isAIEngine();
+  const tierSnapshot = translationRunTier || currentTranslationTier;
   try {
-    const chunks = groupTextNodes(textNodes);
-    console.log("📦 Created chunks:", chunks.length);
-
     if (isFree) {
-      // 免费翻译：最多 3 个并发，避免同时发几十个请求被 Google 限速
-      const MAX_CONCURRENT_FREE = 3;
-      let fqi = 0;
-      const freeResults = [];
-      async function freeWorker() {
-        while (fqi < chunks.length) {
-          const i = fqi++;
-          const chunk = chunks[i];
-          const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
-          chunk.forEach(n => _showChunkLoading([n]));
-          try {
-            const translated = await requestTranslation(combined);
-            chunk.forEach(n => _hideChunkLoading([n]));
-            pauseObserver();
-            applyTranslationResults(chunk, translated);
-            resumeObserver();
-            applyDisplayMode();
-          } catch(err) {
-            chunk.forEach(n => _hideChunkLoading([n]));
-            handleTranslationError(err);
-          }
-        }
-      }
-      await Promise.all(
-        Array.from({ length: Math.min(MAX_CONCURRENT_FREE, chunks.length) }, freeWorker)
-      );
     } else {
-      // AI 翻译：最多 3 个并发（仿沉浸式翻译），避免同时发几十个请求被限速
-      // 每个 chunk 完成立即渲染，用户看到翻译逐块出现
+      const chunks = groupTextNodes(textNodes);
       const MAX_CONCURRENT = 3;
       let qi = 0;
       async function aiWorker() {
@@ -893,30 +1165,26 @@ async function translateNodes(textNodes) {
           const i = qi++;
           const chunk = chunks[i];
           const combined = chunk.map((n, idx) => `[${idx}] ${n.textContent.trim()}`).join('\n');
-          console.log(`⏳ AI chunk ${i + 1}/${chunks.length}...`);
           _showChunkLoading(chunk);
           try {
-            const result = await requestTranslation(combined);
-            // result 可能是字符串（旧路径）或带统计的对象
+            const result = await requestTranslation(combined, false, tierSnapshot);
             const translatedText = (result && result.__shiyuStats) ? result.text : result;
             if (result && result.__shiyuStats) {
               _pageStats.inputTokens  += result.inputTokens  || 0;
               _pageStats.outputTokens += result.outputTokens || 0;
               _pageStats.totalTokens  += result.totalTokens  || 0;
-              _pageStats.cost         += result.cost         || 0;
-              _pageStats.costCredits  += result.costCredits  || 0;
               _pageStats.inputChars   += result.inputChars   || 0;
               _pageStats.outputChars  += result.outputChars  || 0;
-              if (result.sellRate)   _pageStats.sellRate   = result.sellRate;
-              if (result.costRateIn)  _pageStats.costRateIn  = result.costRateIn;
-              if (result.costRateOut) _pageStats.costRateOut = result.costRateOut;
             }
             _hideChunkLoading(chunk);
+            const snap = _captureScrollAnchors(chunk);
             pauseObserver();
-            applyTranslationResults(chunk, translatedText);
+            const applied = applyTranslationResults(chunk, translatedText);
+            if (applied === 0 && chunk.length > 0) {
+              console.warn('[SilkRead] No translations were applied for this chunk');
+            }
             resumeObserver();
-            applyDisplayMode();
-            console.log(`✅ AI chunk ${i + 1} done`);
+            _restoreScrollAnchors(snap);
           } catch(err) {
             _hideChunkLoading(chunk);
             handleTranslationError(err);
@@ -927,9 +1195,10 @@ async function translateNodes(textNodes) {
         Array.from({ length: Math.min(MAX_CONCURRENT, chunks.length) }, aiWorker)
       );
     }
-
     saveTranslationCache();
+    const snapFinal = _captureScrollAnchors([]);
     applyDisplayMode();
+    _restoreScrollAnchors(snapFinal);
   } finally {
     isTranslating = false;
     if (pendingNewNodes) {
@@ -939,47 +1208,42 @@ async function translateNodes(textNodes) {
   }
 }
 
-let _shownChunkErrors = new Set(); // 同一类错误只弹一次，避免重复通知
+let _shownChunkErrors = new Set();
 
 function handleTranslationError(err) {
-  if (err.message === 'CREDITS_EXHAUSTED') {
+  const errMsg = err.message || '';
+
+  if (errMsg === 'CREDITS_EXHAUSTED' ||
+      errMsg.includes('Insufficient Credits') ||
+      errMsg.includes('Insufficient balance')) {
     creditsExhausted = true;
-    showNotification('💳 翻译余额不足，请打开扩展充值', 'error');
-  } else if (err.message === 'LOGGED_OUT') {
+    if (_ball) _ball.title = 'Insufficient Credits. Open SilkRead to buy more.';
+    console.warn('[SilkRead] Insufficient Credits');
+    _setBallState('idle');
+
+  } else if (errMsg === 'LOGGED_OUT' ||
+             errMsg.includes('Sign in') ||
+             errMsg.includes('Please sign in')) {
     creditsExhausted = true;
-    showNotification('🔒 请先登录才能使用付费模型，点击扩展图标 → 去登录', 'error');
-  } else if (err.message === 'EXTENSION_CONTEXT_INVALIDATED' ||
-             err.message?.toLowerCase().includes('extension context') ||
-             err.message?.toLowerCase().includes('context invalidated')) {
-    // 单个 chunk 的 port 断开不代表整体失败（其他 chunk 可能成功）
-    // 真正失效时用户点悬浮球会触发 isContextValid() 检查并提示
-    console.warn('⚠️ Port disconnect on chunk:', err.message);
+    if (_ball) _ball.title = 'Please sign in to SilkRead.';
+    console.warn('[SilkRead] Sign-in required');
+    _setBallState('idle');
+    chrome.runtime.sendMessage({ action: 'openLoginTab' });
+
+  } else if (errMsg === 'EXTENSION_CONTEXT_INVALIDATED' ||
+             errMsg.toLowerCase().includes('extension context') ||
+             errMsg.toLowerCase().includes('context invalidated')) {
+    if (!window.__shiyu_ext_invalid) window.__shiyu_ext_invalid = true;
+    console.warn('[SilkRead] Extension context invalidated');
   } else {
-    console.warn('⚠️ Chunk failed:', err.message);
-    // 相同错误只弹一次，且不覆盖余额/登录通知
-    const key = err.message.slice(0, 60);
-    if (!_shownChunkErrors.has(key)) {
-      _shownChunkErrors.add(key);
-      showNotification('❌ ' + err.message, 'error', 8000);
-    }
+    console.warn('[SilkRead] Chunk failed:', errMsg);
   }
 }
 
 function extractTextNodes(root) {
   const nodes = [];
-  
-  // 跳过这些标签
-  const skipTags = new Set([
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'OBJECT',
-    'SVG', 'CANVAS', 'CODE', 'PRE', 'TEXTAREA', 'INPUT',
-    'SELECT', 'OPTION',
-  ]);
-  
-  // 跳过这些 role（仅跳过纯交互控件）
-  const skipRoles = new Set([
-    'menu', 'menuitem', 'menubar', 'menuitemcheckbox', 'menuitemradio',
-    'listbox', 'option',
-  ]);
+  const skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'OBJECT', 'SVG', 'CANVAS', 'CODE', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION']);
+  const skipRoles = new Set(['combobox', 'spinbutton', 'switch', 'textbox', 'searchbox', 'slider']);
 
   const walker = document.createTreeWalker(
     root,
@@ -987,88 +1251,52 @@ function extractTextNodes(root) {
     {
       acceptNode: function(node) {
         const text = node.textContent.trim();
-        // 过滤纯符号/纯数字（没有任何字母或CJK字符的跳过）
-        if (!text || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) {
-          return NodeFilter.FILTER_REJECT;
+        const rt = node.getRootNode();
+        if (rt instanceof ShadowRoot && rt.host && rt.host.id === '__shiyu_widget__') return NodeFilter.FILTER_REJECT;
+        let _p = node.parentElement;
+        while (_p) {
+          if (_p.id === '__shiyu_widget__') return NodeFilter.FILTER_REJECT;
+          _p = _p.parentElement;
         }
+        if (!text || !/[\u4e00-\u9fa5a-zA-Z\u3040-\u30ff\uac00-\ud7af]/.test(text)) return NodeFilter.FILTER_REJECT;
+        if (_isTargetChineseText(text)) return NodeFilter.FILTER_REJECT;
 
-        // 如果目标语言是中文，跳过本身已经是中文的文本节点（节省积分）
-        if (currentTargetLang && currentTargetLang.startsWith('zh')) {
-          const cjkCount = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-          if (cjkCount / text.length > 0.6) {
-            return NodeFilter.FILTER_REJECT;
-          }
-        }
-
-        // 检查所有祖先节点，同时记录是否在 nav 内
         let parent = node.parentElement;
         let insideNav = false;
         while (parent && parent !== root) {
-          // 跳过特定标签
-          if (skipTags.has(parent.tagName)) {
-            return NodeFilter.FILTER_REJECT;
-          }
+          if (skipTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
           const role = parent.getAttribute('role');
-          // 跳过特定 role
-          if (role && skipRoles.has(role)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          // 标记是否在导航区域（nav 标签或 role="navigation"）
-          if (parent.tagName === 'NAV' || role === 'navigation') {
-            insideNav = true;
-          }
-          // inline style 明确隐藏（无论是否在 nav 内都跳过）
+          if (role && skipRoles.has(role)) return NodeFilter.FILTER_REJECT;
+          if (parent.tagName === 'NAV' || role === 'navigation') insideNav = true;
           const s = parent.style;
-          if (s && (s.display === 'none' || s.visibility === 'hidden')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          // hidden 属性
-          if (parent.hidden) {
-            return NodeFilter.FILTER_REJECT;
-          }
+          if (s && (s.display === 'none' || s.visibility === 'hidden')) return NodeFilter.FILTER_REJECT;
+          if (parent.hidden) return NodeFilter.FILTER_REJECT;
           parent = parent.parentElement;
         }
 
         const el = node.parentElement;
-
-        // nav 下拉菜单字数极少，跳过 CSS 可见性检查，确保下拉项被翻译
-        // 非 nav 区域：用 offsetParent/visibility 过滤真正隐藏的内容（防止过度消耗）
         if (!insideNav) {
-          // CSS class 控制的 display:none 检测（hidden tabs, 分页内容, 折叠面板等）
-          if (el && el.offsetParent === null) {
-            try {
-              const pos = getComputedStyle(el).position;
-              if (pos !== 'fixed' && pos !== 'sticky') {
-                return NodeFilter.FILTER_REJECT;
-              }
-            } catch(_) {}
-          }
-          // visibility:hidden 检测（CSS 继承属性）
           if (el) {
             try {
-              if (getComputedStyle(el).visibility === 'hidden') {
-                return NodeFilter.FILTER_REJECT;
-              }
+              const cs = getComputedStyle(el);
+              if (cs.display === 'none' || cs.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
             } catch(_) {}
           }
         }
-
         return NodeFilter.FILTER_ACCEPT;
       }
     },
     false
   );
-  
-  let node;
-  while (node = walker.nextNode()) {
-    nodes.push(node);
-  }
 
-  // Shadow DOM 穿透：遍历所有有 shadowRoot 的元素，递归采集
+  let node;
+  while (node = walker.nextNode()) nodes.push(node);
+
   try {
     const allElements = root.querySelectorAll('*');
     for (const el of allElements) {
       if (el.shadowRoot) {
+        if (el.id === '__shiyu_widget__') continue;
         const shadowNodes = extractTextNodes(el.shadowRoot);
         nodes.push(...shadowNodes);
       }
@@ -1082,120 +1310,55 @@ function groupTextNodes(nodes) {
   const chunks = [];
   let currentChunk = [];
   let currentLength = 0;
-  
+
   for (const node of nodes) {
     const text = node.textContent.trim();
     const textLength = text.length;
-    
+
     if (currentLength + textLength > CHUNK_SIZE && currentChunk.length > 0) {
       chunks.push(currentChunk);
       currentChunk = [];
       currentLength = 0;
     }
-    
+
     currentChunk.push(node);
     currentLength += textLength;
   }
-  
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk);
-  }
-  
+  if (currentChunk.length > 0) chunks.push(currentChunk);
   return chunks;
 }
 
-// 页面内通知条（CREDITS_EXHAUSTED 等错误提示）
-let _notifTimer = null;
-function showNotification(msg, type = 'info', duration = 5000, action = null) {
-  let el = document.getElementById('__translator_notif__');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = '__translator_notif__';
-    Object.assign(el.style, {
-      position: 'fixed', top: '16px', right: '16px', zIndex: '2147483647',
-      padding: '10px 16px', borderRadius: '8px', fontSize: '13px',
-      fontFamily: 'sans-serif', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-      transition: 'opacity 0.3s', maxWidth: '340px', lineHeight: '1.5',
-      pointerEvents: 'none',
-    });
-    document.body.appendChild(el);
-  }
-  // 清空旧内容
-  el.innerHTML = '';
-  el.style.pointerEvents = 'auto';
-
-  // 第一行：消息 + 关闭按钮
-  const row1 = document.createElement('div');
-  Object.assign(row1.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' });
-
-  const msgSpan = document.createElement('span');
-  msgSpan.textContent = msg;
-  msgSpan.style.flex = '1';
-  row1.appendChild(msgSpan);
-
-  // 关闭按钮（×）
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = '×';
-  Object.assign(closeBtn.style, {
-    marginLeft: '4px', padding: '0 4px', fontSize: '16px', cursor: 'pointer',
-    border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit',
-    lineHeight: '1', flexShrink: '0',
+chrome.storage.local.get(['__shiyu_cache_migrated_v5'], items => {
+  if (items.__shiyu_cache_migrated_v5) return;
+  chrome.storage.local.get(null, all => {
+    const bad = Object.keys(all || {}).filter(k => k.startsWith('tc:'));
+    if (bad.length) chrome.storage.local.remove(bad);
   });
-  const dismiss = () => {
-    clearTimeout(_notifTimer);
-    el.style.opacity = '0';
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
-  };
-  closeBtn.addEventListener('click', dismiss);
-  row1.appendChild(closeBtn);
-  el.appendChild(row1);
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith('tc:')) sessionStorage.removeItem(k);
+    }
+  } catch(_) {}
+  chrome.storage.local.set({ __shiyu_cache_migrated_v5: true });
+});
 
-  // 第二行：action 按钮（如果有）
-  if (action) {
-    const row2 = document.createElement('div');
-    row2.style.marginTop = '6px';
-    const btn = document.createElement('button');
-    btn.textContent = action.label;
-    Object.assign(btn.style, {
-      padding: '3px 10px', fontSize: '12px', cursor: 'pointer',
-      borderRadius: '4px', border: '1px solid currentColor', background: 'transparent',
-      color: 'inherit', fontFamily: 'inherit',
-    });
-    btn.addEventListener('click', () => { action.fn(); dismiss(); });
-    row2.appendChild(btn);
-    el.appendChild(row2);
-  }
-
-  el.style.background = type === 'error' ? '#fee2e2' : '#dbeafe';
-  el.style.color       = type === 'error' ? '#991b1b' : '#1e3a8a';
-  el.style.opacity = '1';
-  clearTimeout(_notifTimer);
-  // 有 action 按钮时不自动消失，等用户点 × 或 action
-  if (!action) {
-    _notifTimer = setTimeout(() => {
-      el.style.opacity = '0';
-      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
-    }, duration);
-  }
-}
-
-function requestTranslation(text) {
+// ====== AI Translation Request Channel ======
+function requestTranslation(text, plain = false, tier = translationRunTier || currentTranslationTier) {
   return new Promise((resolve, reject) => {
     let settled = false;
     try {
-      // 使用长连接 port 代替 sendMessage：
-      // MV3 Service Worker 在 port 存活期间不会被 Chrome 挂起，彻底解决 "message channel closed" 问题
       const port = chrome.runtime.connect({ name: 'translation' });
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
         port.disconnect();
         reject(new Error('Translation timeout'));
-      }, 90000); // 90秒超时
+      }, 90000);
 
       port.onMessage.addListener((msg) => {
         clearTimeout(timer);
-        settled = true;  // 先标记已处理，防止 onDisconnect 误 reject
+        settled = true;
         port.disconnect();
         if (msg.success) resolve(msg.data);
         else reject(new Error(msg.error || 'Translation failed'));
@@ -1203,33 +1366,235 @@ function requestTranslation(text) {
 
       port.onDisconnect.addListener(() => {
         clearTimeout(timer);
-        void chrome.runtime.lastError; // 必须读一次，否则 Chrome 报 unchecked error
-        if (settled) return;           // onMessage 已处理，忽略 disconnect 事件
+        void chrome.runtime.lastError;
+        if (settled) return;
         settled = true;
         reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
       });
 
-      port.postMessage({ action: 'fetchTranslation', text });
+      port.postMessage({ action: 'fetchTranslation', text, plain, tier });
     } catch (e) {
       if (!settled) { settled = true; reject(new Error('EXTENSION_CONTEXT_INVALIDATED')); }
     }
   });
 }
 
-function applyTranslationResults(nodes, resultText) {
-  const lines = resultText.split('\n');
+function _parseNumberedTranslationMap(resultText) {
   const translations = {};
-  for (const line of lines) {
-    const match = line.match(/^\[(\d+)\]\s*(.+)/);
-    if (match) translations[parseInt(match[1])] = match[2].trim();
-  }
+  let raw = resultText == null ? '' : String(resultText).replace(/\uFEFF/g, '');
+  let trim = raw.trim();
+  const outerFence = trim.match(/^```[a-zA-Z0-9+-]*\r?\n([\s\S]*?)\r?\n```\s*$/);
+  if (outerFence) trim = outerFence[1].trim();
+  trim = trim.replace(/\uFF3B/g, '[').replace(/\uFF3D/g, ']');
 
+  for (const line of trim.split('\n')) {
+    const match = line.match(/^\s*\[(\d+)\]\s*(.+)/);
+    if (match) translations[parseInt(match[1], 10)] = match[2].trim();
+  }
+  if (Object.keys(translations).length === 0) {
+    const re = /^\s*\[(\d+)\]\s*(.+)$/gm;
+    let m;
+    while ((m = re.exec(trim)) !== null) {
+      translations[parseInt(m[1], 10)] = m[2].trim();
+    }
+  }
+  return translations;
+}
+
+// Return source indexes whose numbered response is missing, empty, or still
+// identical to the source. This is shared by every paid tier; healthy responses
+// return an empty list and therefore do not trigger a compensation request.
+function _collectFailedTranslationIndexes(blocks, translations) {
+  const failed = [];
+  blocks.forEach((block, index) => {
+    const translated = _sanitizeTranslationText(translations?.[index]);
+    if (!translated || translated.trim() === block.text.trim()) failed.push(index);
+  });
+  return failed;
+}
+
+function _sanitizeTranslationText(s) {
+  if (s == null) return '';
+  let t = String(s).replace(/\u200b/g, '');
+  t = t.split('\n').filter(line => !/^\s*[\{\}]\s*$/.test(line)).join('\n').trim();
+  return t;
+}
+
+function _sanitizePlainBlockTranslation(s) {
+  let t = _sanitizeTranslationText(s);
+  const lines = t.split(/\r?\n/);
+  const nonEmpty = lines.filter(line => line.trim());
+  const numberedCount = nonEmpty.filter(line => /^\s*\[\d+\]\s*/.test(line)).length;
+  if (numberedCount > 1 || /^\s*\[(?:0|1)\]\s*/.test(nonEmpty[0] || '')) {
+    t = lines.map(line => line.replace(/^\s*\[\d+\]\s*/, '')).join('\n').trim();
+  }
+  return t;
+}
+
+function _makeTranslatedEntry(block, translatedText) {
+  return {
+    element: block.element,
+    originalText: block.text,
+    translatedText,
+    textNodes: block.textNodes,
+    textOriginals: block.textOriginals,
+    inlineEls: block.inlineEls,
+    replaceTextOnly: block.replaceTextOnly,
+    attrName: block.attrName,
+    attrOriginal: block.attrOriginal,
+  };
+}
+
+function _controlDisplayText(originalText, translatedText) {
+  const original = String(originalText || '').trim();
+  const translated = String(translatedText || '').trim();
+  if (currentDisplayMode === 'original') return originalText || '';
+  if (currentDisplayMode === 'translationOnly') return translated;
+  if (!original) return translated;
+  if (!translated || translated === original) return original;
+  return `${original} ${translated}`;
+}
+
+function _entryTextNodesConnected(entry) {
+  return !!(entry && entry.textNodes && entry.textNodes.length > 0 && entry.textNodes.some(n => n && n.isConnected));
+}
+
+function _entryCurrentText(entry) {
+  if (!entry || !entry.textNodes || entry.textNodes.length === 0) return '';
+  return entry.textNodes
+    .filter(n => n && n.isConnected)
+    .map(n => n.nodeValue || '')
+    .join('')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+}
+
+function _entryHasBlockTranslation(entry) {
+  if (!entry || !entry.element || !entry.element.isConnected || !entry.translatedText) return false;
+  try {
+    return [...entry.element.querySelectorAll('.shiyu-tr[data-shiyu-block="1"],.shiyu-tr[data-shiyu-tr="1"]')]
+      .some(el => el.isConnected && el.textContent.trim() === String(entry.translatedText).trim());
+  } catch(_) {
+    return false;
+  }
+}
+
+function _pruneStaleTranslations(root) {
+  if (!root) return;
+  let changed = false;
+  translatedElements = translatedElements.filter(entry => {
+    if (!entry || entry.attrName || entry.replaceTextOnly || entry.node) return true;
+    if (!entry.element) return true;
+    const inScope = entry.element === root || root.contains?.(entry.element) || entry.element.contains?.(root);
+    if (!inScope) return true;
+    if (entry.element.isConnected && _entryTextNodesConnected(entry)) return true;
+    try { _translatedElementSet.delete(entry.element); } catch(_) {}
+    if (entry.textNodes) entry.textNodes.forEach(n => { try { _translatedTextNodeSet.delete(n); } catch(_) {} });
+    changed = true;
+    return false;
+  });
+  if (changed) applyDisplayMode();
+}
+
+function _applyTranslatedBlock(block, translatedText) {
+  if (block.attrName && block.element) {
+    // Attributes cannot host a separate translation span, so honor the
+    // current mode at insertion time just like text blocks do.
+    const value = currentDisplayMode === 'original'
+      ? (block.attrOriginal || '')
+      : translatedText;
+    block.element.setAttribute(block.attrName, value);
+    _translatedElementSet.add(block.element);
+    return;
+  }
+  if (block.replaceTextOnly && block.textNodes && block.textNodes.length > 0) {
+    block.textNodes[0].nodeValue = _controlDisplayText(block.text, translatedText);
+    for (let i = 1; i < block.textNodes.length; i++) block.textNodes[i].nodeValue = '';
+    if (block.element) _translatedElementSet.add(block.element);
+    block.textNodes.forEach(n => _translatedTextNodeSet.add(n));
+    return;
+  }
+  const blockTr = applyBlockResult(block.element, translatedText, block.insertAfterNode, block.textNodes, block.brNode);
+  applyDisplayModeToBlock(block, translatedText, blockTr);
+}
+
+function _isCompactControlElement(el) {
+  if (!el || !el.matches) return false;
+  const selector = 'a,button,summary,label,[role="button"],[role="link"],[role="menuitem"],[role="tab"]';
+  if (!el.matches(selector)) return false;
+  const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!text || text.length > 80) return false;
+  if (el.querySelector(selector)) return false;
+  if (el.querySelector('article,section,div,p,ul,ol,li,table')) return false;
+  try {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+  } catch(_) {}
+  const role = (el.getAttribute('role') || '').toLowerCase();
+  const isLinkLike = el.tagName === 'A' || role === 'link';
+  if (isLinkLike) {
+    const parent = el.closest('[role="menu"],[role="menubar"],[role="tablist"],[role="navigation"]');
+    const scopeText = `${String(el.className || '')} ${String(parent?.className || '')}`.toLowerCase();
+    if (!parent && !/sidebar|side-nav|left-rail|navigation|nav-item|menu-item|tab-item|topbar|top-nav|toolbar|pagetop|topsel/.test(scopeText)) return false;
+  }
+  return true;
+}
+
+function _textNodeStyleScore(node) {
+  if (!node || !node.parentElement) return -1;
+  const text = (node.nodeValue || '').trim();
+  if (!text) return -1;
+  let score = Math.min(text.length, 120);
+  try {
+    const el = node.parentElement;
+    const cs = getComputedStyle(el);
+    const fontSize = parseFloat(cs.fontSize) || 0;
+    const fontWeight = parseInt(cs.fontWeight, 10) || (cs.fontWeight === 'bold' ? 700 : 400);
+    score += fontSize * 8;
+    if (fontWeight >= 600) score += 40;
+    if (el.closest('.sitebit,.comhead,.subtext,.age,.hnuser,.score')) score -= 80;
+    if (el.closest('a,[role="link"],h1,h2,h3,h4,h5,h6,strong,b')) score += 25;
+  } catch(_) {}
+  return score;
+}
+
+function _pickTranslationStyleSource(textNodes) {
+  if (!textNodes || !textNodes.length) return null;
+  let best = null;
+  let bestScore = -1;
+  for (const node of textNodes) {
+    const score = _textNodeStyleScore(node);
+    if (score > bestScore) {
+      bestScore = score;
+      best = node;
+    }
+  }
+  return best && best.parentElement ? best.parentElement : null;
+}
+
+function _applyComputedTextStyle(target, sourceEl) {
+  if (!target || !sourceEl) return;
+  try {
+    const cs = getComputedStyle(sourceEl);
+    const props = ['color', 'font-size', 'line-height', 'font-weight', 'font-style', 'font-family'];
+    props.forEach(prop => target.style.setProperty(prop, cs.getPropertyValue(prop), 'important'));
+  } catch(_) {}
+}
+
+function applyTranslationResults(nodes, resultText) {
+  const translations = _parseNumberedTranslationMap(resultText);
+  let applied = 0;
   nodes.forEach((node, index) => {
-    const translatedText = translations[index];
+    let translatedText = _sanitizeTranslationText(translations[index]);
     if (!translatedText) return;
     if (!node.parentNode) return;
 
     const originalText = node.nodeValue;
+    if (translatedText.trim() === originalText.trim()) return;
+
+    applied++;
     translatedElements.push({ node, originalText, translatedText });
     translationMap[originalText.trim()] = translatedText;
 
@@ -1241,99 +1606,772 @@ function applyTranslationResults(nodes, resultText) {
     }
   });
 
-  // 每个 chunk 翻译完立即同步写 sessionStorage，确保刷新不丢失
   try {
     const key = _cacheKey();
     sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), map: translationMap }));
   } catch(_) {}
+  return applied;
 }
 
 function applyNodeTranslation(node, originalText, translatedText) {
-  // 先清除上次注入的译文元素（模式切换 / 重新翻译时）
-  const prevTr = _injectedTrMap.get(node);
-  if (prevTr && prevTr.parentNode) prevTr.parentNode.removeChild(prevTr);
-  _injectedTrMap.delete(node);
-
-  if (currentDisplayMode === 'original') {
-    node.nodeValue = originalText;
-  } else if (currentDisplayMode === 'translationOnly') {
-    node.nodeValue = translatedText;
-  } else {
-    // 双语模式：检测父元素 display，inline 父元素用内联括号样式，block 父元素用换行块级样式
-    node.nodeValue = originalText;
-    if (node.parentNode) {
-      const tr = document.createElement('font');
-      tr.className = 'shiyu-tr';
-      // 判断父元素是否是块级：取计算样式 display
-      const parentDisplay = window.getComputedStyle(node.parentNode).display;
-      const isBlock = parentDisplay === 'block' || parentDisplay === 'flex' ||
-                      parentDisplay === 'grid' || parentDisplay === 'list-item' ||
-                      parentDisplay === 'table-cell' || parentDisplay === 'table';
-      if (isBlock) {
-        tr.classList.add('shiyu-tr-block');
-        tr.textContent = translatedText;
-      } else {
-        // inline 父元素：空格 + 括号包裹，不换行，不破坏原布局
-        tr.classList.add('shiyu-tr-inline');
-        tr.textContent = '（' + translatedText + '）';
-      }
-      const next = node.nextSibling;
-      if (next) node.parentNode.insertBefore(tr, next);
-      else node.parentNode.appendChild(tr);
-      _injectedTrMap.set(node, tr);
+  try {
+    _translatedTextNodeSet.add(node);
+    const control = node.parentElement?.closest?.('a,button,summary,label,[role="button"],[role="link"],[role="menuitem"],[role="tab"]');
+    if (control && _isCompactControlElement(control)) {
+      // Keep cached/lazy control translations compact, matching extractBlocks()
+      // standalone-control handling instead of injecting a block wrapper.
+      node.nodeValue = _controlDisplayText(originalText, translatedText);
+      _translatedElementSet.add(control);
+      return;
     }
-  }
+    node.nodeValue = (currentDisplayMode === 'translationOnly') ? '' : originalText;
+    if (!node.parentNode) return;
+
+    const block = _getBlockAncestor(node);
+    let blockTr = _blockTrMap.get(block);
+    let blockTexts;
+
+    if (!blockTr || !blockTr.parentNode) {
+      blockTexts = new Map();
+      _blockTextsMap.set(block, blockTexts);
+
+      blockTr = document.createElement('span');
+      blockTr.className = 'shiyu-tr';
+      blockTr.setAttribute('data-shiyu-tr', '1');
+
+      block.appendChild(blockTr);
+      _blockTrMap.set(block, blockTr);
+    } else {
+      blockTexts = _blockTextsMap.get(block) || new Map();
+      _blockTextsMap.set(block, blockTexts);
+    }
+
+    const currentSource = _blockStyleSourceMap.get(block);
+    const currentScore = _blockStyleScoreMap.get(block) ?? -1;
+    const nextScore = _textNodeStyleScore(node);
+    const nextSource = _pickTranslationStyleSource([node]);
+    if (!currentSource || nextScore > currentScore) {
+      _blockStyleSourceMap.set(block, nextSource);
+      _blockStyleScoreMap.set(block, nextScore);
+      _applyComputedTextStyle(blockTr, nextSource);
+    } else {
+      _applyComputedTextStyle(blockTr, currentSource);
+    }
+
+    blockTexts.set(node, translatedText);
+    blockTr.textContent = _blockMergedTranslation(block);
+    // Apply the current mode immediately for cached/lazy node translations too.
+    // This keeps dynamic content consistent with _applyTranslatedBlock().
+    if (currentDisplayMode === 'translationOnly') {
+      node.nodeValue = translatedText;
+      blockTr.style.setProperty('display', 'none', 'important');
+    } else if (currentDisplayMode === 'original') {
+      node.nodeValue = originalText;
+      blockTr.style.setProperty('display', 'none', 'important');
+    } else {
+      node.nodeValue = originalText;
+      blockTr.style.removeProperty('display');
+    }
+  } catch (err) {}
 }
 
-// ============ 显示模式切换 ============
 function applyDisplayMode() {
-  // CSS class toggle — instant, zero DOM mutations, covers ALL .shiyu-tr including
-  // untracked elements left by a previous content script run after extension reload.
-  document.documentElement.classList.toggle('shiyu-mode-original',    currentDisplayMode === 'original');
+  document.documentElement.classList.toggle('shiyu-mode-original', currentDisplayMode === 'original');
   document.documentElement.classList.toggle('shiyu-mode-translation', currentDisplayMode === 'translationOnly');
 
-  // Text-node swap: only the node's text content needs changing.
-  // bilingual / original: show original text (shiyu-tr visibility managed by CSS above)
-  // translationOnly:      show translated text in the text node itself (CSS hides shiyu-tr)
-  // Pause the observer so these nodeValue changes don't cascade into observer callbacks.
+  const applyEntryBlockSpanMode = (entry) => {
+    if (!entry || !entry.element || !entry.translatedText) return;
+    try {
+      const expected = String(entry.translatedText).trim();
+      entry.element.querySelectorAll('.shiyu-tr[data-shiyu-block="1"],.shiyu-tr[data-shiyu-tr="1"]')
+        .forEach(span => {
+          if (String(span.textContent || '').trim() !== expected) return;
+          if (currentDisplayMode === 'bilingual') span.style.removeProperty('display');
+          else span.style.setProperty('display', 'none', 'important');
+        });
+    } catch(_) {}
+  };
+
   pauseObserver();
-  translatedElements.forEach(({ node, originalText, translatedText }) => {
-    if (!node || !node.parentNode) return;
-    const want = (currentDisplayMode === 'translationOnly') ? translatedText : originalText;
-    if (node.nodeValue !== want) node.nodeValue = want;
+  translatedElements.forEach(entry => {
+    if (entry.attrName && entry.element) {
+      try {
+        entry.element.setAttribute(
+          entry.attrName,
+          currentDisplayMode === 'original' ? entry.attrOriginal : entry.translatedText
+        );
+      } catch(_) {}
+      return;
+    }
+    if (entry.replaceTextOnly && entry.textNodes && entry.textNodes.length > 0) {
+      if (currentDisplayMode === 'original') {
+        entry.textNodes.forEach((n, i) => { try { n.nodeValue = entry.textOriginals[i]; } catch(_) {} });
+      } else {
+        entry.textNodes[0].nodeValue = _controlDisplayText(entry.originalText, entry.translatedText);
+        for (let i = 1; i < entry.textNodes.length; i++) entry.textNodes[i].nodeValue = '';
+      }
+      return;
+    }
+    if (entry.element && entry.textNodes && entry.textOriginals && !entry.replaceTextOnly) {
+      const currentText = _entryCurrentText(entry);
+      const originalText = String(entry.originalText || '').trim();
+      const translatedText = String(entry.translatedText || '').trim();
+      const storedOriginalText = entry.textOriginals.join('').replace(/[\r\n]+/g, ' ').trim();
+      if (storedOriginalText === originalText &&
+          currentText && currentText !== originalText && currentText !== translatedText) {
+        try { _translatedElementSet.delete(entry.element); } catch(_) {}
+        entry.textNodes.forEach(n => { try { _translatedTextNodeSet.delete(n); } catch(_) {} });
+        entry.__stale = true;
+        return;
+      }
+    }
+    if (currentDisplayMode === 'translationOnly') {
+      // Translation-only mode replaces original text nodes directly.
+      if (entry.textNodes && entry.textNodes.length > 0 && entry.translatedText) {
+        entry.textNodes[0].nodeValue = entry.translatedText;
+        for (let i = 1; i < entry.textNodes.length; i++) entry.textNodes[i].nodeValue = '';
+      } else if (entry.node && entry.node.parentNode) {
+        entry.node.nodeValue = entry.translatedText || '';
+      }
+      applyEntryBlockSpanMode(entry);
+    } else {
+      // Original and bilingual modes restore original text nodes.
+      if (entry.textNodes && entry.textOriginals) {
+        entry.textNodes.forEach((n, i) => { try { if (n.nodeValue !== entry.textOriginals[i]) n.nodeValue = entry.textOriginals[i]; } catch(_) {} });
+        if (currentDisplayMode === 'bilingual' && entry.element && entry.translatedText && !_entryHasBlockTranslation(entry)) {
+          applyBlockResult(entry.element, entry.translatedText, entry.insertAfterNode, entry.textNodes, entry.brNode);
+        }
+      } else if (entry.node && entry.node.parentNode) {
+        if (entry.node.nodeValue !== entry.originalText) entry.node.nodeValue = entry.originalText;
+      }
+      applyEntryBlockSpanMode(entry);
+    }
   });
+  translatedElements = translatedElements.filter(entry => !entry.__stale);
   resumeObserver();
 }
 
-// ============ 清空翻译 ============
-function clearTranslations() {
+function extractBlocks(root) {
+  const INLINE_DISPLAYS = new Set(['inline','inline-block','inline-flex','inline-grid','inline-table','ruby','ruby-base','ruby-base-container','ruby-text','ruby-text-container','math','inline-math','contents']);
+  const SKIP_TAGS = new Set(['SCRIPT','STYLE','NOSCRIPT','IFRAME','SVG','CANVAS','CODE','TEXTAREA','INPUT','SELECT','OPTION']);
+  const FORCE_BLOCK_TAGS = new Set(['P','H1','H2','H3','H4','H5','H6','DIV','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','LI','TD','TH','DT','DD']);
+
+  function isBlock(el) {
+    if (FORCE_BLOCK_TAGS.has(el.tagName)) return true;
+    try {
+      const d = getComputedStyle(el).display;
+      if (d.includes('inline')) return false;
+      return !INLINE_DISPLAYS.has(d);
+    } catch(_) { return false; }
+  }
+
+  function shouldSkipText(text) {
+    if (!text || !text.trim()) return true;
+    if (!/[a-zA-Z\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(text)) return true;
+    if (_isTargetChineseText(text)) return true;
+    return false;
+  }
+
+  function isAlreadyTranslatedNode(node) {
+    if (!node) return false;
+    if (node.nodeType === Node.TEXT_NODE && _translatedTextNodeSet.has(node)) return true;
+    let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    while (el && el !== root) {
+      if (_translatedElementSet.has(el)) return true;
+      if (el.classList && (el.classList.contains('shiyu-tr') || el.classList.contains('shiyu-loading'))) return true;
+      el = el.parentElement;
+    }
+    return !!(el && _translatedElementSet.has(el));
+  }
+
+  const results = [];
+  let curTexts = [], curTextNodes = [], curInlineEls = [], curElement = null;
+  const handledControlEls = new Set();
+
+  function commitParagraph(brNode = null, insertAfterNode = null) {
+    const text = curTexts.join('').trim();
+    const textNodes = curTextNodes.slice();
+    const inlineEls = curInlineEls.slice();
+    curTexts = []; curTextNodes = []; curInlineEls = [];
+
+    if (!text || !curElement || shouldSkipText(text)) return;
+    const textOriginals = textNodes.map(n => n.nodeValue);
+
+    const makeEntry = (t, anchor) => ({ element: curElement, text: t, insertAfterNode: anchor, brNode, textNodes, textOriginals, inlineEls });
+
+    if (text.length > 3000) {
+      const sentences = text.split(/(?<=[.!?\u3002\uff01\uff1f])\s+/).filter(s => s.trim());
+      if (sentences.length > 1) {
+        let chunk = [], chunkLen = 0;
+        for (let i = 0; i < sentences.length; i++) {
+          const s = sentences[i];
+          if (chunkLen + s.length > 1500 && chunk.length > 0) {
+            results.push(makeEntry(chunk.join(' '), null));
+            chunk = []; chunkLen = 0;
+          }
+          chunk.push(s); chunkLen += s.length;
+        }
+        if (chunk.length > 0) results.push(makeEntry(chunk.join(' '), insertAfterNode));
+        return;
+      }
+    }
+    results.push(makeEntry(text, insertAfterNode));
+  }
+  const preEls = root.querySelectorAll ? root.querySelectorAll('pre') : [];
+  const handledPres = new Set();
+  for (const pre of preEls) {
+    const raw = pre.textContent || '';
+    if (raw && raw.trim() && !shouldSkipText(raw)) {
+      const textNodes = [];
+      const textWalker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT, null);
+      let textNode;
+      while ((textNode = textWalker.nextNode())) textNodes.push(textNode);
+      results.push({
+        element: pre,
+        text: raw.trim(),
+        insertAfterNode: null,
+        brNode: null,
+        textNodes,
+        textOriginals: textNodes.map(n => n.nodeValue),
+        inlineEls: [],
+        isPre: true,
+      });
+      handledPres.add(pre);
+    }
+  }
+
+  function isVisibleControl(el) {
+    try {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    } catch(_) {
+      return true;
+    }
+  }
+
+  function isNavLikeControl(el) {
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    const tag = el.tagName;
+    if (!['A', 'BUTTON', 'SUMMARY', 'LABEL'].includes(tag) &&
+        !['button', 'link', 'menuitem', 'tab'].includes(role)) {
+      return false;
+    }
+    // Prefer the innermost interactive element so nested controls do not
+    // produce duplicate parent/child blocks.
+    const hasNestedInteractive = !!el.querySelector?.(
+      'a,button,summary,label,[role="button"],[role="link"],[role="menuitem"],[role="tab"]'
+    );
+    if (hasNestedInteractive) return false;
+    if (el.closest('nav,[role="navigation"],[role="tablist"]')) return true;
+    let p = el;
+    for (let depth = 0; p && depth < 5; depth++, p = p.parentElement) {
+      const cls = String(p.className || '').toLowerCase();
+      if (cls.includes('nav') || cls.includes('menu') || cls.includes('dropdown') || cls.includes('tab')) return true;
+    }
+    if (el.hasAttribute('aria-haspopup') || el.getAttribute('aria-expanded') !== null) return true;
+
+    // Reddit-like sidebars often use generic DIV wrappers without nav/menu
+    // semantics. Treat a visible, compact control as standalone, but avoid
+    // turning large post/card links into individual controls.
+    const text = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+    const compact = text.length > 0 && text.length <= 80;
+    const hasBlockDescendant = !!el.querySelector?.('article,section,div,p,ul,ol,li,table');
+    // If a control contains another interactive control, let the innermost
+    // control own its text. This prevents parent/child duplicate blocks.
+    const isButtonLike = tag === 'BUTTON' || tag === 'SUMMARY' || tag === 'LABEL' || role === 'button';
+    const isLinkLike = tag === 'A' || role === 'link';
+    if (compact && !hasBlockDescendant && !hasNestedInteractive && isVisibleControl(el)) {
+      if (isButtonLike) return true;
+      if (isLinkLike) {
+        const parent = el.closest('[role="menu"],[role="menubar"],[role="tablist"],[role="navigation"]');
+        const scopeText = `${String(el.className || '')} ${String(parent?.className || '')}`.toLowerCase();
+        // Generic sidebar/menu/topbar signals cover sites that do not use
+        // semantic nav elements, while ordinary article/post links remain
+        // content blocks even when their text is short.
+        return !!(parent || /sidebar|side-nav|left-rail|navigation|nav-item|menu-item|tab-item|topbar|top-nav|toolbar|pagetop|topsel/.test(scopeText));
+      }
+    }
+    return false;
+  }
+
+  function collectControlTextNodes(el) {
+    const nodes = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const text = node.nodeValue || '';
+        if (_translatedTextNodeSet.has(node)) return NodeFilter.FILTER_REJECT;
+        if (shouldSkipText(text)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let textNode;
+    while ((textNode = walker.nextNode())) nodes.push(textNode);
+    return nodes;
+  }
+
+  function collectOptionTextNodes(el) {
+    const nodes = [];
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE && !shouldSkipText(child.nodeValue || '')) {
+        nodes.push(child);
+      }
+    }
+    return nodes;
+  }
+
+  const optionEls = [];
+  if (root.matches && root.matches('option')) optionEls.push(root);
+  if (root.querySelectorAll) optionEls.push(...root.querySelectorAll('option'));
+  for (const option of optionEls) {
+    if (handledControlEls.has(option) || _translatedElementSet.has(option)) continue;
+    const textNodes = collectOptionTextNodes(option);
+    const text = textNodes.map(n => n.nodeValue.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (!text || shouldSkipText(text)) continue;
+    results.push({
+      element: option,
+      text,
+      insertAfterNode: null,
+      brNode: null,
+      textNodes,
+      textOriginals: textNodes.map(n => n.nodeValue),
+      inlineEls: [],
+      replaceTextOnly: true,
+    });
+    handledControlEls.add(option);
+  }
+
+  const controlSelector = 'a,button,summary,label,[role="button"],[role="link"],[role="menuitem"],[role="tab"]';
+  const controlEls = [];
+  if (root.matches && root.matches(controlSelector)) controlEls.push(root);
+  if (root.querySelectorAll) controlEls.push(...root.querySelectorAll(controlSelector));
+  for (const el of controlEls) {
+    if (handledControlEls.has(el) || _translatedElementSet.has(el) || !isNavLikeControl(el)) continue;
+    const textNodes = collectControlTextNodes(el);
+    if (textNodes.some(n => _translatedTextNodeSet.has(n))) continue;
+    const text = textNodes.map(n => n.nodeValue.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (!text || shouldSkipText(text)) continue;
+    results.push({
+      element: el,
+      text,
+      insertAfterNode: null,
+      brNode: null,
+      textNodes,
+      textOriginals: textNodes.map(n => n.nodeValue),
+      inlineEls: [],
+      replaceTextOnly: true,
+    });
+    handledControlEls.add(el);
+  }
+
+  const attrSelector = 'input[placeholder],textarea[placeholder],option[label],optgroup[label]';
+  const attrEls = [];
+  if (root.matches && root.matches(attrSelector)) attrEls.push(root);
+  if (root.querySelectorAll) attrEls.push(...root.querySelectorAll(attrSelector));
+  for (const el of attrEls) {
+    const attrName = el.hasAttribute('placeholder') ? 'placeholder' : 'label';
+    if (attrName === 'placeholder' && !isVisibleControl(el)) continue;
+    const text = (el.getAttribute(attrName) || '').trim();
+    if (!text || shouldSkipText(text)) continue;
+    results.push({
+      element: el,
+      text,
+      insertAfterNode: null,
+      brNode: null,
+      textNodes: [],
+      textOriginals: [],
+      inlineEls: [],
+      attrName,
+      attrOriginal: el.getAttribute(attrName) || '',
+    });
+  }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode(node) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          if (SKIP_TAGS.has(node.tagName)) return NodeFilter.FILTER_REJECT;
+          if (node.tagName === 'PRE' && handledPres.has(node)) return NodeFilter.FILTER_REJECT;
+          if (handledControlEls.has(node)) return NodeFilter.FILTER_REJECT;
+          if (isAlreadyTranslatedNode(node)) return NodeFilter.FILTER_REJECT;
+          if (node.id === '__shiyu_widget__') return NodeFilter.FILTER_REJECT;
+          if (node.classList && (node.classList.contains('shiyu-tr') || node.classList.contains('shiyu-loading'))) return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.tagName === 'BR') { commitParagraph(node); }
+      else if (isBlock(node)) { commitParagraph(null); curElement = node; }
+      else { curInlineEls.push(node); }
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      if (isAlreadyTranslatedNode(node)) continue;
+      if (node.textContent.trim()) {
+        curTexts.push(node.textContent.replace(/[\r\n]+/g, ' '));
+        curTextNodes.push(node);
+        if (!curElement) curElement = node.parentElement;
+      }
+    }
+  }
+  commitParagraph(null);
+  return results;
+}
+
+function applyBlockResult(element, translatedText, insertAfterNode, textNodes, brNode) {
+  if (!element) return null;
+  _translatedElementSet.add(element);
+  if (textNodes && textNodes.length) textNodes.forEach(n => _translatedTextNodeSet.add(n));
+  const styleSource = _pickTranslationStyleSource(textNodes);
+  const blockTr = document.createElement('span');
+  blockTr.className = 'shiyu-tr';
+  blockTr.setAttribute('data-shiyu-block', '1');
+  blockTr.textContent = translatedText;
+  _applyComputedTextStyle(blockTr, styleSource);
+
+  // Keep translations anchored next to their source text. The wrapper's
+  // block display creates the new visual line; no <br> is required.
+  const lastTextNode = textNodes && textNodes.length > 0 ? textNodes[textNodes.length - 1] : null;
+  if (lastTextNode && lastTextNode.parentNode) {
+    const nextNode = lastTextNode.nextSibling;
+    lastTextNode.parentNode.insertBefore(blockTr, nextNode);
+  } else {
+    element.appendChild(blockTr);
+  }
+  return blockTr;
+}
+
+// Apply the current display mode to only the newly translated block. This
+// avoids a transient bilingual frame while preserving the full-page refresh
+// path used when the user explicitly changes display mode.
+function applyDisplayModeToBlock(block, translatedText, blockTr) {
+  if (!block) return;
+  const nodes = block.textNodes || [];
+  if (currentDisplayMode === 'translationOnly') {
+    if (nodes.length > 0) {
+      nodes[0].nodeValue = translatedText || '';
+      for (let i = 1; i < nodes.length; i++) nodes[i].nodeValue = '';
+    }
+    if (blockTr) blockTr.style.setProperty('display', 'none', 'important');
+  } else if (currentDisplayMode === 'original') {
+    if (nodes.length > 0 && block.textOriginals) {
+      nodes.forEach((node, i) => { node.nodeValue = block.textOriginals[i] ?? ''; });
+    }
+    if (blockTr) blockTr.style.setProperty('display', 'none', 'important');
+  } else if (blockTr) {
+    blockTr.style.removeProperty('display');
+  }
+}
+
+// ==========================================
+// Free translation channel: Google public endpoint via the background queue.
+// ==========================================
+
+function requestGoogleTranslation(textsArray) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    try {
+      const port = chrome.runtime.connect({ name: 'translation' });
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        port.disconnect();
+        reject(new Error('Translation timeout'));
+      }, 90000);
+
+      port.onMessage.addListener((msg) => {
+        clearTimeout(timer);
+        settled = true;
+        port.disconnect();
+        if (msg.success) resolve(msg.data);
+        else reject(new Error(msg.error || 'Translation failed'));
+      });
+
+      port.onDisconnect.addListener(() => {
+        clearTimeout(timer);
+        if (settled) return;
+        settled = true;
+        reject(new Error('EXTENSION_CONTEXT_INVALIDATED'));
+      });
+
+      port.postMessage({ action: 'fetchGoogleTranslation', texts: textsArray, tl: currentTargetLang });
+    } catch (e) {
+      if (!settled) { settled = true; reject(new Error('EXTENSION_CONTEXT_INVALIDATED')); }
+    }
+  });
+}
+
+async function translateBlocksFree(blocks) {
+  if (!blocks.length) return;
+  const CHUNK_SIZE = 3000;
+  const MAX_BLOCKS_PER_CHUNK = 4;
+
+  const chunks = [];
+  let cur = [], curLen = 0;
+  for (const b of blocks) {
+    if ((curLen + b.text.length > CHUNK_SIZE || cur.length >= MAX_BLOCKS_PER_CHUNK) && cur.length > 0) {
+      chunks.push(cur); cur = []; curLen = 0;
+    }
+    cur.push(b); curLen += b.text.length;
+  }
+  if (cur.length > 0) chunks.push(cur);
+
+  const MAX_PARALLEL = 3;
+  let qi = 0;
+
+  async function worker() {
+    while (qi < chunks.length) {
+      const chunk = chunks[qi++];
+      const textsToTranslate = chunk.map(b => b.text);
+      const nodesToLoad = chunk.flatMap(b => b.textNodes && b.textNodes.length > 0 ? b.textNodes : [b.element]).filter(Boolean);
+
+      try {
+        _showChunkLoading(nodesToLoad);
+        let translatedArray = [];
+        try {
+          translatedArray = await requestGoogleTranslation(textsToTranslate);
+        } catch (batchErr) {
+          console.warn('[SilkRead] Google free translation request failed', batchErr);
+        }
+
+        // Apply each block independently. A missing/empty/unchanged item must not
+        // discard otherwise valid translations returned for the rest of the batch.
+        for (let idx = 0; idx < chunk.length; idx++) {
+          try {
+            const b = chunk[idx];
+            let tr = Array.isArray(translatedArray) && translatedArray[idx]
+              ? String(translatedArray[idx]).trim()
+              : '';
+
+            if (tr && tr !== b.text.trim()) {
+              translationMap[b.text] = tr;
+              translatedElements.push(_makeTranslatedEntry(b, tr));
+              _applyTranslatedBlock(b, tr);
+            }
+          } catch (blockErr) {
+            console.warn('[SilkRead] Free block apply failed', blockErr);
+          }
+        }
+      } catch(err) {
+        console.warn('[SilkRead] Free block translation failed', err);
+      } finally {
+        _hideChunkLoading(nodesToLoad);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, chunks.length) }, worker));
+  saveTranslationCache();
+}
+
+async function translateBlocksAI_legacy(blocks) {
+  if (!blocks.length) return;
+  const CHUNK_SIZE = 3000;
+  const tierSnapshot = translationRunTier || currentTranslationTier;
+  const preBlocks = blocks.filter(b => b.isPre);
+  const normalBlocks = blocks.filter(b => !b.isPre);
+
+  for (const b of preBlocks) {
+    const nodesToLoad = (b.textNodes && b.textNodes.length > 0) ? b.textNodes : [b.element];
+    try {
+      _showChunkLoading(nodesToLoad);
+      // Translate pre blocks in plain mode to preserve line breaks.
+      const result = await requestTranslation(b.text, true, tierSnapshot);
+      let tr = (result && result.__shiyuStats) ? result.text : result;
+      tr = String(tr || '').trim();
+      if (tr && tr !== b.text.trim()) {
+        translationMap[b.text] = tr;
+        translatedElements.push(_makeTranslatedEntry(b, tr));
+        _applyTranslatedBlock(b, tr);
+      }
+    } catch(err) {
+      handleTranslationError(err);
+    } finally {
+      _hideChunkLoading(nodesToLoad);
+    }
+  }
+
+  // Normal blocks keep the existing chunked translation flow.
+  const chunks = [];
+  let cur = [], curLen = 0;
+  for (const b of normalBlocks) {
+    if (curLen + b.text.length > CHUNK_SIZE && cur.length > 0) { chunks.push(cur); cur = []; curLen = 0; }
+    cur.push(b); curLen += b.text.length;
+  }
+  if (cur.length > 0) chunks.push(cur);
+
+  const MAX_PARALLEL = 3;
+  let qi = 0;
+  async function worker() {
+    while (qi < chunks.length) {
+      const chunk = chunks[qi++];
+      const nodesToLoad = chunk.flatMap(b => b.textNodes && b.textNodes.length > 0 ? b.textNodes : [b.element]).filter(Boolean);
+      try {
+        _showChunkLoading(nodesToLoad);
+        const results = [];
+        for (const b of chunk) {
+          try {
+            const result = await requestTranslation(b.text, false, tierSnapshot);
+            let tr = (result && result.__shiyuStats) ? result.text : result;
+            tr = String(tr || '').trim().replace(/^\s*\[\d+\]\s*/, '');
+            results.push(tr);
+          } catch (e) {
+            handleTranslationError(e);
+            results.push('');
+          }
+        }
+        chunk.forEach((b, idx) => {
+          const tr = results[idx] ? results[idx].trim() : '';
+          if (tr && tr !== b.text.trim()) {
+            translationMap[b.text] = tr;
+            translatedElements.push(_makeTranslatedEntry(b, tr));
+            _applyTranslatedBlock(b, tr);
+          }
+        });
+      } catch(err) {
+        handleTranslationError(err);
+      } finally {
+        _hideChunkLoading(nodesToLoad);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, chunks.length) }, worker));
+  saveTranslationCache();
+}
+
+async function translateBlocksAI(blocks) {
+  if (!blocks.length) return;
+  const CHUNK_SIZE = 3000;
+  const tierSnapshot = translationRunTier || currentTranslationTier;
+  const preBlocks = blocks.filter(b => b.isPre);
+  const normalBlocks = blocks.filter(b => !b.isPre);
+
+  for (const b of preBlocks) {
+    const nodesToLoad = (b.textNodes && b.textNodes.length > 0) ? b.textNodes : [b.element];
+    try {
+      _showChunkLoading(nodesToLoad);
+      const result = await requestTranslation(b.text, true, tierSnapshot);
+      const raw = (result && result.__shiyuStats) ? result.text : result;
+      const tr = _sanitizePlainBlockTranslation(raw);
+      if (tr && tr !== b.text.trim()) {
+        translationMap[b.text] = tr;
+        translatedElements.push(_makeTranslatedEntry(b, tr));
+        _applyTranslatedBlock(b, tr);
+      }
+    } catch(err) {
+      handleTranslationError(err);
+    } finally {
+      _hideChunkLoading(nodesToLoad);
+    }
+  }
+
+  const chunks = [];
+  let cur = [], curLen = 0;
+  for (const b of normalBlocks) {
+    if (curLen + b.text.length > CHUNK_SIZE && cur.length > 0) {
+      chunks.push(cur);
+      cur = [];
+      curLen = 0;
+    }
+    cur.push(b);
+    curLen += b.text.length;
+  }
+  if (cur.length > 0) chunks.push(cur);
+
+  const MAX_PARALLEL = 3;
+  let qi = 0;
+  async function worker() {
+    while (qi < chunks.length) {
+      const chunk = chunks[qi++];
+      const nodesToLoad = chunk.flatMap(b => b.textNodes && b.textNodes.length > 0 ? b.textNodes : [b.element]).filter(Boolean);
+      try {
+        _showChunkLoading(nodesToLoad);
+        const combined = chunk.map((b, idx) => `[${idx}] ${b.text}`).join('\n');
+        const result = await requestTranslation(combined, false, tierSnapshot);
+        const raw = (result && result.__shiyuStats) ? result.text : result;
+        const parsed = _parseNumberedTranslationMap(raw);
+        const results = chunk.map((_, idx) => _sanitizeTranslationText(parsed[idx]));
+
+        // Models occasionally omit a numbered item or echo its source text.
+        // Collect those items and make one shared compensation request only when
+        // needed; healthy model responses incur no additional request.
+        const failed = _collectFailedTranslationIndexes(chunk, parsed);
+        if (failed.length > 0) {
+          try {
+            // Use a compact index range for the compensation request, then
+            // map those results back to the original chunk indexes.
+            const retryCombined = failed
+              .map((originalIdx, retryIdx) => `[${retryIdx}] ${chunk[originalIdx].text}`)
+              .join('\n');
+            const retryResult = await requestTranslation(retryCombined, false, tierSnapshot);
+            const retryRaw = (retryResult && retryResult.__shiyuStats) ? retryResult.text : retryResult;
+            const retryParsed = _parseNumberedTranslationMap(retryRaw);
+            failed.forEach((originalIdx, retryIdx) => {
+              const block = chunk[originalIdx];
+              const retryText = _sanitizeTranslationText(retryParsed[retryIdx]);
+              if (retryText && retryText.trim() !== block.text.trim()) results[originalIdx] = retryText;
+            });
+          } catch (retryErr) {
+            console.warn('[SilkRead] AI compensation request failed', retryErr);
+          }
+        }
+
+        chunk.forEach((b, idx) => {
+          const tr = results[idx] ? results[idx].trim() : '';
+          if (tr && tr !== b.text.trim()) {
+            translationMap[b.text] = tr;
+            translatedElements.push(_makeTranslatedEntry(b, tr));
+            _applyTranslatedBlock(b, tr);
+          }
+        });
+      } catch(err) {
+        handleTranslationError(err);
+      } finally {
+        _hideChunkLoading(nodesToLoad);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, chunks.length) }, worker));
+  saveTranslationCache();
+}
+
+function clearTranslations(alsoClearStorage) {
   resetLazyObserver();
   pauseObserver();
-  // 清除 CSS 模式类，避免切回原文后残留状态
   document.documentElement.classList.remove('shiyu-mode-original', 'shiyu-mode-translation');
-  translatedElements.forEach(({ node, originalText }) => {
-    if (node && node.parentNode) node.nodeValue = originalText;
-    // 移除注入的译文元素
-    const tr = _injectedTrMap.get(node);
-    if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
-    _injectedTrMap.delete(node);
+  translatedElements.forEach(entry => {
+    if (entry.attrName && entry.element) {
+      try { entry.element.setAttribute(entry.attrName, entry.attrOriginal || ''); } catch(_) {}
+    } else if (entry.node && entry.node.parentNode) {
+      entry.node.nodeValue = entry.originalText;
+    } else if (entry.textNodes && entry.textOriginals) {
+      entry.textNodes.forEach((n, i) => { try { n.nodeValue = entry.textOriginals[i]; } catch(_) {} });
+    }
   });
-  // 扫除所有残留（node 已脱离 DOM 但 font 还在的情况）
   document.querySelectorAll('.shiyu-tr').forEach(el => el.remove());
+  document.querySelectorAll('.shiyu-br').forEach(el => el.remove());
   translatedElements = [];
   translationMap = {};
+  _translatedElementSet = new WeakSet();
+  _translatedTextNodeSet = new WeakSet();
   observerTranslateCount.clear();
+  _ballTranslated = false;
   resumeObserver();
+  if (alsoClearStorage) {
+    try {
+      const key = _cacheKey();
+      const hostKey = _hostCacheKey();
+      sessionStorage.removeItem(key);
+      sessionStorage.removeItem(hostKey);
+      chrome.storage.local.remove([key]);
+    } catch(_) {}
+  }
 }
 
-// ============ 网页 → 扩展 鉴权中继 ============
-// 当用户在 shiyuai.top 完成邮箱验证码登录后，网页会发 postMessage，
-// content.js 负责把 token 转发给 background.js 保存。
-window.addEventListener('message', (event) => {
-  if (event.origin !== 'https://shiyuai.top') return;
-  if (!event.data || event.data.type !== 'SHIYU_AUTH') return;
-  const { token, email } = event.data;
-  if (token && email) {
-    chrome.runtime.sendMessage({ action: 'saveAuthToken', token, email });
-  }
-}, false);
+window.__shiyuTranslateFrame = translatePageNow;
+window.__shiyuClearFrame = function () {
+  clearTranslations();
+};

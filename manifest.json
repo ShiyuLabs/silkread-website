@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "诗语翻译 - AI 智能翻译助手",
-  "version": "1.2",
-  "description": "诗语翻译：支持全球顶级大模型的沉浸式双语对照翻译",
+  "name": "SilkRead",
+  "version": "1.4.6",
+  "description": "SilkRead: immersive AI-powered bilingual web translation for global readers.",
   "permissions": [
     "storage",
     "scripting",
@@ -11,7 +11,12 @@
     "alarms"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://getsilkread.com/*",
+    "https://www.getsilkread.com/*",
+    "https://api.getsilkread.com/*",
+    "https://*.microsoft.com/*",
+    "https://*.microsofttranslator.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -20,24 +25,27 @@
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
-      "48": "icon.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
       "128": "icon128.png"
     }
   },
   "icons": {
     "16": "icon16.png",
-    "48": "icon.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
     "128": "icon128.png"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "exclude_matches": ["*://shiyuai.top/*", "*://*.shiyuai.top/*"],
+      "exclude_matches": ["https://getsilkread.com/*", "https://www.getsilkread.com/*"],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_end",
+      "all_frames": true
     },
     {
-      "matches": ["*://shiyuai.top/*"],
+      "matches": ["https://getsilkread.com/*", "https://www.getsilkread.com/*"],
       "js": ["auth-relay.js"],
       "run_at": "document_end"
     }

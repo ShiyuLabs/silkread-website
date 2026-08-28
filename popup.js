@@ -1,283 +1,276 @@
-﻿// popup.js
+// popup.js
 
-const autoToggle       = document.getElementById('autoToggle');
-const modeOriginal     = document.getElementById('modeOriginal');
-const modeBilingual    = document.getElementById('modeBilingual');
-const modeTranslation  = document.getElementById('modeTranslation');
+const LOGIN_URL = 'https://www.getsilkread.com/login?from=extension';
+const RECHARGE_URL = 'https://www.getsilkread.com/#pricing';
 
-const sourceLangSel    = document.getElementById('sourceLang');
-const targetLangSel    = document.getElementById('targetLang');
-const managedModelSel  = document.getElementById('managedModel');
-const modelRateHint    = document.getElementById('modelRateHint');
-const balanceText      = document.getElementById('balanceText');
-const topupBtn         = document.getElementById('topupBtn');
-const accountEmail     = document.getElementById('accountEmail');
-const accountActionBtn = document.getElementById('accountActionBtn');
+const autoToggle = document.getElementById('autoToggle');
+const ballToggle = document.getElementById('ballToggle');
+const modeOriginal = document.getElementById('modeOriginal');
+const modeBilingual = document.getElementById('modeBilingual');
+const modeTranslation = document.getElementById('modeTranslation');
+const sourceLangSel = document.getElementById('sourceLang');
+const targetLangSel = document.getElementById('targetLang');
 
-const WEBSITE = 'https://shiyuai.top/';
+const notLoggedInPanel = document.getElementById('notLoggedInPanel');
+const loggedInPanel = document.getElementById('loggedInPanel');
+const openLoginBtn = document.getElementById('openLoginBtn');
+const emailDisplay = document.getElementById('emailDisplay');
+const balanceDisplay = document.getElementById('balanceDisplay');
+const refreshBalanceBtn = document.getElementById('refreshBalanceBtn');
+const topupBtn = document.getElementById('topupBtn');
+const logoutBtn = document.getElementById('logoutBtn');
 
-// 每个模型的计费比率（积分 / 1K Token）
-const MODEL_RATES = {
-  'free-translation':            0,
-  'deepseek-v3.2':               8,
-  'qwen3-235b-a22b':             18,
-  'gemini-2.5-flash-nothinking': 25,
-  'claude-sonnet-4-6':           250,
+const DEFAULT_TIER = 'economy';
+
+const TIERS = {
+  free: { engine: 'free' },
+  economy: { engine: 'paid' },
+  smart: { engine: 'paid' },
+  natural: { engine: 'paid' },
+  expert: { engine: 'paid' },
 };
 
-const MODEL_RATE_HINTS = {
-  'free-translation':            '谷歌通道 · 完全免费',
-  'deepseek-v3.2':               '¥0.008 / 1K Token',
-  'qwen3-235b-a22b':             '¥0.018 / 1K Token',
-  'gemini-2.5-flash-nothinking': '¥0.025 / 1K Token',
-  'claude-sonnet-4-6':           '¥0.25 / 1K Token',
-};
-
-// 旧版本模型 key 迁移映射（老用户 storage 里可能存有旧 key）
-const MODEL_MIGRATION = {
-  'deepseek-chat':    'deepseek-v3.2',
-  'gemini-2.5-flash': 'gemini-2.5-flash-nothinking',
-  'gpt-5-mini':       'deepseek-v3.2',
-};
-
-function updateModelRateHint(model) {
-  if (modelRateHint) modelRateHint.textContent = MODEL_RATE_HINTS[model] || '';
-}
-
-// 浏览器语言 -> 目标语言 映射
 function detectBrowserLang() {
-  const lang = navigator.language || navigator.userLanguage || 'zh-CN';
+  const lang = navigator.language || navigator.userLanguage || 'en';
   const map = {
-    'zh': 'zh-CN', 'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh-HK': 'zh-TW',
-    'ja': 'ja', 'ko': 'ko', 'fr': 'fr', 'de': 'de',
-    'es': 'es', 'pt': 'pt', 'ru': 'ru', 'ar': 'ar', 'it': 'it', 'en': 'en'
+    zh: 'zh-CN',
+    'zh-CN': 'zh-CN',
+    'zh-TW': 'zh-TW',
+    'zh-HK': 'zh-TW',
+    ja: 'ja',
+    ko: 'ko',
+    fr: 'fr',
+    de: 'de',
+    es: 'es',
+    pt: 'pt',
+    ru: 'ru',
+    ar: 'ar',
+    it: 'it',
+    en: 'en',
   };
-  return map[lang] || map[lang.split('-')[0]] || 'zh-CN';
+  return map[lang] || map[lang.split('-')[0]] || 'en';
 }
 
-// ===== 初始化：加载所有设置 =====
-chrome.storage.sync.get(
-  ['autoTranslateEnabled', 'displayMode', 'translationEngine', 'sourceLang', 'targetLang', 'managedModel'],
-  (syncResult) => {
-    updateAutoTranslateUI(syncResult.autoTranslateEnabled || false);
-    updateDisplayModeUI(syncResult.displayMode || 'bilingual');
+chrome.storage.local.get(
+  [
+    'selectedTier',
+    'authToken',
+    'authEmail',
+    'cachedCredits',
+    'autoTranslateEnabled',
+    'displayMode',
+    'sourceLang',
+    'targetLang',
+    'ballHidden',
+  ],
+  (local) => {
+    chrome.storage.sync.get(
+      [
+        'autoTranslateEnabled',
+        'displayMode',
+        'sourceLang',
+        'targetLang',
+        'translationTier',
+        'translationEngine',
+      ],
+      (sync) => {
+        updateAutoTranslateUI(
+          local.autoTranslateEnabled !== undefined
+            ? local.autoTranslateEnabled
+            : (sync.autoTranslateEnabled || false)
+        );
+        updateDisplayModeUI(local.displayMode || sync.displayMode || 'bilingual');
 
-    const targetLang = syncResult.targetLang || detectBrowserLang();
-    const sourceLang = syncResult.sourceLang || 'auto';
-    setSelectValue(sourceLangSel, sourceLang);
-    setSelectValue(targetLangSel, targetLang);
-    if (!syncResult.targetLang) chrome.storage.sync.set({ targetLang, sourceLang: 'auto' });
+        setSelectValue(sourceLangSel, local.sourceLang || sync.sourceLang || 'auto');
+        setSelectValue(targetLangSel, local.targetLang || sync.targetLang || detectBrowserLang());
 
-    if (syncResult.translationEngine === 'free') {
-      setSelectValue(managedModelSel, 'free-translation');
-      updateModelRateHint('free-translation');
-    } else {
-      let targetModel = syncResult.managedModel || 'deepseek-v3.2';
-      // 旧 key 迁移：自动映射到新模型并持久化
-      if (MODEL_MIGRATION[targetModel]) {
-        targetModel = MODEL_MIGRATION[targetModel];
-        chrome.storage.sync.set({ managedModel: targetModel });
+        let tier = normalizeTier(local.selectedTier);
+        if (!tier) tier = normalizeTier(sync.translationTier);
+        if (!tier && sync.translationEngine === 'free') tier = 'free';
+        selectTier(tier || DEFAULT_TIER, false);
+        persistTier(tier || DEFAULT_TIER);
+
+        if (ballToggle) ballToggle.checked = !local.ballHidden;
+
+        if (local.authToken) {
+          showLoggedInUI(local.authEmail || 'SilkRead account');
+          displayBalance(local.cachedCredits);
+          refreshBalance();
+        } else {
+          showNotLoggedIn();
+        }
       }
-      setSelectValue(managedModelSel, targetModel);
-      updateModelRateHint(managedModelSel.value);
-      // 如果模型在新选项列表里仍找不到，回退到最便宜的付费档
-      if (!managedModelSel.value || managedModelSel.value !== targetModel) {
-        managedModelSel.value = 'deepseek-v3.2';
-        chrome.storage.sync.set({ managedModel: 'deepseek-v3.2' });
-      }
-    }
-
-    // 加载余额（先用缓存，再刷新）
-    chrome.storage.local.get(['cachedCredits'], (local) => {
-      if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
-    });
-    checkLoginState(() => loadBalance());
+    );
   }
 );
 
-// ===== 账户状态 =====
-function setLoggedInUI(email) {
-  accountEmail.textContent     = email;
-  accountActionBtn.textContent = '退出';
-  accountActionBtn.onclick     = doLogout;
-}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
 
-function setLoggedOutUI() {
-  accountEmail.textContent     = '未登录';
-  accountActionBtn.textContent = '去登录';
-  accountActionBtn.onclick     = openWebsite;
-}
-
-function requestAuthSyncFromWebsite(done) {
-  chrome.tabs.query({ url: ['*://shiyuai.top/*', '*://*.shiyuai.top/*'] }, (tabs) => {
-    if (!tabs || tabs.length === 0) return done && done(false);
-    let pending = tabs.length;
-    let anySent = false;
-    tabs.forEach((tab) => {
-      chrome.tabs.sendMessage(tab.id, { action: 'syncAuthFromPage' }, () => {
-        if (!chrome.runtime.lastError) anySent = true;
-        pending -= 1;
-        if (pending === 0) done && done(anySent);
-      });
-    });
-  });
-}
-
-function checkLoginState(cb) {
-  // Always request website-side sync first so both login and logout stay consistent.
-  requestAuthSyncFromWebsite(() => {
-    setTimeout(() => {
-      chrome.storage.local.get(['authToken', 'authEmail'], (fresh) => {
-        if (fresh.authToken && fresh.authEmail) {
-          setLoggedInUI(fresh.authEmail);
-          if (cb) cb(true);
-        } else {
-          setLoggedOutUI();
-          if (cb) cb(false);
-        }
-      });
-    }, 250);
-  });
-}
-
-function doLogout() {
-  chrome.runtime.sendMessage({ action: 'logout' }, () => {
-    // Push logout state to website tabs so web and extension stay in sync.
-    chrome.tabs.query({ url: ['*://shiyuai.top/*', '*://*.shiyuai.top/*'] }, (tabs) => {
-      (tabs || []).forEach((tab) => {
-        chrome.tabs.sendMessage(tab.id, { action: 'logoutFromExtension' }, () => { chrome.runtime.lastError; });
-      });
-    });
-    accountEmail.textContent     = '未登录';
-    accountActionBtn.textContent = '去登录';
-    accountActionBtn.onclick     = openWebsite;
-    if (managedModelSel.value !== 'free-translation') {
-      balanceText.textContent = '余额：未登录';
-      balanceText.style.color = '#9ca3af';
+  if ('authToken' in changes) {
+    if (changes.authToken?.newValue) {
+      showLoggedInUI(changes.authEmail?.newValue || 'SilkRead account');
+      displayBalance(changes.cachedCredits?.newValue);
     } else {
-      setFreeMode();
+      showNotLoggedIn();
     }
+  } else {
+    if ('authEmail' in changes) {
+      emailDisplay.textContent = changes.authEmail?.newValue || 'SilkRead account';
+    }
+    if ('cachedCredits' in changes) {
+      displayBalance(changes.cachedCredits?.newValue);
+    }
+  }
+
+  if ('ballHidden' in changes && ballToggle) {
+    ballToggle.checked = !changes.ballHidden.newValue;
+  }
+});
+
+function normalizeTier(tierId) {
+  if (!tierId) return null;
+  return TIERS[tierId] ? tierId : null;
+}
+
+function selectTier(tierId, save = true) {
+  tierId = normalizeTier(tierId) || DEFAULT_TIER;
+
+  document.querySelectorAll('.model-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.tier === tierId);
+  });
+
+  const expertDetails = document.querySelector('.expert-settings');
+  if (expertDetails && tierId === 'expert') {
+    expertDetails.open = true;
+  }
+
+  if (!save) return;
+
+  persistTier(tierId);
+}
+
+function persistTier(tierId) {
+  const tier = TIERS[tierId] || TIERS[DEFAULT_TIER];
+  chrome.storage.local.set({ selectedTier: tierId });
+  chrome.storage.sync.set({
+    translationEngine: tier.engine,
+    translationTier: tierId === 'free' ? '' : tierId,
   });
 }
 
-function openWebsite() {
-  chrome.tabs.create({ url: WEBSITE });
-}
+document.querySelectorAll('.model-card').forEach(card => {
+  card.addEventListener('click', () => selectTier(card.dataset.tier, true));
+});
 
-// ===== 充值按钮  直接跳转网站 =====
-topupBtn.addEventListener('click', () => {
-  chrome.storage.local.get(['authToken'], (stored) => {
-    const url = stored.authToken
-      ? WEBSITE + '?token=' + stored.authToken
-      : WEBSITE;
-    chrome.tabs.create({ url });
+openLoginBtn.addEventListener('click', () => {
+  openLoginBtn.disabled = true;
+  openLoginBtn.textContent = 'Opening...';
+  chrome.runtime.sendMessage({ action: 'openLoginPage', url: LOGIN_URL }, () => {
+    void chrome.runtime.lastError;
+    openLoginBtn.disabled = false;
+    openLoginBtn.textContent = 'Sign In / Create Account';
   });
 });
 
-// ===== 余额显示 =====
-function setFreeMode() {
-  updateModelRateHint('free-translation');
-  balanceText.textContent = '免费通道·无需登录';
-  balanceText.style.color = '#10b981';
-  topupBtn.textContent = '充値升级';
-}
-
-function updateBalanceUI(credits) {
-  const model = managedModelSel.value;
-  if (model === 'free-translation') { setFreeMode(); return; }
-  topupBtn.textContent = '充値';
-  const rate = MODEL_RATES[model];
-  if (credits <= 0) {
-    balanceText.textContent = '余额：已用尽';
-    balanceText.style.color = '#ef4444';
+function displayBalance(value) {
+  if (value === undefined || value === null || !Number.isFinite(Number(value))) {
+    balanceDisplay.innerHTML = '<span class="balance-loading">Loading...</span>';
     return;
   }
-  // 显示人民币余额（1积分 = ¥0.001，与模型无关）
-  const yuan = (credits * 0.001).toFixed(4);
-  balanceText.textContent = `余额：¥${yuan}`;
-  balanceText.style.color = '#10b981';
+  const credits = Math.max(0, Math.floor(Number(value)));
+  balanceDisplay.textContent = `${credits.toLocaleString()} Credits`;
+  balanceDisplay.style.color = credits > 0 ? '#059669' : '#ef4444';
 }
 
-function loadBalance() {
-  if (managedModelSel.value === 'free-translation') { setFreeMode(); return; }
-  topupBtn.textContent = '充値';
-  balanceText.textContent = '余额：加载中';
-  balanceText.style.color = '#9ca3af';
-  chrome.runtime.sendMessage({ action: 'getBalance' }, (res) => {
-    if (res && res.ok) {
-      updateBalanceUI(res.credits);
-    } else if (res && res.loggedOut) {
-      balanceText.textContent = '余额：未登录';
-      balanceText.style.color = '#9ca3af';
+function refreshBalance() {
+  balanceDisplay.innerHTML = '<span style="font-size:12px;color:#94a3b8;">Refreshing...</span>';
+  chrome.runtime.sendMessage({ action: 'refreshUserInfo' }, (resp) => {
+    void chrome.runtime.lastError;
+    if (resp?.ok) {
+      displayBalance(resp.credits);
+    } else if (resp?.reason === 'unauthorized' || resp?.reason === 'logged_out') {
+      showNotLoggedIn();
+    } else if (resp?.reason === 'insufficient_credits') {
+      displayBalance(0);
     } else {
-      balanceText.textContent = '余额：获取失败';
-      balanceText.style.color = '#9ca3af';
+      balanceDisplay.innerHTML = '<span style="color:#ef4444;font-size:12px;">Unable to refresh</span>';
     }
   });
 }
 
-// ===== 核心模型切换 =====
-managedModelSel.addEventListener('change', () => {
-  const val = managedModelSel.value;
-  if (val === 'free-translation') {
-      chrome.storage.sync.set({ translationEngine: 'free' }, () => retranslateIfAuto());
-      setFreeMode();
-    } else {
-      chrome.storage.sync.set({ translationEngine: 'ai', aiMode: 'managed', managedModel: val }, () => retranslateIfAuto());
-      updateModelRateHint(val);
-      topupBtn.textContent = '充値';
-    chrome.storage.local.get(['cachedCredits'], (local) => {
-      if (local.cachedCredits !== undefined) updateBalanceUI(local.cachedCredits);
-      else loadBalance();
-    });
-  }
-});
+refreshBalanceBtn.addEventListener('click', refreshBalance);
 
-// ===== 语言选择 =====
-sourceLangSel.addEventListener('change', () => {
-  chrome.storage.sync.set({ sourceLang: sourceLangSel.value }, () => retranslateIfAuto());
-});
-targetLangSel.addEventListener('change', () => {
-  chrome.storage.sync.set({ targetLang: targetLangSel.value }, () => retranslateIfAuto());
-});
+logoutBtn.addEventListener('click', doLogout);
 
-// ===== 自动翻译开关 =====
-autoToggle.addEventListener('change', () => {
-  const newState = autoToggle.checked;
-  chrome.storage.sync.set({ autoTranslateEnabled: newState }, () => {
-    updateAutoTranslateUI(newState);
-    if (newState) sendToCurrentTab({ action: 'translate' });
-  });
-});
-
-// ===== 显示模式按钮 =====
-function setDisplayMode(mode) {
-  chrome.storage.sync.set({ displayMode: mode }, () => {
-    updateDisplayModeUI(mode);
-    sendToCurrentTab({ action: 'changeDisplayMode', mode });
+function doLogout() {
+  chrome.runtime.sendMessage({ action: 'doLogout' }, () => {
+    void chrome.runtime.lastError;
+    window.location.reload();
   });
 }
-modeOriginal.addEventListener('click',    () => setDisplayMode('original'));
-modeBilingual.addEventListener('click',   () => setDisplayMode('bilingual'));
+
+topupBtn.addEventListener('click', () => {
+  chrome.tabs.create({ url: RECHARGE_URL });
+});
+
+function showNotLoggedIn() {
+  notLoggedInPanel.style.display = '';
+  loggedInPanel.style.display = 'none';
+}
+
+function showLoggedInUI(email) {
+  notLoggedInPanel.style.display = 'none';
+  loggedInPanel.style.display = '';
+  emailDisplay.textContent = email;
+}
+
+sourceLangSel.addEventListener('change', () => {
+  const val = sourceLangSel.value;
+  chrome.storage.sync.set({ sourceLang: val }, retranslateIfAuto);
+  chrome.storage.local.set({ sourceLang: val });
+});
+
+targetLangSel.addEventListener('change', () => {
+  const val = targetLangSel.value;
+  chrome.storage.sync.set({ targetLang: val }, retranslateIfAuto);
+  chrome.storage.local.set({ targetLang: val });
+});
+
+autoToggle.addEventListener('change', () => {
+  const newState = autoToggle.checked;
+  chrome.storage.sync.set({ autoTranslateEnabled: newState });
+  chrome.storage.local.set({ autoTranslateEnabled: newState });
+  updateAutoTranslateUI(newState);
+  if (newState) sendToCurrentTab({ action: 'translate' });
+});
+
+function setDisplayMode(mode) {
+  chrome.storage.sync.set({ displayMode: mode });
+  chrome.storage.local.set({ displayMode: mode });
+  updateDisplayModeUI(mode);
+  sendToCurrentTab({ action: 'changeDisplayMode', mode });
+}
+
+modeOriginal.addEventListener('click', () => setDisplayMode('original'));
+modeBilingual.addEventListener('click', () => setDisplayMode('bilingual'));
 modeTranslation.addEventListener('click', () => setDisplayMode('translationOnly'));
 
-// ===== 辅助 =====
 function retranslateIfAuto() {
-  chrome.storage.sync.get(['autoTranslateEnabled'], (result) => {
-    if (result.autoTranslateEnabled) sendToCurrentTab({ action: 'translate' });
+  chrome.storage.sync.get(['autoTranslateEnabled'], (r) => {
+    if (r.autoTranslateEnabled) sendToCurrentTab({ action: 'translate' });
   });
 }
 
 function sendToCurrentTab(msg) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) return;
-    chrome.tabs.sendMessage(tabs[0].id, msg, () => { chrome.runtime.lastError; });
+    chrome.tabs.sendMessage(tabs[0].id, msg, () => { void chrome.runtime.lastError; });
   });
 }
 
 function setSelectValue(sel, value) {
-  const option = sel.querySelector(`option[value="${value}"]`);
-  if (option) sel.value = value;
+  if (sel.querySelector(`option[value="${value}"]`)) sel.value = value;
 }
 
 function updateAutoTranslateUI(enabled) {
@@ -286,7 +279,14 @@ function updateAutoTranslateUI(enabled) {
 
 function updateDisplayModeUI(mode) {
   [modeOriginal, modeBilingual, modeTranslation].forEach(b => b.classList.remove('active'));
-  if (mode === 'original')         modeOriginal.classList.add('active');
+  if (mode === 'original') modeOriginal.classList.add('active');
   else if (mode === 'translationOnly') modeTranslation.classList.add('active');
-  else                             modeBilingual.classList.add('active');
+  else modeBilingual.classList.add('active');
+}
+
+if (ballToggle) {
+  ballToggle.addEventListener('change', () => {
+    const hidden = !ballToggle.checked;
+    chrome.storage.local.set({ ballHidden: hidden });
+  });
 }

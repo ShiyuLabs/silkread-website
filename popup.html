@@ -1,262 +1,497 @@
-﻿<!DOCTYPE html>
-<html lang="zh">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <style>
     body {
-      width: 290px;
+      width: 310px;
       padding: 13px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      background: linear-gradient(160deg, #f5f3ff 0%, #eff6ff 60%, #f0fdf4 100%);
+      background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 56%, #ecfdf5 100%);
+      color: #111827;
     }
     h3 {
-      margin: 0 0 12px 0; font-size: 15px; font-weight: 800; text-align: center;
-      background: linear-gradient(90deg, #4f46e5, #7c3aed);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 800;
+      text-align: center;
+      background: linear-gradient(90deg, #4338ca, #0891b2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     .section { margin-bottom: 12px; }
-    .section-label { font-size: 11px; color: #6d28d9; margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+    .section-label {
+      font-size: 11px;
+      color: #475569;
+      margin-bottom: 6px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
     button {
-      width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;
-      font-size: 13px; cursor: pointer; transition: all 0.2s; font-weight: 600;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 700;
+      font-family: inherit;
     }
-    button:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-    .btn-primary {
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
-      color: white; border: none;
-      box-shadow: 0 2px 8px rgba(79,70,229,0.3);
-    }
-    .btn-primary.active {
-      background: linear-gradient(135deg, #10b981, #059669);
-      border: none;
-      box-shadow: 0 2px 8px rgba(16,185,129,0.3);
-    }
-    .btn-secondary {
-      background: linear-gradient(135deg, #eff6ff, #f5f3ff);
-      color: #3730a3; border-color: #a5b4fc;
-    }
-    .btn-secondary.active { background: linear-gradient(135deg, #dbeafe, #ede9fe); color: #1e40af; border-color: #818cf8; }
-    .mode-group { display: flex; gap: 6px; }
-    .mode-group button { flex: 1; padding: 8px 4px; font-size: 12px; border-radius: 8px; background: #f5f3ff; color: #6d28d9; border: 1.5px solid #c4b5fd; font-weight: 600; }
-    .mode-group button.active { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; border-color: #4f46e5; box-shadow: 0 2px 6px rgba(79,70,229,0.25); }
-    .status-item { display: flex; align-items: center; font-size: 12px; color: #666; margin-top: 8px; justify-content: center; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; margin-right: 6px; transition: background 0.3s; }
-    .status-dot.active { background: #10b981; box-shadow: 0 0 4px #10b981; }
-    .lang-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
-    .lang-row label { font-size: 12px; color: #6d28d9; white-space: nowrap; width: 32px; flex-shrink: 0; font-weight: 600; }
-    select {
-      flex: 1; min-width: 0; max-width: 100%; padding: 7px 8px; border: 1px solid #c4b5fd; border-radius: 8px;
-      font-size: 12px; background: #fff; cursor: pointer; color: #333; transition: border-color 0.2s;
-    }
-    select:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,0.12); }
-    .arrow { font-size: 14px; color: #9ca3af; font-weight: bold; }
-    
-    .sub-panel {
-      background: linear-gradient(135deg, #faf5ff 0%, #eff6ff 100%);
-      border: 1px solid #c4b5fd; border-radius: 10px;
-      padding: 12px 11px; margin-top: 4px;
-      box-shadow: 0 2px 8px rgba(109,40,217,0.06);
-    }
-    
-    .tip { margin-top: 10px; font-size: 11px; color: #6b7280; border-top: 1px solid #e0e7ff; padding-top: 10px; line-height: 1.7; }
-    
-    /* 余额行 */
-    .balance-row { 
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 10px;
-      margin-top: 10px; padding-top: 10px; border-top: 1px dashed #c4b5fd; 
-    }
-    .balance-text { font-size: 12px; color: #374151; font-weight: 700; white-space: nowrap; flex: 1; min-width: 0; }
+    button:hover { box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08); }
 
-    /* 拨动开关 */
-    .toggle-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 7px 13px;
-      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-      border: 1px solid #6ee7b7; border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(16,185,129,0.08);
+    .model-cards { display: flex; flex-direction: column; gap: 6px; }
+    .model-card {
+      display: flex;
+      align-items: center;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 2px solid #e5e7eb;
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.18s;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+      position: relative;
+      user-select: none;
     }
-    .toggle-label { font-size: 13px; font-weight: 700; color: #065f46; }
-    .toggle-switch { position: relative; display: inline-block; width: 46px; height: 26px; cursor: pointer; flex-shrink: 0; }
-    .toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute; inset: 0; background: #d1d5db; border-radius: 26px; transition: background 0.28s;
+    .model-card:hover {
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.1);
+      border-color: #a5b4fc;
+      transform: translateY(-1px);
     }
-    .toggle-slider::before {
-      content: ''; position: absolute; width: 20px; height: 20px;
-      left: 3px; top: 3px; background: #fff; border-radius: 50%;
-      transition: transform 0.28s; box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+    .model-card.active {
+      border-color: var(--tc);
+      background: var(--tbg);
+      box-shadow: 0 3px 12px rgba(15, 23, 42, 0.1);
     }
-    .toggle-switch input:checked + .toggle-slider { background: #10b981; }
-    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .model-card.active::after {
+      content: '✓';
+      position: absolute;
+      top: 7px;
+      right: 10px;
+      font-size: 11px;
+      font-weight: 900;
+      color: var(--tc);
+    }
+    .tier-icon {
+      font-size: 18px;
+      width: 26px;
+      flex-shrink: 0;
+      text-align: center;
+      line-height: 1;
+    }
+    .card-info {
+      flex: 1;
+      min-width: 0;
+      margin: 0 8px 0 6px;
+    }
+    .card-name {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #111827;
+      line-height: 1.3;
+    }
+    .card-tagline {
+      font-size: 10.5px;
+      color: #64748b;
+      line-height: 1.35;
+      margin-top: 1px;
+    }
+    .card-price {
+      width: 68px;
+      font-size: 11px;
+      font-weight: 900;
+      color: var(--tc);
+      text-align: right;
+      white-space: normal;
+      flex-shrink: 0;
+      background: var(--tpbg);
+      padding: 4px 7px;
+      border-radius: 6px;
+      border: 1.5px solid var(--tpbd);
+      line-height: 1.2;
+    }
+    .card-price small {
+      display: block;
+      font-size: 8.5px;
+      font-weight: 600;
+      opacity: 0.8;
+      margin-top: 1px;
+    }
+    details.expert-settings {
+      margin-top: 7px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      overflow: hidden;
+    }
+    details.expert-settings summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #475569;
+    }
+    details.expert-settings summary::-webkit-details-marker { display: none; }
+    details.expert-settings summary::after {
+      content: 'Advanced';
+      float: right;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    details.expert-settings[open] summary::after { content: 'Hide'; }
+    .expert-body {
+      padding: 0 8px 8px;
+    }
+
+    .account-panel {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      padding: 11px 12px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+    .login-prompt-wrap { text-align: center; }
+    .login-prompt-icon { font-size: 26px; margin-bottom: 4px; }
+    .login-prompt-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+      margin-bottom: 3px;
+    }
+    .login-prompt-sub {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .btn-open-login,
     .btn-topup {
-      padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; flex-shrink: 0; width: auto;
-      cursor: pointer; border: none;
-      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-      color: white; transition: all 0.2s;
-      box-shadow: 0 2px 6px rgba(124,58,237,0.35);
+      border: none;
+      background: linear-gradient(135deg, #4338ca, #0891b2);
+      color: white;
+      box-shadow: 0 2px 8px rgba(67, 56, 202, 0.24);
     }
-    .btn-topup:hover { background: linear-gradient(135deg, #7c3aed, #6d28d9); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(109,40,217,0.4); }
-    .btn-topup:active { transform: translateY(0); }
+    .btn-open-login:hover,
+    .btn-topup:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(67, 56, 202, 0.32);
+    }
+    .user-info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .user-tag {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #4338ca;
+    }
+    #emailDisplay {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .refresh-link {
+      font-size: 10px;
+      color: #64748b;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .balance-display-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 9px;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #e0e7ff;
+      margin-bottom: 8px;
+    }
+    .balance-label {
+      font-size: 12px;
+      color: #334155;
+      font-weight: 700;
+    }
+    .balance-value {
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 900;
+      color: #059669;
+      text-align: right;
+      word-break: break-word;
+    }
+    .balance-loading { font-size: 12px; color: #94a3b8; }
+    .account-btn-row { display: flex; gap: 7px; }
+    .btn-topup,
+    .btn-logout {
+      flex: 1;
+      padding: 7px;
+      border-radius: 7px;
+      font-size: 12px;
+      width: auto;
+    }
+    .btn-logout {
+      border: 1.5px solid #e5e7eb;
+      background: #fff;
+      color: #64748b;
+    }
+    .btn-logout:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+      background: #fef2f2;
+      box-shadow: none;
+    }
 
-    /* 账户状态行 */
-    .account-row {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-top: 5px; font-size: 11px;
+    .lang-row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+    .lang-row label {
+      font-size: 12px;
+      color: #475569;
+      white-space: nowrap;
+      width: 36px;
+      flex-shrink: 0;
+      font-weight: 700;
     }
-    .account-email {
-      color: #6b7280; font-weight: 500;
-      text-overflow: ellipsis; overflow: hidden; max-width: 175px; white-space: nowrap;
-    }
-    .model-rate-hint { font-size: 11px; color: #9ca3af; text-align: right; margin-top: 3px; margin-bottom: 2px; letter-spacing: 0.2px; }
-    .btn-sm-link {
-      font-size: 11px; background: none; border: none; cursor: pointer; padding: 0;
-      width: auto; color: #7c3aed; text-decoration: underline; font-weight: 600;
-      box-shadow: none; transition: color 0.2s;
-    }
-    .btn-sm-link:hover { color: #5b21b6; box-shadow: none; transform: none; }
-
-    /* 登录验证框 */
-    .login-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(2px); z-index: 200; align-items: center; justify-content: center;
-    }
-    .login-overlay.open { display: flex; animation: fadeIn 0.2s ease-out; }
-    .login-box {
-      background: #fff; border-radius: 16px; padding: 22px 18px 16px; width: 258px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-      animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    .login-box h4 { margin: 0 0 4px; font-size: 15px; color: #111; font-weight: 800; }
-    .login-box > p { margin: 0 0 14px; font-size: 12px; color: #6b7280; }
-    .login-input {
-      width: 100%; box-sizing: border-box; padding: 10px 12px;
-      border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 13px;
-      color: #111; outline: none; margin-bottom: 10px; font-family: inherit;
+    select {
+      flex: 1;
+      min-width: 0;
+      max-width: 100%;
+      padding: 7px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 12px;
+      background: #fff;
+      cursor: pointer;
+      color: #1f2937;
       transition: border-color 0.2s;
     }
-    .login-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.1); }
-    .login-input::placeholder { color: #9ca3af; }
-    .login-btn-confirm {
-      width: 100%; padding: 10px; background: #4f46e5; color: white;
-      border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
-      cursor: pointer; transition: background 0.2s; margin-bottom: 8px;
+    select:focus {
+      outline: none;
+      border-color: #4338ca;
+      box-shadow: 0 0 0 2px rgba(67, 56, 202, 0.12);
     }
-    .login-btn-confirm:hover:not(:disabled) { background: #4338ca; }
-    .login-btn-confirm:disabled { background: #a5b4fc; cursor: not-allowed; }
-    .login-status { font-size: 12px; min-height: 18px; margin-bottom: 6px; font-weight: 500; text-align: center; }
-    .login-footer { display: flex; justify-content: space-between; align-items: center; }
-    
-    /* 充值套餐卡片 */
-    .pkg-row { display: flex; gap: 8px; margin: 12px 0 10px; }
-    .pkg-card {
-      flex: 1; padding: 10px 4px; border: 2px solid #f3f4f6; border-radius: 10px;
-      text-align: center; cursor: pointer; transition: all 0.2s; background: #fff;
+    .arrow {
+      font-size: 14px;
+      color: #94a3b8;
+      font-weight: 800;
     }
-    .pkg-card:hover { border-color: #8b5cf6; }
-    .pkg-card.selected { border-color: #8b5cf6; background: #f5f3ff; }
-    .pkg-card .pkg-price { font-size: 16px; font-weight: 800; color: #7c3aed; }
-    .pkg-card .pkg-qty   { font-size: 11px; color: #6b7280; margin-top: 4px; font-weight: 500;}
-    .pkg-card .pkg-tag   { font-size: 9px; background: #ef4444; color: #fff; border-radius: 4px; padding: 2px 6px; margin-top: 4px; display: inline-block; font-weight: 600; letter-spacing: 0.5px;}
-    
-    /* 充值模态框 */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
-      z-index: 100; align-items: center; justify-content: center;
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 13px;
+      background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+      border: 1px solid #99f6e4;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(20, 184, 166, 0.08);
     }
-    .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    
-    .modal-box {
-      background: #fff; border-radius: 16px; padding: 20px 18px 16px;
-      width: 258px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-      transform: scale(1); animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    .toggle-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f766e;
     }
-    @keyframes popUp { from { transform: scale(0.95); } to { transform: scale(1); } }
-    
-    .modal-box h4 { margin: 0 0 6px; font-size: 15px; color: #111; font-weight: 800; }
-    .modal-price { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
-    .modal-btn-row { display: flex; gap: 10px; margin-top: 12px; }
-    .modal-btn {
-      flex: 1; padding: 10px; border-radius: 8px; font-size: 13px;
-      font-weight: 700; cursor: pointer; border: none; transition: all 0.2s;
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 26px;
+      cursor: pointer;
+      flex-shrink: 0;
     }
-    .modal-btn.cancel  { background: #f3f4f6; color: #4b5563; }
-    .modal-btn.cancel:hover { background: #e5e7eb; color: #111; }
-    .modal-btn.confirm { background: #4f46e5; color: white; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3); }
-    .modal-btn.confirm:hover { background: #4338ca; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.4); }
+    .toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #d1d5db;
+      border-radius: 26px;
+      transition: background 0.28s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.28s;
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #0d9488; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .toggle-switch input:checked + .ball-slider { background: linear-gradient(135deg, #4338ca, #0891b2); }
+
+    .mode-group { display: flex; gap: 6px; }
+    .mode-group button {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #475569;
+      border: 1.5px solid #cbd5e1;
+    }
+    .mode-group button.active {
+      background: linear-gradient(135deg, #4338ca, #0891b2);
+      color: #fff;
+      border-color: #4338ca;
+      box-shadow: 0 2px 6px rgba(67, 56, 202, 0.25);
+    }
+    .tip {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
-  <h3>✦ 诗语翻译 AI 助手</h3>
+  <h3>SilkRead AI Translator</h3>
 
-  <!-- 核心翻译引擎 -->
   <div class="section">
-    <div class="section-label">翻译模型与计费</div>
-    <div class="sub-panel">
-      <div class="lang-row">
-        <label>模型</label>
-        <select id="managedModel">
-          <option value="free-translation">🆓 免费翻译（谷歌通道）</option>
-          <option value="deepseek-v3.2">⚡ DeepSeek V3.2（¥0.008/1K Token）</option>
-          <option value="qwen3-235b-a22b">🌟 Qwen3-235B（¥0.018/1K Token）</option>
-          <option value="gemini-2.5-flash-nothinking">🎯 Gemini 2.5 Flash（¥0.025/1K Token）</option>
-          <option value="claude-sonnet-4-6">👑 Claude Sonnet 4.6（¥0.25/1K Token）</option>
-        </select>
+    <div class="section-label">Translation Model</div>
+    <div class="model-cards" id="modelCards">
+      <div class="model-card" data-tier="free"
+           style="--tc:#059669;--tbg:#ecfdf5;--tpbg:#d1fae5;--tpbd:#6ee7b7;">
+        <div class="tier-icon">B</div>
+        <div class="card-info">
+          <div class="card-name">Browser Basic (Free)</div>
+          <div class="card-tagline">Built-in browser translation fallback</div>
+        </div>
+        <div class="card-price">Free<small>No Credits used</small></div>
       </div>
-      <div class="model-rate-hint" id="modelRateHint">谷歌通道 · 完全免费</div>
-      <div class="balance-row" id="balanceRow">
-        <span class="balance-text" id="balanceText">余额：加载中</span>
-        <button class="btn-topup" id="topupBtn">充值</button>
-      </div>      <div class="account-row">
-        <span class="account-email" id="accountEmail">未登录</span>
-        <button class="btn-sm-link" id="accountActionBtn">登录</button>
-      </div>    </div>
+
+      <div class="model-card" data-tier="economy"
+           style="--tc:#2563eb;--tbg:#eff6ff;--tpbg:#dbeafe;--tpbd:#93c5fd;">
+        <div class="tier-icon">E</div>
+        <div class="card-info">
+          <div class="card-name">Economy</div>
+          <div class="card-tagline">Qwen3.7 Flash</div>
+        </div>
+        <div class="card-price">~25<small>Credits / 1K source tokens</small></div>
+      </div>
+
+      <div class="model-card" data-tier="smart"
+           style="--tc:#0891b2;--tbg:#ecfeff;--tpbg:#cffafe;--tpbd:#67e8f9;">
+        <div class="tier-icon">S</div>
+        <div class="card-info">
+          <div class="card-name">Smart ★ Recommended</div>
+          <div class="card-tagline">GPT-5.6 Luna</div>
+        </div>
+        <div class="card-price">~70<small>Credits / 1K source tokens</small></div>
+      </div>
+
+      <div class="model-card" data-tier="natural"
+           style="--tc:#7c3aed;--tbg:#f5f3ff;--tpbg:#ede9fe;--tpbd:#c4b5fd;">
+        <div class="tier-icon">N</div>
+        <div class="card-info">
+          <div class="card-name">Natural</div>
+          <div class="card-tagline">Claude Haiku 4.5</div>
+        </div>
+        <div class="card-price">~300<small>Credits / 1K source tokens</small></div>
+      </div>
+    </div>
+
+    <details class="expert-settings">
+      <summary>Expert Settings</summary>
+      <div class="expert-body">
+        <div class="model-card" data-tier="expert"
+             style="--tc:#be123c;--tbg:#fff1f2;--tpbg:#ffe4e6;--tpbd:#fda4af;">
+          <div class="tier-icon">X</div>
+          <div class="card-info">
+            <div class="card-name">Expert</div>
+            <div class="card-tagline">Claude Sonnet 5</div>
+          </div>
+          <div class="card-price">~600<small>Credits / 1K source tokens</small></div>
+        </div>
+      </div>
+    </details>
   </div>
 
-  <!-- 语言方向 -->
   <div class="section">
-    <div class="section-label">翻译方向</div>
+    <div class="section-label">Account</div>
+    <div class="account-panel">
+      <div id="notLoggedInPanel" class="login-prompt-wrap">
+        <div class="login-prompt-icon">S</div>
+        <div class="login-prompt-title">Sign in to use AI translation</div>
+        <div class="login-prompt-sub">Credits are billed through your SilkRead account.</div>
+        <button class="btn-open-login" id="openLoginBtn">Sign In / Create Account</button>
+      </div>
+
+      <div id="loggedInPanel" style="display:none;">
+        <div class="user-info-row">
+          <div class="user-tag">
+            <span>Account</span>
+            <span id="emailDisplay">User</span>
+          </div>
+          <span class="refresh-link" id="refreshBalanceBtn" title="Refresh credits balance">Refresh</span>
+        </div>
+        <div class="balance-display-row">
+          <span class="balance-label">Credits Balance</span>
+          <span class="balance-value" id="balanceDisplay"><span class="balance-loading">Loading...</span></span>
+        </div>
+        <div class="account-btn-row">
+          <button class="btn-topup" id="topupBtn">Buy Credits</button>
+          <button class="btn-logout" id="logoutBtn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Translation Direction</div>
     <div class="lang-row">
-      <label>从</label>
+      <label>From</label>
       <select id="sourceLang">
-        <option value="auto">自动检测</option>
-        <option value="en">英语</option>
-        <option value="zh-CN">中文（简体）</option>
-        <option value="zh-TW">中文（繁体）</option>
-        <option value="ja">日语</option>
-        <option value="ko">韩语</option>
-        <option value="fr">法语</option>
-        <option value="de">德语</option>
-        <option value="es">西班牙语</option>
-        <option value="pt">葡萄牙语</option>
-        <option value="ru">俄语</option>
-        <option value="ar">阿拉伯语</option>
-        <option value="it">意大利语</option>
+        <option value="auto">Detect language</option>
+        <option value="en">English</option>
+        <option value="zh-CN">Chinese (Simplified)</option>
+        <option value="zh-TW">Chinese (Traditional)</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="es">Spanish</option>
+        <option value="pt">Portuguese</option>
+        <option value="ru">Russian</option>
+        <option value="ar">Arabic</option>
+        <option value="it">Italian</option>
       </select>
-      <span class="arrow"></span>
+      <span class="arrow">→</span>
       <select id="targetLang">
-        <option value="zh-CN">中文（简体）</option>
-        <option value="zh-TW">中文（繁体）</option>
-        <option value="en">英语</option>
-        <option value="ja">日语</option>
-        <option value="ko">韩语</option>
-        <option value="fr">法语</option>
-        <option value="de">德语</option>
-        <option value="es">西班牙语</option>
-        <option value="pt">葡萄牙语</option>
-        <option value="ru">俄语</option>
-        <option value="ar">阿拉伯语</option>
-        <option value="it">意大利语</option>
+        <option value="en">English</option>
+        <option value="zh-CN">Chinese (Simplified)</option>
+        <option value="zh-TW">Chinese (Traditional)</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="es">Spanish</option>
+        <option value="pt">Portuguese</option>
+        <option value="ru">Russian</option>
+        <option value="ar">Arabic</option>
+        <option value="it">Italian</option>
       </select>
     </div>
   </div>
 
-  <!-- 自动翻译 -->
   <div class="section">
     <div class="toggle-row">
-      <span class="toggle-label">自动翻译</span>
+      <span class="toggle-label">Auto Translate</span>
       <label class="toggle-switch">
         <input type="checkbox" id="autoToggle">
         <span class="toggle-slider"></span>
@@ -264,19 +499,32 @@
     </div>
   </div>
 
-  <!-- 显示模式 -->
   <div class="section">
-    <div class="section-label">显示模式</div>
+    <div class="section-label">Display Mode</div>
     <div class="mode-group">
-      <button id="modeOriginal">📝 原文</button>
-      <button id="modeBilingual" class="active">🔀 双语</button>
-      <button id="modeTranslation">✨ 译文</button>
+      <button id="modeOriginal">Original</button>
+      <button id="modeBilingual" class="active">Bilingual</button>
+      <button id="modeTranslation">Translation</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Floating Control</div>
+    <div class="toggle-row" style="background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border-color:#bfdbfe;">
+      <div>
+        <span class="toggle-label" style="color:#2563eb;">Page translation control</span>
+        <div style="font-size:10px;color:#64748b;margin-top:1px;">Bottom-right · draggable</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="ballToggle" checked>
+        <span class="toggle-slider ball-slider"></span>
+      </label>
     </div>
   </div>
 
   <div class="tip">
-    🆓 免费翻译：谷歌免费通道，无需登录<br>
-    ⚡🌟🎯👑 付费档：按实际 Token 消耗精准扣费，Token 永不过期，可跨月累计
+    Browser Basic is free and uses no Credits. AI translation uses prepaid Credits based on the selected model and source text length.<br>
+    Expert mode is tucked away to prevent accidental high-cost use.
   </div>
 
   <script src="popup.js"></script>

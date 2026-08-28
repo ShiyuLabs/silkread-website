@@ -515,43 +515,147 @@ async function performPaidTranslation(text, sourceLang, targetLang, plain = fals
   }
   throw lastError || new Error('Translation failed after retries.');
 }
-function toFreeLangCode(lang) {
+// ==========================================
+// Free translation: Google public endpoint.
+// All requests are issued here in the service worker so Chrome and Edge use
+// the same CORS-safe path and no SilkRead credentials or Credits are involved.
+// ==========================================
+const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single';
+const GOOGLE_FREE_MAX_CONCURRENT = 3;
+const GOOGLE_FREE_MAX_RETRIES = 3;
+const googleFreeQueue = [];
+let googleFreeActive = 0;
+const googleFreeInFlight = new Map();
+const googleFreeCache = new Map();
+
+function toGoogleLangCode(lang) {
   const map = {
-    'zh-CN': 'zh-Hans', 'zh-TW': 'zh-Hant', 'zh': 'zh-Hans',
+    'zh-CN': 'zh-CN', 'zh-TW': 'zh-TW', 'zh': 'zh-CN',
     'en': 'en', 'ja': 'ja', 'ko': 'ko', 'fr': 'fr', 'de': 'de',
     'es': 'es', 'pt': 'pt', 'ru': 'ru', 'ar': 'ar', 'it': 'it',
   };
-  return map[lang] || lang;
+  return map[lang] || lang || 'auto';
+}
+
+function googleFreeKey(text, targetLang) {
+  return `${targetLang || 'zh-CN'}\u0000${text}`;
+}
+
+function parseRetryAfterMs(value) {
+  if (!value) return 0;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : 0;
+}
+
+function isGoogleRetryableError(error) {
+  const status = Number(error?.status || 0);
+  if (status === 429 || status >= 500) return true;
+  return /failed to fetch|networkerror|load failed|timed out|timeout/i.test(String(error?.message || error));
+}
+
+async function fetchGoogleTranslation(text, sourceLang, targetLang) {
+  const params = new URLSearchParams({
+    client: 'gtx',
+    sl: toGoogleLangCode(sourceLang),
+    tl: toGoogleLangCode(targetLang),
+    dt: 't',
+    q: text,
+  });
+  const response = await fetch(`${GOOGLE_FREE_ENDPOINT}?${params.toString()}`);
+  if (!response.ok) {
+    const error = new Error(`Google free translation failed status=${response.status}`);
+    error.status = response.status;
+    error.retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'));
+    throw error;
+  }
+  const data = await response.json();
+  const translated = Array.isArray(data?.[0])
+    ? data[0].map(segment => segment?.[0] || '').join('')
+    : '';
+  if (!translated) {
+    const error = new Error('Google free translation returned an empty result');
+    error.status = response.status;
+    throw error;
+  }
+  return translated;
+}
+
+async function translateGoogleWithRetry(text, sourceLang, targetLang) {
+  for (let attempt = 0; attempt <= GOOGLE_FREE_MAX_RETRIES; attempt += 1) {
+    try {
+      return await fetchGoogleTranslation(text, sourceLang, targetLang);
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      console.warn(`[SilkRead] Google free translation failed status=${status || 'network'}`);
+      if (attempt >= GOOGLE_FREE_MAX_RETRIES || !isGoogleRetryableError(error)) {
+        console.warn('[SilkRead] Google free translation unavailable');
+        return '';
+      }
+      const delay = error?.retryAfterMs || (1000 * (2 ** attempt));
+      console.warn(`[SilkRead] Google free translation retry attempt=${attempt + 1}`);
+      await sleep(delay);
+    }
+  }
+  return '';
+}
+
+function drainGoogleFreeQueue() {
+  while (googleFreeActive < GOOGLE_FREE_MAX_CONCURRENT && googleFreeQueue.length > 0) {
+    const job = googleFreeQueue.shift();
+    googleFreeActive += 1;
+    translateGoogleWithRetry(job.text, job.sourceLang, job.targetLang)
+      .then(result => {
+        if (result) googleFreeCache.set(job.key, result);
+        job.resolve(result);
+      })
+      .catch(() => job.resolve(''))
+      .finally(() => {
+        googleFreeActive -= 1;
+        googleFreeInFlight.delete(job.key);
+        drainGoogleFreeQueue();
+      });
+  }
+}
+
+function enqueueGoogleFreeTranslation(text, sourceLang, targetLang) {
+  const key = googleFreeKey(text, targetLang);
+  if (googleFreeCache.has(key)) return Promise.resolve(googleFreeCache.get(key));
+  const pending = googleFreeInFlight.get(key);
+  if (pending) return pending;
+  const promise = new Promise(resolve => {
+    googleFreeQueue.push({ key, text, sourceLang, targetLang, resolve });
+    drainGoogleFreeQueue();
+  });
+  googleFreeInFlight.set(key, promise);
+  return promise;
 }
 
 async function handleFreeTranslation(text, sourceLang, targetLang) {
-  const results = await translateWithEdge([text], targetLang);
-  return results[0] || '';
+  return enqueueGoogleFreeTranslation(String(text || ''), sourceLang, targetLang);
 }
 
 async function handleFreeTranslationArray(texts, sourceLang, targetLang) {
   const list = Array.isArray(texts) ? texts : [];
-  if (!list.length) return [];
-  try {
-    return await translateWithEdge(list, targetLang);
-  } catch (batchErr) {
-    const results = new Array(list.length).fill('');
-    let index = 0;
-    const workers = Array.from({ length: Math.min(3, list.length) }, async () => {
-      while (index < list.length) {
-        const i = index++;
-        try {
-          const single = await translateWithEdge([list[i]], targetLang);
-          results[i] = single[0] || '';
-        } catch (_) {
-          results[i] = '';
-        }
-      }
-    });
-    await Promise.all(workers);
-    if (results.some(Boolean)) return results;
-    throw batchErr;
+  const results = new Array(list.length).fill('');
+  const seen = new Map();
+  const promises = new Array(list.length);
+  for (let i = 0; i < list.length; i += 1) {
+    const text = String(list[i] || '');
+    const key = googleFreeKey(text, targetLang);
+    let resultPromise = seen.get(key);
+    if (!resultPromise) {
+      resultPromise = enqueueGoogleFreeTranslation(text, sourceLang, targetLang);
+      seen.set(key, resultPromise);
+    }
+    promises[i] = resultPromise;
   }
+  const settled = await Promise.allSettled(promises);
+  settled.forEach((entry, index) => {
+    results[index] = entry.status === 'fulfilled' ? (entry.value || '') : '';
+  });
+  return results;
 }
 const ACTION_ICON_PATHS = {
   16: 'icon16.png',
@@ -574,54 +678,10 @@ chrome.runtime.onInstalled.addListener(scheduleToolbarIcons);
 chrome.runtime.onStartup.addListener(scheduleToolbarIcons);
 scheduleToolbarIcons();
 
-// ==========================================
-// ==========================================
-let edgeToken = null;
-let edgeTokenExpiry = 0;
-async function getEdgeToken(forceRefresh = false) {
-  if (!forceRefresh && edgeToken && Date.now() < edgeTokenExpiry) {
-    return edgeToken;
-  }
-  try {
-    const response = await fetch('https://edge.microsoft.com/translate/auth');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    edgeToken = await response.text();
-    edgeTokenExpiry = Date.now() + 9 * 60 * 1000;
-    return edgeToken;
-  } catch (e) {
-    throw new Error('Failed to get the Microsoft translation token.');
-  }
-}
-
-async function translateWithEdge(texts, targetLang, didRefresh = false) {
-  const token = await getEdgeToken(didRefresh);
-  const toLang = toFreeLangCode(targetLang);
-  const body = texts.map(t => ({ Text: t }));
-
-  const response = await fetch(`https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=${toLang}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (response.status === 401 && !didRefresh) {
-    edgeToken = null;
-    edgeTokenExpiry = 0;
-    return translateWithEdge(texts, targetLang, true);
-  }
-  if (!response.ok) throw new Error(`Microsoft Translator error: HTTP ${response.status}`);
-
-  const data = await response.json();
-  return data.map(item => item.translations?.[0]?.text || '');
-}
-
 chrome.runtime.onConnect.addListener(port => {
   if (port.name === 'translation') {
     port.onMessage.addListener(async (msg) => {
-      if (msg.action === 'fetchEdgeTranslation') {
+      if (msg.action === 'fetchGoogleTranslation') {
         try {
           const results = await handleFreeTranslationArray(msg.texts, _cachedSettings.sourceLang || 'auto', msg.tl || _cachedSettings.targetLang || 'en');
           port.postMessage({ success: true, data: results });
